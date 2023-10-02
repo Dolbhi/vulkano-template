@@ -15,11 +15,11 @@ use vulkano::swapchain::{
 use vulkano::sync::future::{FenceSignalFuture, JoinFuture, NowFuture};
 use vulkano::sync::{self, FlushError, GpuFuture};
 use vulkano_template::game_objects::Square;
-use vulkano_template::models::SquareModel;
+use vulkano_template::models::{Mesh, Model, SquareModel};
 use vulkano_template::shaders::movable_square;
+use vulkano_template::vulkano_objects;
 use vulkano_template::vulkano_objects::allocators::Allocators;
 use vulkano_template::vulkano_objects::buffers::Buffers;
-use vulkano_template::{vulkano_objects, VertexFull};
 use vulkano_win::VkSurfaceBuild;
 use winit::dpi::LogicalSize;
 use winit::event_loop::EventLoop;
@@ -39,7 +39,7 @@ pub struct Renderer {
     render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>,
     allocators: Allocators,
-    buffers: Buffers<VertexFull, movable_square::vs::Data>,
+    buffers: Buffers<movable_square::vs::Data>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
     viewport: Viewport,
@@ -124,11 +124,16 @@ impl Renderer {
 
         let allocators = Allocators::new(device.clone());
 
-        let buffers = Buffers::initialize_device_local::<SquareModel>(
+        let mesh = Mesh::from_model::<movable_square::vs::Data, SquareModel>();
+        let initial_uniform = SquareModel::get_initial_uniform_data();
+
+        let buffers = Buffers::initialize_device_local(
             &allocators,
             pipeline.layout().set_layouts().get(0).unwrap().clone(),
             images.len(),
             queue.clone(),
+            mesh,
+            initial_uniform,
         );
 
         let command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers(

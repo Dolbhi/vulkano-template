@@ -26,7 +26,7 @@ pub struct Buffers<U: BufferContents> {
     pub uniforms: Vec<Uniform<U>>,
 }
 
-impl<U: BufferContents> Buffers<U> {
+impl<U: BufferContents + Clone> Buffers<U> {
     /// Creates simple vertex, index and uniform buffers of specified model
     // pub fn initialize_host_accessible<M: Model<V, U>>(
     //     allocators: &Allocators,
@@ -233,7 +233,7 @@ fn create_device_local_index(
 }
 
 /// returns uniform buffers with corresponding descriptor sets for interfacing
-fn create_cpu_accessible_uniforms<U: BufferContents>(
+fn create_cpu_accessible_uniforms<U: BufferContents + Clone>(
     allocators: &Allocators,
     descriptor_set_layout: Arc<DescriptorSetLayout>,
     buffer_count: usize,
@@ -251,7 +251,7 @@ fn create_cpu_accessible_uniforms<U: BufferContents>(
                     usage: MemoryUsage::Upload,
                     ..Default::default()
                 },
-                initial_uniform,
+                initial_uniform.clone(),
             )
             .unwrap();
 

@@ -52,12 +52,12 @@ pub fn create_only_vertex_command_buffers(
 }
 
 /// Creates a command buffer for each framebuffer with the given pipeline and corresponding vertex, index and uniform buffers
-pub fn create_simple_command_buffers<V: BufferContents, U: BufferContents>(
+pub fn create_simple_command_buffers<U: BufferContents + Clone>(
     allocators: &Allocators,
     queue: Arc<Queue>,
     pipeline: Arc<GraphicsPipeline>,
     framebuffers: &[Arc<Framebuffer>],
-    buffers: &Buffers<V, U>,
+    buffers: &Buffers<U>,
 ) -> Vec<Arc<PrimaryAutoCommandBuffer>> {
     framebuffers
         .iter()
@@ -102,12 +102,12 @@ pub fn create_simple_command_buffers<V: BufferContents, U: BufferContents>(
 }
 
 /// Creates a command buffer for each framebuffer with the given pipeline and corresponding vertex, index and uniform buffers
-pub fn create_simple_command_buffers_2<V: BufferContents, U: BufferContents>(
+pub fn create_simple_command_buffers_2<U: BufferContents + Clone>(
     allocators: &Allocators,
     queue: Arc<Queue>,
     pipeline: Arc<GraphicsPipeline>,
     framebuffers: &[Arc<Framebuffer>],
-    buffers: &Buffers<V, U>,
+    buffers: &Buffers<U>,
     bg_colour: [f32; 4],
 ) -> Vec<Arc<PrimaryAutoCommandBuffer>> {
     framebuffers
