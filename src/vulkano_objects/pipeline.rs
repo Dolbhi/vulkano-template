@@ -9,7 +9,7 @@ use vulkano::pipeline::GraphicsPipeline;
 use vulkano::render_pass::{RenderPass, Subpass};
 use vulkano::shader::ShaderModule;
 
-use crate::Vertex2d;
+use crate::VertexFull;
 
 pub fn create_pipeline(
     device: Arc<Device>,
@@ -21,7 +21,7 @@ pub fn create_pipeline(
     // rasterization polygon mode
 ) -> Arc<GraphicsPipeline> {
     GraphicsPipeline::start()
-        .vertex_input_state(Vertex2d::per_vertex())
+        .vertex_input_state(VertexFull::per_vertex())
         .vertex_shader(vs.entry_point("main").unwrap(), ())
         .input_assembly_state(InputAssemblyState::new())
         .rasterization_state(RasterizationState::new())
