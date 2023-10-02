@@ -111,8 +111,4 @@ impl RenderLoop {
         // impacts the next update
         self.window_resized = true;
     }
-
-    pub fn swap_pipeline(&mut self) {
-        self.renderer.swap_pipeline();
-    }
 }

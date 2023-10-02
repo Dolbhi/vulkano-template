@@ -75,7 +75,6 @@ impl App {
             VirtualKeyCode::Space => {
                 if state == Pressed && self.keys.space == Released {
                     // self.square.change_to_random_color();
-                    self.render_loop.swap_pipeline();
                 }
                 self.keys.space = state;
             }

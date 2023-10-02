@@ -1,25 +1,33 @@
 use crate::models::Model;
 use crate::shaders::movable_square;
-use crate::Vertex2d;
+use crate::VertexFull;
 
 pub struct SquareModel;
 
 type UniformData = movable_square::vs::Data;
 
-impl Model<Vertex2d, UniformData> for SquareModel {
-    fn get_vertices() -> Vec<Vertex2d> {
+impl Model<VertexFull, UniformData> for SquareModel {
+    fn get_vertices() -> Vec<VertexFull> {
         vec![
-            Vertex2d {
-                position: [-0.25, -0.25],
+            VertexFull {
+                position: [-0.25, -0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
             },
-            Vertex2d {
-                position: [0.25, -0.25],
+            VertexFull {
+                position: [0.25, -0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
             },
-            Vertex2d {
-                position: [-0.25, 0.25],
+            VertexFull {
+                position: [-0.25, 0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
             },
-            Vertex2d {
-                position: [0.25, 0.25],
+            VertexFull {
+                position: [0.25, 0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
             },
         ]
     }
@@ -30,7 +38,7 @@ impl Model<Vertex2d, UniformData> for SquareModel {
 
     fn get_initial_uniform_data() -> UniformData {
         UniformData {
-            color: [0.0, 0.0, 0.0].into(),
+            // color: [0.0, 0.0, 0.0].into(),
             position: [0.0, 0.0],
         }
     }

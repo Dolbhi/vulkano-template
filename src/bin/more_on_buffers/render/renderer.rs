@@ -19,7 +19,7 @@ use vulkano_template::models::SquareModel;
 use vulkano_template::shaders::movable_square;
 use vulkano_template::vulkano_objects::allocators::Allocators;
 use vulkano_template::vulkano_objects::buffers::Buffers;
-use vulkano_template::{vulkano_objects, Vertex2d};
+use vulkano_template::{vulkano_objects, VertexFull};
 use vulkano_win::VkSurfaceBuild;
 use winit::dpi::LogicalSize;
 use winit::event_loop::EventLoop;
@@ -39,9 +39,8 @@ pub struct Renderer {
     render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>,
     allocators: Allocators,
-    buffers: Buffers<Vertex2d, movable_square::vs::Data>,
+    buffers: Buffers<VertexFull, movable_square::vs::Data>,
     vertex_shader: Arc<ShaderModule>,
-    uv_vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
     viewport: Viewport,
     pipelines: Vec<Arc<GraphicsPipeline>>,
@@ -109,9 +108,6 @@ impl Renderer {
         let fragment_shader =
             movable_square::fs::load(device.clone()).expect("failed to create shader module");
 
-        let uv_vertex_shader =
-            movable_square::vs_uv::load(device.clone()).expect("failed to create shader module");
-
         let viewport = Viewport {
             origin: [0.0, 0.0],
             dimensions: window.inner_size().into(),
@@ -121,13 +117,6 @@ impl Renderer {
         let pipeline = vulkano_objects::pipeline::create_pipeline(
             device.clone(),
             vertex_shader.clone(),
-            fragment_shader.clone(),
-            render_pass.clone(),
-            viewport.clone(),
-        );
-        let uv_pipeline = vulkano_objects::pipeline::create_pipeline(
-            device.clone(),
-            uv_vertex_shader.clone(),
             fragment_shader.clone(),
             render_pass.clone(),
             viewport.clone(),
@@ -162,10 +151,9 @@ impl Renderer {
             allocators,
             buffers,
             vertex_shader,
-            uv_vertex_shader,
             fragment_shader,
             viewport,
-            pipelines: vec![pipeline, uv_pipeline],
+            pipelines: vec![pipeline],
             pipeline_index: 0,
             command_buffers,
         }
@@ -197,14 +185,6 @@ impl Renderer {
         self.pipelines[0] = vulkano_objects::pipeline::create_pipeline(
             self.device.clone(),
             self.vertex_shader.clone(),
-            self.fragment_shader.clone(),
-            self.render_pass.clone(),
-            self.viewport.clone(),
-        );
-
-        self.pipelines[1] = vulkano_objects::pipeline::create_pipeline(
-            self.device.clone(),
-            self.uv_vertex_shader.clone(),
             self.fragment_shader.clone(),
             self.render_pass.clone(),
             self.viewport.clone(),
@@ -263,7 +243,7 @@ impl Renderer {
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to uniform buffer\n{}", e));
 
-        uniform_content.color = square.color.into();
+        // uniform_content.color = square.color.into();
         uniform_content.position = square.position;
     }
 
@@ -278,15 +258,15 @@ impl Renderer {
         );
     }
 
-    pub fn swap_pipeline(&mut self) {
-        self.pipeline_index = (self.pipeline_index + 1) % 2;
+    // pub fn swap_pipeline(&mut self) {
+    //     self.pipeline_index = (self.pipeline_index + 1) % 2;
 
-        self.command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers(
-            &self.allocators,
-            self.queue.clone(),
-            self.pipelines[self.pipeline_index].clone(),
-            &self.framebuffers,
-            &self.buffers,
-        );
-    }
+    //     self.command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers(
+    //         &self.allocators,
+    //         self.queue.clone(),
+    //         self.pipelines[self.pipeline_index].clone(),
+    //         &self.framebuffers,
+    //         &self.buffers,
+    //     );
+    // }
 }

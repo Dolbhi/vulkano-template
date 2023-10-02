@@ -26,7 +26,7 @@ pub struct VertexFull {
     pub colour: [f32; 3],
 }
 
-pub struct Mesh {
-    vertices: Vec<VertexFull>,
-    // buffer
-}
+// pub struct Mesh {
+//     vertices: Vec<VertexFull>,
+//     // buffer
+// }
