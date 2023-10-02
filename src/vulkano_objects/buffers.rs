@@ -14,46 +14,49 @@ use vulkano::sync::GpuFuture;
 use vulkano::DeviceSize;
 
 use super::allocators::Allocators;
-use crate::models::Model;
+use crate::models::Mesh;
+use crate::VertexFull;
 
 pub type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
 
 /// Struct with a vertex, index and uniform buffer, with generic (V)ertices and (U)niforms.
-pub struct Buffers<V: BufferContents, U: BufferContents> {
-    pub vertex: Subbuffer<[V]>,
+pub struct Buffers<U: BufferContents> {
+    pub vertex: Subbuffer<[VertexFull]>,
     pub index: Subbuffer<[u16]>,
     pub uniforms: Vec<Uniform<U>>,
 }
 
-impl<V: BufferContents, U: BufferContents> Buffers<V, U> {
+impl<U: BufferContents> Buffers<U> {
     /// Creates simple vertex, index and uniform buffers of specified model
-    pub fn initialize_host_accessible<M: Model<V, U>>(
-        allocators: &Allocators,
-        descriptor_set_layout: Arc<DescriptorSetLayout>,
-        uniform_buffer_count: usize,
-    ) -> Self {
-        Self {
-            vertex: create_cpu_accessible_vertex::<V, U, M>(allocators),
-            index: create_cpu_accessible_index::<V, U, M>(allocators),
-            uniforms: create_cpu_accessible_uniforms::<V, U, M>(
-                allocators,
-                descriptor_set_layout,
-                uniform_buffer_count,
-            ),
-        }
-    }
+    // pub fn initialize_host_accessible<M: Model<V, U>>(
+    //     allocators: &Allocators,
+    //     descriptor_set_layout: Arc<DescriptorSetLayout>,
+    //     uniform_buffer_count: usize,
+    // ) -> Self {
+    //     Self {
+    //         vertex: create_cpu_accessible_vertex::<V, U, M>(allocators),
+    //         index: create_cpu_accessible_index::<V, U, M>(allocators),
+    //         uniforms: create_cpu_accessible_uniforms::<V, U, M>(
+    //             allocators,
+    //             descriptor_set_layout,
+    //             uniform_buffer_count,
+    //         ),
+    //     }
+    // }
 
     /// Creates device local vertex, index and uniform buffers of specified model
-    pub fn initialize_device_local<M: Model<V, U>>(
+    pub fn initialize_device_local(
         allocators: &Allocators,
         descriptor_set_layout: Arc<DescriptorSetLayout>,
         uniform_buffer_count: usize,
         transfer_queue: Arc<Queue>,
+        mesh: Mesh,
+        initial_uniform: U,
     ) -> Self {
         let (vertex, vertex_future) =
-            create_device_local_vertex::<V, U, M>(allocators, transfer_queue.clone());
+            create_device_local_vertex(allocators, transfer_queue.clone(), mesh.get_vertices());
         let (index, index_future) =
-            create_device_local_index::<V, U, M>(allocators, transfer_queue);
+            create_device_local_index(allocators, transfer_queue, mesh.get_indicies());
 
         let fence = vertex_future
             .join(index_future)
@@ -65,15 +68,16 @@ impl<V: BufferContents, U: BufferContents> Buffers<V, U> {
         Self {
             vertex,
             index,
-            uniforms: create_cpu_accessible_uniforms::<V, U, M>(
+            uniforms: create_cpu_accessible_uniforms::<U>(
                 allocators,
                 descriptor_set_layout,
                 uniform_buffer_count,
+                initial_uniform,
             ),
         }
     }
 
-    pub fn get_vertex(&self) -> Subbuffer<[V]> {
+    pub fn get_vertex(&self) -> Subbuffer<[VertexFull]> {
         self.vertex.clone()
     }
 
@@ -87,39 +91,33 @@ impl<V: BufferContents, U: BufferContents> Buffers<V, U> {
 }
 
 /// returns simple cpu accessible vertex buffer
-fn create_cpu_accessible_vertex<V, U, M>(allocators: &Allocators) -> Subbuffer<[V]>
-where
-    V: BufferContents,
-    U: BufferContents,
-    M: Model<V, U>,
-{
-    Buffer::from_iter(
-        &allocators.memory,
-        BufferCreateInfo {
-            usage: BufferUsage::VERTEX_BUFFER,
-            ..Default::default()
-        },
-        AllocationCreateInfo {
-            usage: MemoryUsage::Upload,
-            ..Default::default()
-        },
-        M::get_vertices(),
-    )
-    .unwrap()
-}
+// fn create_cpu_accessible_vertex<V, U, M>(allocators: &Allocators) -> Subbuffer<[V]>
+// where
+//     V: BufferContents,
+//     U: BufferContents,
+//     M: Model<V, U>,
+// {
+//     Buffer::from_iter(
+//         &allocators.memory,
+//         BufferCreateInfo {
+//             usage: BufferUsage::VERTEX_BUFFER,
+//             ..Default::default()
+//         },
+//         AllocationCreateInfo {
+//             usage: MemoryUsage::Upload,
+//             ..Default::default()
+//         },
+//         M::get_vertices(),
+//     )
+//     .unwrap()
+// }
 
 /// returns a device only vertex buffer and a future that copies data to it
-fn create_device_local_vertex<V, U, M>(
+fn create_device_local_vertex<V: BufferContents>(
     allocators: &Allocators,
     queue: Arc<Queue>,
-) -> (Subbuffer<[V]>, CommandBufferExecFuture<NowFuture>)
-where
-    V: BufferContents,
-    U: BufferContents,
-    M: Model<V, U>,
-{
-    let vertices = M::get_vertices();
-
+    vertices: Vec<V>,
+) -> (Subbuffer<[V]>, CommandBufferExecFuture<NowFuture>) {
     let buffer = Buffer::new_slice(
         &allocators.memory,
         BufferCreateInfo {
@@ -164,39 +162,33 @@ where
 }
 
 /// returns simple cpu accessible index buffer
-fn create_cpu_accessible_index<V, U, M>(allocators: &Allocators) -> Subbuffer<[u16]>
-where
-    V: BufferContents,
-    U: BufferContents,
-    M: Model<V, U>,
-{
-    Buffer::from_iter(
-        &allocators.memory,
-        BufferCreateInfo {
-            usage: BufferUsage::INDEX_BUFFER,
-            ..Default::default()
-        },
-        AllocationCreateInfo {
-            usage: MemoryUsage::Upload,
-            ..Default::default()
-        },
-        M::get_indices(),
-    )
-    .unwrap()
-}
+// fn create_cpu_accessible_index<V, U, M>(allocators: &Allocators) -> Subbuffer<[u16]>
+// where
+//     V: BufferContents,
+//     U: BufferContents,
+//     M: Model<V, U>,
+// {
+//     Buffer::from_iter(
+//         &allocators.memory,
+//         BufferCreateInfo {
+//             usage: BufferUsage::INDEX_BUFFER,
+//             ..Default::default()
+//         },
+//         AllocationCreateInfo {
+//             usage: MemoryUsage::Upload,
+//             ..Default::default()
+//         },
+//         M::get_indices(),
+//     )
+//     .unwrap()
+// }
 
 /// returns a device only index buffer and a future that copies data to it
-fn create_device_local_index<V, U, M>(
+fn create_device_local_index(
     allocators: &Allocators,
     queue: Arc<Queue>,
-) -> (Subbuffer<[u16]>, CommandBufferExecFuture<NowFuture>)
-where
-    V: BufferContents,
-    U: BufferContents,
-    M: Model<V, U>,
-{
-    let indices = M::get_indices();
-
+    indices: Vec<u16>,
+) -> (Subbuffer<[u16]>, CommandBufferExecFuture<NowFuture>) {
     let buffer = Buffer::new_slice(
         &allocators.memory,
         BufferCreateInfo {
@@ -241,16 +233,12 @@ where
 }
 
 /// returns uniform buffers with corresponding descriptor sets for interfacing
-fn create_cpu_accessible_uniforms<V, U, M>(
+fn create_cpu_accessible_uniforms<U: BufferContents>(
     allocators: &Allocators,
     descriptor_set_layout: Arc<DescriptorSetLayout>,
     buffer_count: usize,
-) -> Vec<Uniform<U>>
-where
-    V: BufferContents,
-    U: BufferContents,
-    M: Model<V, U>,
-{
+    initial_uniform: U,
+) -> Vec<Uniform<U>> {
     (0..buffer_count)
         .map(|_| {
             let buffer = Buffer::from_data(
@@ -263,7 +251,7 @@ where
                     usage: MemoryUsage::Upload,
                     ..Default::default()
                 },
-                M::get_initial_uniform_data(),
+                initial_uniform,
             )
             .unwrap();
 
