@@ -112,10 +112,10 @@ pub fn create_simple_command_buffers_2<U: BufferContents + Clone>(
     bg_colour: [f32; 4],
     radians: cgmath::Rad<f32>,
 ) -> Vec<Arc<PrimaryAutoCommandBuffer>> {
-    let cam_pos = cgmath::vec3(0., 0., -2.);
-    let view = Matrix4::from_translation(cam_pos);
-    let mut projection = cgmath::perspective(cgmath::Rad(1.2), 1., 0.1, 200.);
-    projection.x.x *= -1.;
+    let cam_pos = cgmath::vec3(1., 0., 2.);
+    let view = Matrix4::from_translation(-cam_pos);
+    let projection = cgmath::perspective(cgmath::Rad(1.2), 1., 0.1, 200.);
+    // projection.x.x *= -1.;
     let model = Matrix4::from_axis_angle(cgmath::vec3(0., 1., 0.), radians);
 
     let push_constants = MeshPushConstants {

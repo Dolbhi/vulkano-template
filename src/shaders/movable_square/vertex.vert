@@ -19,11 +19,13 @@ layout( push_constant ) uniform constants{
 
 void main() {
     outColor = colour;
-    vec4 pos = vec4(
-        position.x + uniforms.position.x, 
-        position.y + uniforms.position.y, 
-        position.z, 
-        1.0
+    vec4 localPos = vec4(position, 1.0);
+    localPos = PushConstants.render_matrix * localPos;
+    
+    gl_Position = vec4(
+        localPos.x + uniforms.position.x, 
+        localPos.y + uniforms.position.y, 
+        localPos.z, 
+        localPos.w
     );
-    gl_Position = PushConstants.render_matrix * pos; 
 }
