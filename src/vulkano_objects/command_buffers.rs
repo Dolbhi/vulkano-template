@@ -1,4 +1,4 @@
-use cgmath::{Matrix4, Vector4};
+use cgmath::Matrix4;
 use std::sync::Arc;
 
 use vulkano::buffer::{BufferContents, Subbuffer};

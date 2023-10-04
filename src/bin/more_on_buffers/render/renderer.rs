@@ -201,7 +201,7 @@ impl Renderer {
         self.recreate_swapchain();
         self.viewport.dimensions = self.window.inner_size().into();
 
-        self.pipelines[0] = vulkano_objects::pipeline::create_pipeline(
+        self.pipelines[self.pipeline_index] = vulkano_objects::pipeline::create_pipeline(
             self.device.clone(),
             self.vertex_shader.clone(),
             self.fragment_shader.clone(),
