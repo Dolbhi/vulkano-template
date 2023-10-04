@@ -46,6 +46,12 @@ pub struct Renderer {
     pipelines: Vec<Arc<GraphicsPipeline>>,
     pipeline_index: usize,
     command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
+    stuff: Stuff,
+}
+
+struct Stuff {
+    view_radians: cgmath::Rad<f32>,
+    bg_colour: [f32; 4],
 }
 
 impl Renderer {
@@ -136,12 +142,19 @@ impl Renderer {
             initial_uniform,
         );
 
-        let command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers(
+        let stuff = Stuff {
+            view_radians: cgmath::Rad(0.),
+            bg_colour: [0.1, 0.1, 0.1, 0.1],
+        };
+
+        let command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers_2(
             &allocators,
             queue.clone(),
             pipeline.clone(),
             &framebuffers,
             &buffers,
+            stuff.bg_colour.clone(),
+            stuff.view_radians.clone(),
         );
 
         Self {
@@ -161,6 +174,7 @@ impl Renderer {
             pipelines: vec![pipeline],
             pipeline_index: 0,
             command_buffers,
+            stuff,
         }
     }
 
@@ -195,12 +209,18 @@ impl Renderer {
             self.viewport.clone(),
         );
 
-        self.command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers(
+        // self.recreate_cb();
+    }
+
+    pub fn recreate_cb(&mut self) {
+        self.command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers_2(
             &self.allocators,
             self.queue.clone(),
             self.pipelines[0].clone(),
             &self.framebuffers,
             &self.buffers,
+            self.stuff.bg_colour.clone(),
+            self.stuff.view_radians.clone(),
         );
     }
 
@@ -252,15 +272,9 @@ impl Renderer {
         uniform_content.position = square.position;
     }
 
-    pub fn update_bg_color(&mut self, colour: [f32; 4]) {
-        self.command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers_2(
-            &self.allocators,
-            self.queue.clone(),
-            self.pipelines[self.pipeline_index].clone(),
-            &self.framebuffers,
-            &self.buffers,
-            colour,
-        );
+    pub fn update_stuff(&mut self, colour: [f32; 4], radians: cgmath::Rad<f32>) {
+        self.stuff.bg_colour = colour;
+        self.stuff.view_radians = radians;
     }
 
     // pub fn swap_pipeline(&mut self) {

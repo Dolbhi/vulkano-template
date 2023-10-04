@@ -1,3 +1,4 @@
+use cgmath::{Matrix4, Vector4};
 use std::sync::Arc;
 
 use vulkano::buffer::{BufferContents, Subbuffer};
@@ -109,7 +110,19 @@ pub fn create_simple_command_buffers_2<U: BufferContents + Clone>(
     framebuffers: &[Arc<Framebuffer>],
     buffers: &Buffers<U>,
     bg_colour: [f32; 4],
+    radians: cgmath::Rad<f32>,
 ) -> Vec<Arc<PrimaryAutoCommandBuffer>> {
+    let cam_pos = cgmath::vec3(0., 0., -2.);
+    let view = Matrix4::from_translation(cam_pos);
+    let mut projection = cgmath::perspective(cgmath::Rad(1.2), 1., 0.1, 200.);
+    projection.x.x *= -1.;
+    let model = Matrix4::from_axis_angle(cgmath::vec3(0., 1., 0.), radians);
+
+    let push_constants = MeshPushConstants {
+        data: [0., 0., 0., 0.],
+        render_matrix: (projection * view * model).into(),
+    };
+
     framebuffers
         .iter()
         .enumerate()
@@ -140,6 +153,7 @@ pub fn create_simple_command_buffers_2<U: BufferContents + Clone>(
                     0,
                     buffers.get_uniform_descriptor_set(i),
                 )
+                .push_constants(pipeline.layout().clone(), 0, push_constants.clone())
                 .bind_vertex_buffers(0, buffers.get_vertex())
                 .bind_index_buffer(index_buffer)
                 .draw_indexed(index_buffer_length as u32, 1, 0, 0, 0)
@@ -174,3 +188,10 @@ pub fn create_simple_command_buffers_2<U: BufferContents + Clone>(
 
 //     Arc::new(command_pool)
 // }
+
+#[derive(BufferContents, Clone)]
+#[repr(C)]
+struct MeshPushConstants {
+    data: [f32; 4],
+    render_matrix: [[f32; 4]; 4],
+}

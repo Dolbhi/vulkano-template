@@ -34,16 +34,23 @@ impl RenderLoop {
 
     /// update renderer and draw upcoming image
     pub fn update(&mut self, render_object: &Square, seconds_passed: f32) {
+        // update bg
+        self.total_seconds += seconds_passed;
+        self.renderer.update_stuff(
+            [0.1, 0.1, self.total_seconds.sin().abs(), 1.0],
+            cgmath::Rad(self.total_seconds * 1.),
+        );
+
         // do recreation if necessary
         if self.window_resized {
             self.window_resized = false;
             self.recreate_swapchain = false;
             self.renderer.handle_window_resize();
-        }
-        if self.recreate_swapchain {
+        } else if self.recreate_swapchain {
             self.recreate_swapchain = false;
             self.renderer.recreate_swapchain();
         }
+        self.renderer.recreate_cb();
 
         // get upcoming image to display as well as corresponding future
         let (image_i, suboptimal, acquire_future) = match self.renderer.acquire_swapchain_image() {
@@ -64,10 +71,6 @@ impl RenderLoop {
             image_fence.wait(None).unwrap();
         }
 
-        // update bg
-        self.total_seconds += seconds_passed;
-        self.renderer
-            .update_bg_color([0.1, 0.1, self.total_seconds.sin().abs(), 1.0]);
         // update uniform data
         self.renderer.update_uniform(image_i, render_object);
 
