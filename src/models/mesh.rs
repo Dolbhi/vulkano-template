@@ -30,25 +30,25 @@ impl Mesh {
         for i in 0..length {
             let first = i * 3;
             let position = [
-                mesh.positions[first],
-                mesh.positions[first + 1],
-                mesh.positions[first + 2],
+                mesh.positions[first] / 3.,
+                mesh.positions[first + 1] / 3.,
+                mesh.positions[first + 2] / 3.,
             ];
             let normal = [
                 mesh.normals[first],
                 mesh.normals[first + 1],
                 mesh.normals[first + 2],
             ];
-            let colour = [
-                mesh.vertex_color[first],
-                mesh.vertex_color[first + 1],
-                mesh.vertex_color[first + 2],
-            ];
+            // let colour = [1., 0., 0.];
+            //     mesh.vertex_color[first],
+            //     mesh.vertex_color[first + 1],
+            //     mesh.vertex_color[first + 2],
+            // ];
 
             vertices.push(VertexFull {
                 position,
-                normal,
-                colour,
+                normal: normal.clone(),
+                colour: normal,
             })
         }
 

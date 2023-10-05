@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::sync::Arc;
 
 use vulkano::command_buffer::{CommandBufferExecFuture, PrimaryAutoCommandBuffer};
@@ -130,7 +131,10 @@ impl Renderer {
 
         let allocators = Allocators::new(device.clone());
 
-        let mesh = Mesh::from_model::<movable_square::vs::Data, SquareModel>();
+        let path = Path::new(
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/engine.obj",
+        );
+        let mesh = Mesh::from_obj(path); // Mesh::from_model::<movable_square::vs::Data, SquareModel>();
         let initial_uniform = SquareModel::get_initial_uniform_data();
 
         let buffers = Buffers::initialize_device_local(
