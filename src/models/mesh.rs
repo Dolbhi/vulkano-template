@@ -14,8 +14,13 @@ pub struct Mesh {
 
 impl Mesh {
     pub fn from_obj(file_name: &Path) -> Self {
-        let (models, materials) = tobj::load_obj(file_name, &tobj::GPU_LOAD_OPTIONS).unwrap();
+        let (models, _) = tobj::load_obj(file_name, &tobj::GPU_LOAD_OPTIONS).unwrap();
         let mesh = &models[0].mesh;
+
+        // mesh.texcoords
+        // mesh.material_id
+
+        assert!(mesh.positions.len() % 3 == 0);
 
         let mut vertices = Vec::new();
         let length = mesh.positions.len() / 3;
