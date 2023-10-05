@@ -32,7 +32,7 @@ impl Model<VertexFull, UniformData> for SquareModel {
         ]
     }
 
-    fn get_indices() -> Vec<u16> {
+    fn get_indices() -> Vec<u32> {
         vec![0, 1, 2, 1, 2, 3]
     }
 

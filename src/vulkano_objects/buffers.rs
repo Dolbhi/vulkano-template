@@ -22,7 +22,7 @@ pub type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
 /// Struct with a vertex, index and uniform buffer, with generic (V)ertices and (U)niforms.
 pub struct Buffers<U: BufferContents> {
     pub vertex: Subbuffer<[VertexFull]>,
-    pub index: Subbuffer<[u16]>,
+    pub index: Subbuffer<[u32]>,
     pub uniforms: Vec<Uniform<U>>,
 }
 
@@ -81,7 +81,7 @@ impl<U: BufferContents + Clone> Buffers<U> {
         self.vertex.clone()
     }
 
-    pub fn get_index(&self) -> Subbuffer<[u16]> {
+    pub fn get_index(&self) -> Subbuffer<[u32]> {
         self.index.clone()
     }
 
@@ -187,8 +187,8 @@ fn create_device_local_vertex<V: BufferContents>(
 fn create_device_local_index(
     allocators: &Allocators,
     queue: Arc<Queue>,
-    indices: Vec<u16>,
-) -> (Subbuffer<[u16]>, CommandBufferExecFuture<NowFuture>) {
+    indices: Vec<u32>,
+) -> (Subbuffer<[u32]>, CommandBufferExecFuture<NowFuture>) {
     let buffer = Buffer::new_slice(
         &allocators.memory,
         BufferCreateInfo {

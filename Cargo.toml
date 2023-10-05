@@ -13,6 +13,7 @@ winit = "0.28.3"
 vulkano-win = "0.33.0"
 rand = "0.8.5"
 cgmath = "0.18.0"
+tobj = "4.0.0"
 
 [profile.dev]
 opt-level = 1
