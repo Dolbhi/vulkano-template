@@ -2,10 +2,15 @@ use std::sync::Arc;
 
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::Device;
+use vulkano::format::Format;
 use vulkano::image::view::ImageView;
+use vulkano::image::{AttachmentImage, ImageAccess};
 use vulkano::image::{ImageUsage, SwapchainImage};
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
 use vulkano::swapchain::{Surface, Swapchain, SwapchainCreateInfo};
+
+use super::allocators::Allocators;
+
 use winit::window::Window;
 
 pub fn create_swapchain(
@@ -50,7 +55,27 @@ pub fn create_swapchain(
 pub fn create_framebuffers_from_swapchain_images(
     images: &[Arc<SwapchainImage>],
     render_pass: Arc<RenderPass>,
+    memory_allocator: &Allocators,
 ) -> Vec<Arc<Framebuffer>> {
+    let depth_attachment = ImageView::new_default(
+        AttachmentImage::with_usage(
+            &memory_allocator.memory,
+            images[0].dimensions().width_height(),
+            Format::D16_UNORM,
+            ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
+            // ImageCreateInfo {
+            //     image_type: ImageType::Dim2d,
+            //     format: Format::D16_UNORM,
+            //     extent: images[0].extent(),
+            //     usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
+            //     ..Default::default()
+            // },
+            // AllocationCreateInfo::default(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
     images
         .iter()
         .map(|image| {
@@ -58,7 +83,7 @@ pub fn create_framebuffers_from_swapchain_images(
             Framebuffer::new(
                 render_pass.clone(),
                 FramebufferCreateInfo {
-                    attachments: vec![view],
+                    attachments: vec![view, depth_attachment.clone()],
                     ..Default::default()
                 },
             )

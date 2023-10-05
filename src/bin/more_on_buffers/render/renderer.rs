@@ -103,11 +103,14 @@ impl Renderer {
         let (swapchain, images) =
             vulkano_objects::swapchain::create_swapchain(&physical_device, device.clone(), surface);
 
+        let allocators = Allocators::new(device.clone());
+
         let render_pass =
             vulkano_objects::render_pass::create_render_pass(device.clone(), swapchain.clone());
         let framebuffers = vulkano_objects::swapchain::create_framebuffers_from_swapchain_images(
             &images,
             render_pass.clone(),
+            &allocators,
         );
 
         let vertex_shader =
@@ -128,8 +131,6 @@ impl Renderer {
             render_pass.clone(),
             viewport.clone(),
         );
-
-        let allocators = Allocators::new(device.clone());
 
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/engine.obj",
@@ -197,6 +198,7 @@ impl Renderer {
         self.framebuffers = vulkano_objects::swapchain::create_framebuffers_from_swapchain_images(
             &new_images,
             self.render_pass.clone(),
+            &self.allocators,
         );
     }
 

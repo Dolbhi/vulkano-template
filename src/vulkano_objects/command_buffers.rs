@@ -77,7 +77,7 @@ pub fn create_simple_command_buffers<U: BufferContents + Clone>(
             builder
                 .begin_render_pass(
                     RenderPassBeginInfo {
-                        clear_values: vec![Some([0.1, 0.1, 0.1, 1.0].into())],
+                        clear_values: vec![Some([0.1, 0.1, 0.1, 1.0].into()), Some(1.0.into())],
                         ..RenderPassBeginInfo::framebuffer(framebuffer.clone())
                     },
                     SubpassContents::Inline,
@@ -140,7 +140,7 @@ pub fn create_simple_command_buffers_2<U: BufferContents + Clone>(
             builder
                 .begin_render_pass(
                     RenderPassBeginInfo {
-                        clear_values: vec![Some(bg_colour.into())],
+                        clear_values: vec![Some(bg_colour.into()), Some(1.0.into())],
                         ..RenderPassBeginInfo::framebuffer(framebuffer.clone())
                     },
                     SubpassContents::Inline,
