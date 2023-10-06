@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use cgmath::Matrix4;
+
 use vulkano::command_buffer::{CommandBufferExecFuture, PrimaryAutoCommandBuffer};
 use vulkano::device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo};
 use vulkano::image::SwapchainImage;
@@ -16,7 +18,7 @@ use vulkano::swapchain::{
 use vulkano::sync::future::{FenceSignalFuture, JoinFuture, NowFuture};
 use vulkano::sync::{self, FlushError, GpuFuture};
 use vulkano_template::game_objects::Square;
-use vulkano_template::models::{Mesh, Model, SquareModel};
+use vulkano_template::models::Mesh;
 use vulkano_template::shaders::movable_square;
 use vulkano_template::vulkano_objects;
 use vulkano_template::vulkano_objects::allocators::Allocators;
@@ -47,12 +49,6 @@ pub struct Renderer {
     pipelines: Vec<Arc<GraphicsPipeline>>,
     pipeline_index: usize,
     command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
-    stuff: Stuff,
-}
-
-struct Stuff {
-    view_radians: cgmath::Rad<f32>,
-    bg_colour: [f32; 4],
 }
 
 impl Renderer {
@@ -133,10 +129,21 @@ impl Renderer {
         );
 
         let path = Path::new(
-            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/engine.obj",
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/gun.obj",
         );
-        let mesh = Mesh::from_obj(path); // Mesh::from_model::<movable_square::vs::Data, SquareModel>();
-        let initial_uniform = SquareModel::get_initial_uniform_data();
+        let mesh = Mesh::from_obj(path);
+
+        let cam_pos = cgmath::vec3(0., 0., 2.);
+        let view = Matrix4::from_translation(-cam_pos);
+        let projection = cgmath::perspective(cgmath::Rad(1.2), 1., 0.1, 200.);
+        // projection.x.x *= -1.;
+        let model = Matrix4::from_axis_angle(cgmath::vec3(0., 1., 0.), cgmath::Rad(0.));
+
+        let initial_uniform = movable_square::vs::Data {
+            position: [0., 0.].into(),
+            data: [0., 0., 0., 0.],
+            render_matrix: (projection * view * model).into(),
+        };
 
         let buffers = Buffers::initialize_device_local(
             &allocators,
@@ -147,19 +154,12 @@ impl Renderer {
             initial_uniform,
         );
 
-        let stuff = Stuff {
-            view_radians: cgmath::Rad(0.),
-            bg_colour: [0.1, 0.1, 0.1, 0.1],
-        };
-
-        let command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers_2(
+        let command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers(
             &allocators,
             queue.clone(),
             pipeline.clone(),
             &framebuffers,
             &buffers,
-            stuff.bg_colour.clone(),
-            stuff.view_radians.clone(),
         );
 
         Self {
@@ -179,7 +179,6 @@ impl Renderer {
             pipelines: vec![pipeline],
             pipeline_index: 0,
             command_buffers,
-            stuff,
         }
     }
 
@@ -219,14 +218,12 @@ impl Renderer {
     }
 
     pub fn recreate_cb(&mut self) {
-        self.command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers_2(
+        self.command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers(
             &self.allocators,
             self.queue.clone(),
             self.pipelines[0].clone(),
             &self.framebuffers,
             &self.buffers,
-            self.stuff.bg_colour.clone(),
-            self.stuff.view_radians.clone(),
         );
     }
 
@@ -268,19 +265,22 @@ impl Renderer {
             .then_signal_fence_and_flush()
     }
 
-    pub fn update_uniform(&self, index: u32, square: &Square) {
+    pub fn update_uniform(&self, index: u32, square: &Square, radians: cgmath::Rad<f32>) {
         let mut uniform_content = self.buffers.uniforms[index as usize]
             .0
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to uniform buffer\n{}", e));
 
         // uniform_content.color = square.color.into();
-        uniform_content.position = square.position;
-    }
+        uniform_content.position = square.position.into();
 
-    pub fn update_stuff(&mut self, colour: [f32; 4], radians: cgmath::Rad<f32>) {
-        self.stuff.bg_colour = colour;
-        self.stuff.view_radians = radians;
+        let cam_pos = cgmath::vec3(0., 0., 2.);
+        let view = Matrix4::from_translation(-cam_pos);
+        let projection = cgmath::perspective(cgmath::Rad(1.2), 1., 0.1, 200.);
+        // projection.y.y *= -1.;
+        let model = Matrix4::from_axis_angle(cgmath::vec3(0., 1., 0.), radians);
+
+        uniform_content.render_matrix = (projection * view * model).into();
     }
 
     // pub fn swap_pipeline(&mut self) {
