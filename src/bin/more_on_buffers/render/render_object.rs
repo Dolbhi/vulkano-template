@@ -1,12 +1,8 @@
 use cgmath::{Matrix4, SquareMatrix};
-use std::sync::Arc;
 
-use vulkano::{
-    buffer::BufferContents, descriptor_set::layout::DescriptorSetLayout, pipeline::GraphicsPipeline,
-};
-use vulkano_template::vulkano_objects::{
-    allocators::Allocators,
-    buffers::{create_cpu_accessible_uniforms, Uniform},
+use vulkano::buffer::BufferContents;
+use vulkano_template::{
+    game_objects::Square, shaders::movable_square::vs::Data, vulkano_objects::buffers::Uniform,
 };
 
 pub struct RenderObject<U: BufferContents + Clone> {
@@ -18,23 +14,7 @@ pub struct RenderObject<U: BufferContents + Clone> {
 }
 
 impl<U: BufferContents + Clone> RenderObject<U> {
-    pub fn new(
-        allocators: &Allocators,
-        mesh_id: String,
-        pipeline_id: String,
-        descriptor_set_layout: Arc<DescriptorSetLayout>,
-        uniform_buffer_count: usize,
-        initial_uniform: U,
-    ) -> Self {
-        // let buffers = Buffers::initialize_device_local(allocators, transfer_queue, mesh);
-        let uniforms = create_cpu_accessible_uniforms(
-            allocators,
-            descriptor_set_layout,
-            uniform_buffer_count,
-            initial_uniform,
-        );
-        // let material = create_pipeline(device, vs, fs, render_pass, viewport)
-
+    pub fn new(mesh_id: String, pipeline_id: String, uniforms: Vec<Uniform<U>>) -> Self {
         Self {
             mesh_id,
             pipeline_id,
@@ -50,12 +30,27 @@ impl<U: BufferContents + Clone> RenderObject<U> {
     pub fn get_uniforms(&self) -> &Vec<Uniform<U>> {
         &self.uniforms
     }
+}
 
-    // pub fn get_pipeline(&self) -> Arc<GraphicsPipeline> {
-    //     return self.pipeline.clone();
-    // }
+impl RenderObject<Data> {
+    pub fn update_uniform(&self, index: u32, square: &Square, radians: cgmath::Rad<f32>) {
+        let mut uniform_content = self.uniforms[index as usize]
+            .0
+            .write()
+            .unwrap_or_else(|e| panic!("Failed to write to uniform buffer\n{}", e));
 
-    // pub fn replace_pipeline(&mut self, new_pipeline: Arc<GraphicsPipeline>) {
-    //     self.pipeline = new_pipeline;
-    // }
+        // uniform_content.color = square.color.into();
+        // uniform_content.position = square.position.into();
+
+        let cam_pos = cgmath::vec3(0., 0., 2.);
+        let view = Matrix4::from_translation(-cam_pos);
+        let projection = cgmath::perspective(cgmath::Rad(1.2), 1., 0.1, 200.);
+        // projection.y.y *= -1.;
+        let model = Matrix4::from_axis_angle(cgmath::vec3(0., 1., 0.), radians);
+
+        let translation =
+            Matrix4::from_translation([square.position[0], square.position[1], 0.].into());
+
+        uniform_content.render_matrix = (projection * view * model * translation).into();
+    }
 }

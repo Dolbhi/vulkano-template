@@ -1,11 +1,17 @@
+use std::path::Path;
 use std::sync::Arc;
 
 use vulkano::swapchain::AcquireError;
 use vulkano::sync::{FlushError, GpuFuture};
 use vulkano_template::game_objects::Square;
+use vulkano_template::models::{Mesh, SquareModel};
+use vulkano_template::shaders::movable_square;
 use winit::event_loop::EventLoop;
 
 use crate::render::renderer::{Fence, Renderer};
+
+// use super::render_object::RenderObject;
+use super::UniformData;
 
 pub struct RenderLoop {
     renderer: Renderer,
@@ -14,13 +20,50 @@ pub struct RenderLoop {
     fences: Vec<Option<Arc<Fence>>>,
     previous_fence_i: u32,
     total_seconds: f32,
+    controlled_i: usize,
 }
 
 impl RenderLoop {
     pub fn new(event_loop: &EventLoop<()>) -> Self {
-        let renderer = Renderer::initialize(event_loop);
+        let mut renderer = Renderer::initialize(event_loop);
         let frames_in_flight = renderer.get_image_count();
         let fences: Vec<Option<Arc<Fence>>> = vec![None; frames_in_flight];
+
+        // materials
+        let vertex_shader = movable_square::vs::load(renderer.clone_device())
+            .expect("failed to create shader module");
+        let fragment_shader = movable_square::fs::load(renderer.clone_device())
+            .expect("failed to create shader module");
+
+        let material_id = String::from("basic");
+        renderer.init_material(material_id.clone(), vertex_shader, fragment_shader);
+
+        // meshes
+        let path = Path::new(
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/gun.obj",
+        );
+        let mesh = Mesh::from_obj(path);
+        let mesh_id = String::from("gun");
+        renderer.init_mesh(mesh_id.clone(), mesh);
+
+        let square_mesh = Mesh::from_model::<SquareModel>();
+        let square_id = String::from("square");
+        renderer.init_mesh(square_id.clone(), square_mesh);
+
+        // objects
+        let cam_pos = cgmath::vec3(0., 0., 2.);
+        let view = cgmath::Matrix4::from_translation(-cam_pos);
+        let projection = cgmath::perspective(cgmath::Rad(1.2), 1., 0.1, 200.);
+        let initial_uniform = UniformData {
+            data: [0., 0., 0., 0.],
+            render_matrix: (projection * view).into(),
+        };
+        let controlled_i = renderer.add_render_object(
+            mesh_id,
+            material_id,
+            renderer.get_image_count(),
+            initial_uniform,
+        );
 
         Self {
             renderer,
@@ -29,6 +72,7 @@ impl RenderLoop {
             fences,
             previous_fence_i: 0,
             total_seconds: 0.0,
+            controlled_i,
         }
     }
 
@@ -45,7 +89,7 @@ impl RenderLoop {
         } else if self.recreate_swapchain {
             self.recreate_swapchain = false;
             self.renderer.recreate_swapchain();
-            self.renderer.recreate_cb();
+            // self.renderer.recreate_cb();
         }
 
         // get upcoming image to display as well as corresponding future
@@ -69,6 +113,7 @@ impl RenderLoop {
 
         // update uniform data
         self.renderer
+            .get_render_object(self.controlled_i)
             .update_uniform(image_i, render_object, cgmath::Rad(self.total_seconds * 1.));
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)

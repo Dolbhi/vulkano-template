@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use vulkano::buffer::BufferContents;
+// use vulkano::buffer::BufferContents;
 
 use crate::models::Model;
 use crate::VertexFull;
@@ -59,7 +59,7 @@ impl Mesh {
         }
     }
 
-    pub fn from_model<U: BufferContents, M: Model<VertexFull, U>>() -> Self {
+    pub fn from_model<M: Model<VertexFull>>() -> Self {
         Mesh {
             vertices: M::get_vertices(),
             indices: M::get_indices(),
