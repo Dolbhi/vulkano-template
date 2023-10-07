@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use cgmath::Matrix4;
 
+use vulkano::buffer::BufferContents;
 use vulkano::command_buffer::{CommandBufferExecFuture, PrimaryAutoCommandBuffer};
 use vulkano::device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo};
 use vulkano::image::SwapchainImage;
@@ -22,11 +23,13 @@ use vulkano_template::models::Mesh;
 use vulkano_template::shaders::movable_square;
 use vulkano_template::vulkano_objects;
 use vulkano_template::vulkano_objects::allocators::Allocators;
-use vulkano_template::vulkano_objects::buffers::Buffers;
+// use vulkano_template::vulkano_objects::buffers::Buffers;
 use vulkano_win::VkSurfaceBuild;
 use winit::dpi::LogicalSize;
 use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowBuilder};
+
+use super::render_object::RenderObject;
 
 pub type Fence = FenceSignalFuture<
     PresentFuture<CommandBufferExecFuture<JoinFuture<Box<dyn GpuFuture>, SwapchainAcquireFuture>>>,
@@ -42,13 +45,14 @@ pub struct Renderer {
     render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>,
     allocators: Allocators,
-    buffers: Buffers<movable_square::vs::Data>,
+    // buffers: Buffers<movable_square::vs::Data>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
     viewport: Viewport,
-    pipelines: Vec<Arc<GraphicsPipeline>>,
-    pipeline_index: usize,
+    // pipelines: Vec<Arc<GraphicsPipeline>>,
+    // pipeline_index: usize,
     command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
+    render_objects: Vec<RenderObject<movable_square::vs::Data>>,
 }
 
 impl Renderer {
@@ -140,26 +144,27 @@ impl Renderer {
         let model = Matrix4::from_axis_angle(cgmath::vec3(0., 1., 0.), cgmath::Rad(0.));
 
         let initial_uniform = movable_square::vs::Data {
-            position: [0., 0.].into(),
             data: [0., 0., 0., 0.],
             render_matrix: (projection * view * model).into(),
         };
 
-        let buffers = Buffers::initialize_device_local(
+        let render_object = RenderObject::new(
             &allocators,
-            pipeline.layout().set_layouts().get(0).unwrap().clone(),
-            images.len(),
             queue.clone(),
             mesh,
+            pipeline.layout().set_layouts().get(0).unwrap().clone(),
+            images.len(),
             initial_uniform,
+            pipeline,
         );
 
         let command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers(
             &allocators,
             queue.clone(),
-            pipeline.clone(),
+            render_object.get_pipeline(),
             &framebuffers,
-            &buffers,
+            render_object.get_buffers(),
+            render_object.get_uniforms(),
         );
 
         Self {
@@ -172,13 +177,11 @@ impl Renderer {
             render_pass,
             framebuffers,
             allocators,
-            buffers,
             vertex_shader,
             fragment_shader,
             viewport,
-            pipelines: vec![pipeline],
-            pipeline_index: 0,
             command_buffers,
+            render_objects: vec![render_object],
         }
     }
 
@@ -206,24 +209,27 @@ impl Renderer {
         self.recreate_swapchain();
         self.viewport.dimensions = self.window.inner_size().into();
 
-        self.pipelines[self.pipeline_index] = vulkano_objects::pipeline::create_pipeline(
+        self.render_objects[0].replace_pipeline(vulkano_objects::pipeline::create_pipeline(
             self.device.clone(),
             self.vertex_shader.clone(),
             self.fragment_shader.clone(),
             self.render_pass.clone(),
             self.viewport.clone(),
-        );
+        ));
 
         // self.recreate_cb();
     }
 
     pub fn recreate_cb(&mut self) {
+        let ro = &self.render_objects[0];
+
         self.command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers(
             &self.allocators,
             self.queue.clone(),
-            self.pipelines[0].clone(),
+            ro.get_pipeline(),
             &self.framebuffers,
-            &self.buffers,
+            ro.get_buffers(),
+            ro.get_uniforms(),
         );
     }
 
@@ -266,13 +272,13 @@ impl Renderer {
     }
 
     pub fn update_uniform(&self, index: u32, square: &Square, radians: cgmath::Rad<f32>) {
-        let mut uniform_content = self.buffers.uniforms[index as usize]
+        let mut uniform_content = self.render_objects[0].get_uniforms()[index as usize]
             .0
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to uniform buffer\n{}", e));
 
         // uniform_content.color = square.color.into();
-        uniform_content.position = square.position.into();
+        // uniform_content.position = square.position.into();
 
         let cam_pos = cgmath::vec3(0., 0., 2.);
         let view = Matrix4::from_translation(-cam_pos);
@@ -280,7 +286,10 @@ impl Renderer {
         // projection.y.y *= -1.;
         let model = Matrix4::from_axis_angle(cgmath::vec3(0., 1., 0.), radians);
 
-        uniform_content.render_matrix = (projection * view * model).into();
+        let translation =
+            Matrix4::from_translation([square.position[0], square.position[1], 0.].into());
+
+        uniform_content.render_matrix = (projection * view * model * translation).into();
     }
 
     // pub fn swap_pipeline(&mut self) {

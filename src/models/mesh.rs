@@ -10,6 +10,7 @@ use crate::VertexFull;
 pub struct Mesh {
     vertices: Vec<VertexFull>,
     indices: Vec<u32>,
+    // buffer: Buffers,
 }
 
 impl Mesh {

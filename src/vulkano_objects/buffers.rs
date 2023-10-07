@@ -9,6 +9,7 @@ use vulkano::descriptor_set::layout::DescriptorSetLayout;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::Queue;
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryUsage};
+use vulkano::pipeline::GraphicsPipeline;
 use vulkano::sync::future::NowFuture;
 use vulkano::sync::GpuFuture;
 use vulkano::DeviceSize;
@@ -20,13 +21,13 @@ use crate::VertexFull;
 pub type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
 
 /// Struct with a vertex, index and uniform buffer, with generic (V)ertices and (U)niforms.
-pub struct Buffers<U: BufferContents> {
+pub struct Buffers {
     pub vertex: Subbuffer<[VertexFull]>,
     pub index: Subbuffer<[u32]>,
-    pub uniforms: Vec<Uniform<U>>,
+    // pub uniforms: Vec<Uniform<U>>,
 }
 
-impl<U: BufferContents + Clone> Buffers<U> {
+impl Buffers {
     /// Creates simple vertex, index and uniform buffers of specified model
     // pub fn initialize_host_accessible<M: Model<V, U>>(
     //     allocators: &Allocators,
@@ -47,11 +48,13 @@ impl<U: BufferContents + Clone> Buffers<U> {
     /// Creates device local vertex, index and uniform buffers of specified model
     pub fn initialize_device_local(
         allocators: &Allocators,
-        descriptor_set_layout: Arc<DescriptorSetLayout>,
-        uniform_buffer_count: usize,
+        // descriptor_set_layout: Arc<DescriptorSetLayout>,
+        // uniform_buffer_count: usize,
         transfer_queue: Arc<Queue>,
+        // vertices: Vec<VertexFull>,
+        // indices: Vec<u32>,
         mesh: Mesh,
-        initial_uniform: U,
+        // initial_uniform: U,
     ) -> Self {
         let (vertex, vertex_future) =
             create_device_local_vertex(allocators, transfer_queue.clone(), mesh.get_vertices());
@@ -68,12 +71,12 @@ impl<U: BufferContents + Clone> Buffers<U> {
         Self {
             vertex,
             index,
-            uniforms: create_cpu_accessible_uniforms::<U>(
-                allocators,
-                descriptor_set_layout,
-                uniform_buffer_count,
-                initial_uniform,
-            ),
+            // uniforms: create_cpu_accessible_uniforms::<U>(
+            //     allocators,
+            //     descriptor_set_layout,
+            //     uniform_buffer_count,
+            //     initial_uniform,
+            // ),
         }
     }
 
@@ -85,9 +88,9 @@ impl<U: BufferContents + Clone> Buffers<U> {
         self.index.clone()
     }
 
-    pub fn get_uniform_descriptor_set(&self, i: usize) -> Arc<PersistentDescriptorSet> {
-        self.uniforms[i].1.clone()
-    }
+    // pub fn get_uniform_descriptor_set(&self, i: usize) -> Arc<PersistentDescriptorSet> {
+    //     self.uniforms[i].1.clone()
+    // }
 }
 
 /// returns simple cpu accessible vertex buffer
@@ -233,7 +236,7 @@ fn create_device_local_index(
 }
 
 /// returns uniform buffers with corresponding descriptor sets for interfacing
-fn create_cpu_accessible_uniforms<U: BufferContents + Clone>(
+pub fn create_cpu_accessible_uniforms<U: BufferContents + Clone>(
     allocators: &Allocators,
     descriptor_set_layout: Arc<DescriptorSetLayout>,
     buffer_count: usize,
