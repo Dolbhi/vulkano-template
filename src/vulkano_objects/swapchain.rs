@@ -61,16 +61,8 @@ pub fn create_framebuffers_from_swapchain_images(
         AttachmentImage::with_usage(
             &memory_allocator.memory,
             images[0].dimensions().width_height(),
-            Format::D16_UNORM,
+            Format::D32_SFLOAT,
             ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
-            // ImageCreateInfo {
-            //     image_type: ImageType::Dim2d,
-            //     format: Format::D16_UNORM,
-            //     extent: images[0].extent(),
-            //     usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
-            //     ..Default::default()
-            // },
-            // AllocationCreateInfo::default(),
         )
         .unwrap(),
     )

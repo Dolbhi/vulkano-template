@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use vulkano::device::Device;
-use vulkano::format::Format::D16_UNORM;
+use vulkano::format::Format;
 use vulkano::render_pass::RenderPass;
 use vulkano::swapchain::Swapchain;
 
@@ -18,7 +18,7 @@ pub fn create_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc
             depth_stencil: {
                 load: Clear,
                 store: DontCare,
-                format: D16_UNORM,
+                format: Format::D32_SFLOAT,
                 samples: 1,
             }
         },
