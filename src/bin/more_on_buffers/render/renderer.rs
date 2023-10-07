@@ -1,3 +1,4 @@
+use std::collections::hash_map::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -23,7 +24,7 @@ use vulkano_template::models::Mesh;
 use vulkano_template::shaders::movable_square;
 use vulkano_template::vulkano_objects;
 use vulkano_template::vulkano_objects::allocators::Allocators;
-// use vulkano_template::vulkano_objects::buffers::Buffers;
+use vulkano_template::vulkano_objects::buffers::Buffers;
 use vulkano_win::VkSurfaceBuild;
 use winit::dpi::LogicalSize;
 use winit::event_loop::EventLoop;
@@ -52,6 +53,8 @@ pub struct Renderer {
     // pipelines: Vec<Arc<GraphicsPipeline>>,
     // pipeline_index: usize,
     command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
+    mesh_buffers: HashMap<String, Buffers>,
+    material_pipelines: HashMap<String, Arc<GraphicsPipeline>>,
     render_objects: Vec<RenderObject<movable_square::vs::Data>>,
 }
 
@@ -124,6 +127,7 @@ impl Renderer {
             depth_range: 0.0..1.0,
         };
 
+        let mut material_pipelines = HashMap::new();
         let pipeline = vulkano_objects::pipeline::create_pipeline(
             device.clone(),
             vertex_shader.clone(),
@@ -131,11 +135,20 @@ impl Renderer {
             render_pass.clone(),
             viewport.clone(),
         );
+        let pipeline_layout = pipeline.layout().set_layouts().get(0).unwrap().clone();
+        let pipeline_id = String::from("basic");
+        material_pipelines.insert(pipeline_id.clone(), pipeline);
+
+        let mut mesh_buffers = HashMap::new();
 
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/gun.obj",
         );
         let mesh = Mesh::from_obj(path);
+        let mesh_buffer = Buffers::initialize_device_local(&allocators, queue.clone(), mesh);
+
+        let mesh_id = String::from("gun");
+        mesh_buffers.insert(mesh_id.clone(), mesh_buffer);
 
         let cam_pos = cgmath::vec3(0., 0., 2.);
         let view = Matrix4::from_translation(-cam_pos);
@@ -150,20 +163,19 @@ impl Renderer {
 
         let render_object = RenderObject::new(
             &allocators,
-            queue.clone(),
-            mesh,
-            pipeline.layout().set_layouts().get(0).unwrap().clone(),
+            mesh_id.clone(),
+            pipeline_id,
+            pipeline_layout,
             images.len(),
             initial_uniform,
-            pipeline,
         );
 
         let command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers(
             &allocators,
             queue.clone(),
-            render_object.get_pipeline(),
+            material_pipelines[&render_object.pipeline_id].clone(),
             &framebuffers,
-            render_object.get_buffers(),
+            &mesh_buffers[&mesh_id],
             render_object.get_uniforms(),
         );
 
@@ -181,6 +193,8 @@ impl Renderer {
             fragment_shader,
             viewport,
             command_buffers,
+            mesh_buffers,
+            material_pipelines,
             render_objects: vec![render_object],
         }
     }
@@ -209,13 +223,16 @@ impl Renderer {
         self.recreate_swapchain();
         self.viewport.dimensions = self.window.inner_size().into();
 
-        self.render_objects[0].replace_pipeline(vulkano_objects::pipeline::create_pipeline(
-            self.device.clone(),
-            self.vertex_shader.clone(),
-            self.fragment_shader.clone(),
-            self.render_pass.clone(),
-            self.viewport.clone(),
-        ));
+        self.material_pipelines.insert(
+            self.render_objects[0].pipeline_id.clone(),
+            vulkano_objects::pipeline::create_pipeline(
+                self.device.clone(),
+                self.vertex_shader.clone(),
+                self.fragment_shader.clone(),
+                self.render_pass.clone(),
+                self.viewport.clone(),
+            ),
+        );
 
         // self.recreate_cb();
     }
@@ -226,9 +243,9 @@ impl Renderer {
         self.command_buffers = vulkano_objects::command_buffers::create_simple_command_buffers(
             &self.allocators,
             self.queue.clone(),
-            ro.get_pipeline(),
+            self.material_pipelines[&ro.pipeline_id].clone(),
             &self.framebuffers,
-            ro.get_buffers(),
+            &self.mesh_buffers[&ro.mesh_id],
             ro.get_uniforms(),
         );
     }
