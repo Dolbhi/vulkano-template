@@ -30,10 +30,10 @@ impl Square {
     }
 
     pub fn move_up(&mut self, seconds_passed: f32) {
-        self.position[1] -= seconds_passed * self.speed
+        self.position[1] += seconds_passed * self.speed
     }
 
     pub fn move_down(&mut self, seconds_passed: f32) {
-        self.position[1] += seconds_passed * self.speed
+        self.position[1] -= seconds_passed * self.speed
     }
 }

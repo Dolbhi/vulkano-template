@@ -1,4 +1,4 @@
-use cgmath::{Matrix4, SquareMatrix};
+use cgmath::{Matrix4, Rad, SquareMatrix};
 
 use vulkano::buffer::BufferContents;
 use vulkano_template::{shaders::movable_square::vs::Data, vulkano_objects::buffers::Uniform};
@@ -29,26 +29,27 @@ impl<U: BufferContents + Clone> RenderObject<U> {
         &self.uniforms
     }
 
-    pub fn update_transform(&mut self, position: [f32; 2], radians: cgmath::Rad<f32>) {
-        let cam_pos = cgmath::vec3(0., 0., 2.);
-        let view = Matrix4::from_translation(-cam_pos);
-        let projection = cgmath::perspective(cgmath::Rad(1.2), 1., 0.1, 200.);
-        // projection.y.y *= -1.;
-        let model = Matrix4::from_axis_angle(cgmath::vec3(0., 1., 0.), radians);
+    pub fn update_transform(&mut self, position: [f32; 3], rotation: Rad<f32>) {
+        let rotation = Matrix4::from_axis_angle([0., 1., 0.].into(), rotation);
+        let translation = Matrix4::from_translation(position.into());
 
-        let translation = Matrix4::from_translation([position[0], position[1], 0.].into());
-
-        self.transform_matrix = projection * view * model * translation;
+        self.transform_matrix = translation * rotation;
     }
 }
 
 impl RenderObject<Data> {
-    pub fn update_uniform(&self, index: u32) {
+    pub fn update_uniform(&self, index: u32, cam_rot: cgmath::Rad<f32>) {
         let mut uniform_content = self.uniforms[index as usize]
             .0
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to uniform buffer\n{}", e));
 
-        uniform_content.render_matrix = self.transform_matrix.into();
+        let cam_pos = cgmath::vec3(0., 0., 2.);
+        let view = Matrix4::from_translation(-cam_pos);
+        let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
+        projection.y.y *= -1.;
+        let model = Matrix4::from_axis_angle([0., 1., 0.].into(), cam_rot);
+
+        uniform_content.render_matrix = (projection * view * model * self.transform_matrix).into();
     }
 }

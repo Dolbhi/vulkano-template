@@ -53,7 +53,7 @@ pub struct Renderer {
     // command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
     mesh_buffers: HashMap<String, Buffers>,
     material_pipelines: HashMap<String, Arc<GraphicsPipeline>>,
-    render_objects: Vec<RenderObject<UniformData>>,
+    // render_objects: Vec<RenderObject<UniformData>>,
 }
 
 impl Renderer {
@@ -140,7 +140,7 @@ impl Renderer {
             // command_buffers,
             mesh_buffers: HashMap::new(),
             material_pipelines: HashMap::new(),
-            render_objects: vec![],
+            // render_objects: vec![],
         }
     }
 
@@ -175,7 +175,7 @@ impl Renderer {
             movable_square::fs::load(self.device.clone()).expect("failed to create shader module");
 
         self.material_pipelines.insert(
-            self.render_objects[0].pipeline_id.clone(),
+            String::from("basic"),
             vulkano_objects::pipeline::create_pipeline(
                 self.device.clone(),
                 vertex_shader.clone(),
@@ -215,7 +215,7 @@ impl Renderer {
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
-        // render_objects: &Vec<RenderObject<U>>,
+        render_objects: &Vec<RenderObject<UniformData>>,
     ) -> Result<Fence, FlushError> {
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
@@ -233,7 +233,7 @@ impl Renderer {
                 SubpassContents::Inline,
             )
             .unwrap();
-        for render_obj in &self.render_objects {
+        for render_obj in render_objects {
             let pipeline = &self.material_pipelines[&render_obj.pipeline_id];
 
             let buffers = &self.mesh_buffers[&render_obj.mesh_id];
@@ -291,9 +291,8 @@ impl Renderer {
         &mut self,
         mesh_id: String,
         material_id: String,
-        uniform_buffer_count: usize,
         initial_uniform: UniformData,
-    ) -> usize {
+    ) -> RenderObject<UniformData> {
         let descriptor_set_layout = self.material_pipelines[&material_id]
             .layout()
             .set_layouts()
@@ -304,27 +303,15 @@ impl Renderer {
         let uniforms = create_cpu_accessible_uniforms(
             &self.allocators,
             descriptor_set_layout,
-            uniform_buffer_count,
+            self.get_image_count(),
             initial_uniform,
         );
 
-        let render_obj = RenderObject::new(mesh_id, material_id, uniforms);
+        // let render_obj =
+        RenderObject::new(mesh_id, material_id, uniforms)
 
-        self.render_objects.push(render_obj);
+        // self.render_objects.push(render_obj);
 
-        self.render_objects.len() - 1
-    }
-
-    // pub fn update_ro_transform(
-    //     &mut self,
-    //     ro_i: usize,
-    //     position: [f32; 2],
-    //     radians: cgmath::Rad<f32>,
-    // ) {
-    //     self.render_objects[ro_i].update_transform(position, radians);
-    // }
-
-    pub fn get_render_object(&mut self, ro_i: usize) -> &mut RenderObject<UniformData> {
-        &mut self.render_objects[ro_i]
+        // self.render_objects.len() - 1
     }
 }

@@ -9,7 +9,6 @@ use vulkano::descriptor_set::layout::DescriptorSetLayout;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::Queue;
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryUsage};
-use vulkano::pipeline::GraphicsPipeline;
 use vulkano::sync::future::NowFuture;
 use vulkano::sync::GpuFuture;
 use vulkano::DeviceSize;

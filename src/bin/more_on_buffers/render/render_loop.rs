@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use cgmath::SquareMatrix;
 use vulkano::swapchain::AcquireError;
 use vulkano::sync::{FlushError, GpuFuture};
 use vulkano_template::game_objects::Square;
@@ -11,6 +12,7 @@ use winit::event_loop::EventLoop;
 use crate::render::renderer::{Fence, Renderer};
 
 // use super::render_object::RenderObject;
+use super::render_object::RenderObject;
 use super::UniformData;
 
 pub struct RenderLoop {
@@ -21,6 +23,7 @@ pub struct RenderLoop {
     previous_fence_i: u32,
     total_seconds: f32,
     controlled_i: usize,
+    render_objects: Vec<RenderObject<UniformData>>,
 }
 
 impl RenderLoop {
@@ -43,27 +46,29 @@ impl RenderLoop {
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/gun.obj",
         );
         let mesh = Mesh::from_obj(path);
-        let mesh_id = String::from("gun");
-        renderer.init_mesh(mesh_id.clone(), mesh);
+        let gun_id = String::from("gun");
+        renderer.init_mesh(gun_id.clone(), mesh);
+
+        let path = Path::new(
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/suzanne.obj",
+        );
+        let mesh = Mesh::from_obj(path);
+        let suz_id = String::from("suzanne");
+        renderer.init_mesh(suz_id.clone(), mesh);
 
         let square_mesh = Mesh::from_model::<SquareModel>();
         let square_id = String::from("square");
         renderer.init_mesh(square_id.clone(), square_mesh);
 
         // objects
-        let cam_pos = cgmath::vec3(0., 0., 2.);
-        let view = cgmath::Matrix4::from_translation(-cam_pos);
-        let projection = cgmath::perspective(cgmath::Rad(1.2), 1., 0.1, 200.);
         let initial_uniform = UniformData {
             data: [0., 0., 0., 0.],
-            render_matrix: (projection * view).into(),
+            render_matrix: (cgmath::Matrix4::identity()).into(),
         };
-        let controlled_i = renderer.add_render_object(
-            mesh_id,
-            material_id,
-            renderer.get_image_count(),
-            initial_uniform,
-        );
+        let controlled_obj =
+            renderer.add_render_object(suz_id, material_id.clone(), initial_uniform);
+        let mut square_obj = renderer.add_render_object(square_id, material_id, initial_uniform);
+        square_obj.update_transform([0., 1., 0.], cgmath::Rad(0.));
 
         Self {
             renderer,
@@ -72,7 +77,8 @@ impl RenderLoop {
             fences,
             previous_fence_i: 0,
             total_seconds: 0.0,
-            controlled_i,
+            controlled_i: 0,
+            render_objects: vec![controlled_obj, square_obj],
         }
     }
 
@@ -112,12 +118,13 @@ impl RenderLoop {
         }
 
         // update uniform data
-        let obj = self.renderer.get_render_object(self.controlled_i);
-        obj.update_transform(
-            transform_data.position,
-            cgmath::Rad(self.total_seconds * 1.),
+        self.render_objects[self.controlled_i].update_transform(
+            [transform_data.position[0], transform_data.position[1], 0.],
+            cgmath::Rad(0.),
         );
-        obj.update_uniform(image_i);
+        for obj in &self.render_objects {
+            obj.update_uniform(image_i, cgmath::Rad(self.total_seconds * 1.));
+        }
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
         let something_needs_all_gpu_resources = false;
@@ -135,9 +142,12 @@ impl RenderLoop {
             // logic that can use every GPU resource (the GPU is sleeping)
         }
 
-        let result = self
-            .renderer
-            .flush_next_future(previous_future, acquire_future, image_i);
+        let result = self.renderer.flush_next_future(
+            previous_future,
+            acquire_future,
+            image_i,
+            &self.render_objects,
+        );
 
         // replace fence of upcoming image with new one
         self.fences[image_i as usize] = match result {
