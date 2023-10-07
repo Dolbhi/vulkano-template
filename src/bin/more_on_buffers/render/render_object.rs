@@ -6,16 +6,16 @@ use vulkano_template::{shaders::movable_square::vs::Data, vulkano_objects::buffe
 pub struct RenderObject<U: BufferContents + Clone> {
     // buffers: Buffers,
     pub mesh_id: String,
-    pub pipeline_id: String,
+    pub material_id: String,
     uniforms: Vec<Uniform<U>>,
     transform_matrix: Matrix4<f32>,
 }
 
 impl<U: BufferContents + Clone> RenderObject<U> {
-    pub fn new(mesh_id: String, pipeline_id: String, uniforms: Vec<Uniform<U>>) -> Self {
+    pub fn new(mesh_id: String, material_id: String, uniforms: Vec<Uniform<U>>) -> Self {
         Self {
             mesh_id,
-            pipeline_id,
+            material_id,
             uniforms,
             transform_matrix: Matrix4::identity(),
         }

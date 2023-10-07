@@ -233,24 +233,39 @@ impl Renderer {
                 SubpassContents::Inline,
             )
             .unwrap();
-        for render_obj in render_objects {
-            let pipeline = &self.material_pipelines[&render_obj.pipeline_id];
 
-            let buffers = &self.mesh_buffers[&render_obj.mesh_id];
-            let index_buffer = buffers.get_index();
-            let index_buffer_length = index_buffer.len();
+        let mut last_mat = &String::new();
+        let mut last_mesh = &String::new();
+        let mut last_buffer_len = 0;
+        for render_obj in render_objects {
+            let pipeline = &self.material_pipelines[&render_obj.material_id];
+            if last_mat != &render_obj.material_id {
+                builder.bind_pipeline_graphics(pipeline.clone());
+
+                last_mat = &render_obj.material_id;
+            }
+
+            if last_mesh != &render_obj.mesh_id {
+                let buffers = &self.mesh_buffers[&render_obj.mesh_id];
+                let index_buffer = buffers.get_index();
+                let index_buffer_length = index_buffer.len();
+
+                builder
+                    .bind_vertex_buffers(0, buffers.get_vertex())
+                    .bind_index_buffer(index_buffer);
+
+                last_mesh = &render_obj.mesh_id;
+                last_buffer_len = index_buffer_length;
+            }
 
             builder
-                .bind_pipeline_graphics(pipeline.clone())
                 .bind_descriptor_sets(
                     PipelineBindPoint::Graphics,
                     pipeline.layout().clone(),
                     0,
                     render_obj.get_uniforms()[image_i as usize].1.clone(),
                 )
-                .bind_vertex_buffers(0, buffers.get_vertex())
-                .bind_index_buffer(index_buffer)
-                .draw_indexed(index_buffer_length as u32, 1, 0, 0, 0)
+                .draw_indexed(last_buffer_len as u32, 1, 0, 0, 0)
                 .unwrap();
         }
         builder.end_render_pass().unwrap();
