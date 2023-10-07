@@ -77,7 +77,7 @@ impl RenderLoop {
     }
 
     /// update renderer and draw upcoming image
-    pub fn update(&mut self, render_object: &Square, seconds_passed: f32) {
+    pub fn update(&mut self, transform_data: &Square, seconds_passed: f32) {
         // stuff
         self.total_seconds += seconds_passed;
 
@@ -112,9 +112,12 @@ impl RenderLoop {
         }
 
         // update uniform data
-        self.renderer
-            .get_render_object(self.controlled_i)
-            .update_uniform(image_i, render_object, cgmath::Rad(self.total_seconds * 1.));
+        let obj = self.renderer.get_render_object(self.controlled_i);
+        obj.update_transform(
+            transform_data.position,
+            cgmath::Rad(self.total_seconds * 1.),
+        );
+        obj.update_uniform(image_i);
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
         let something_needs_all_gpu_resources = false;

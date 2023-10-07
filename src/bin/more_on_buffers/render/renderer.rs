@@ -315,7 +315,16 @@ impl Renderer {
         self.render_objects.len() - 1
     }
 
-    pub fn get_render_object(&self, ro_i: usize) -> &RenderObject<UniformData> {
-        &self.render_objects[ro_i]
+    // pub fn update_ro_transform(
+    //     &mut self,
+    //     ro_i: usize,
+    //     position: [f32; 2],
+    //     radians: cgmath::Rad<f32>,
+    // ) {
+    //     self.render_objects[ro_i].update_transform(position, radians);
+    // }
+
+    pub fn get_render_object(&mut self, ro_i: usize) -> &mut RenderObject<UniformData> {
+        &mut self.render_objects[ro_i]
     }
 }
