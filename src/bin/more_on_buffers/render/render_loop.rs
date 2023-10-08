@@ -2,19 +2,19 @@ use std::path::Path;
 use std::sync::Arc;
 
 use cgmath::SquareMatrix;
+
 use vulkano::swapchain::AcquireError;
 use vulkano::sync::{FlushError, GpuFuture};
-use vulkano_template::game_objects::Square;
-use vulkano_template::models::SquareModel;
-use vulkano_template::shaders::basic;
+
 use winit::event_loop::EventLoop;
 
-use crate::render::renderer::{Fence, Renderer};
-
-// use super::render_object::RenderObject;
-use super::mesh::Mesh;
-use super::render_object::RenderObject;
-use super::UniformData;
+use super::{
+    mesh::Mesh,
+    render_object::RenderObject,
+    renderer::{Fence, Renderer},
+    UniformData,
+};
+use vulkano_template::{game_objects::Square, models::SquareModel, shaders::basic};
 
 pub struct RenderLoop {
     renderer: Renderer,

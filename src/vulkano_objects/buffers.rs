@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
-use vulkano::buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer};
-use vulkano::command_buffer::{
-    AutoCommandBufferBuilder, CommandBufferExecFuture, CommandBufferUsage, CopyBufferInfo,
-    PrimaryCommandBufferAbstract,
+use vulkano::{
+    buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer},
+    command_buffer::{
+        AutoCommandBufferBuilder, CommandBufferExecFuture, CommandBufferUsage, CopyBufferInfo,
+        PrimaryCommandBufferAbstract,
+    },
+    descriptor_set::{layout::DescriptorSetLayout, PersistentDescriptorSet, WriteDescriptorSet},
+    device::Queue,
+    memory::allocator::{AllocationCreateInfo, MemoryUsage},
+    sync::{future::NowFuture, GpuFuture},
+    DeviceSize,
 };
-use vulkano::descriptor_set::layout::DescriptorSetLayout;
-use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
-use vulkano::device::Queue;
-use vulkano::memory::allocator::{AllocationCreateInfo, MemoryUsage};
-use vulkano::sync::future::NowFuture;
-use vulkano::sync::GpuFuture;
-use vulkano::DeviceSize;
 
 use super::allocators::Allocators;
 use crate::VertexFull;
