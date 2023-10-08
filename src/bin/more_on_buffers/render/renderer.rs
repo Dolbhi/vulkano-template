@@ -1,9 +1,6 @@
 use std::collections::hash_map::HashMap;
 use std::sync::Arc;
 
-// use cgmath::Matrix4;
-
-// use vulkano::buffer::BufferContents;
 use vulkano::{
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferExecFuture, CommandBufferUsage, RenderPassBeginInfo,
@@ -12,7 +9,7 @@ use vulkano::{
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
     image::SwapchainImage,
     instance::Instance,
-    pipeline::{graphics::viewport::Viewport, GraphicsPipeline, Pipeline, PipelineBindPoint},
+    pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint},
     render_pass::{Framebuffer, RenderPass},
     shader::ShaderModule,
     swapchain::{
@@ -27,7 +24,6 @@ use vulkano::{
 };
 use vulkano_template::{
     models::Mesh,
-    shaders::basic,
     vulkano_objects,
     vulkano_objects::allocators::Allocators,
     vulkano_objects::buffers::{create_cpu_accessible_uniforms, Buffers},
@@ -37,6 +33,7 @@ use winit::dpi::LogicalSize;
 use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowBuilder};
 
+use super::material::Material;
 use super::render_object::RenderObject;
 use super::UniformData;
 
@@ -55,10 +52,8 @@ pub struct Renderer {
     framebuffers: Vec<Arc<Framebuffer>>,
     allocators: Allocators,
     viewport: Viewport,
-    // command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
     mesh_buffers: HashMap<String, Buffers>,
-    material_pipelines: HashMap<String, Arc<GraphicsPipeline>>,
-    // render_objects: Vec<RenderObject<UniformData>>,
+    material_pipelines: HashMap<String, Material>,
 }
 
 impl Renderer {
@@ -119,12 +114,6 @@ impl Renderer {
             &allocators,
         );
 
-        // HELL
-        // let vertex_shader =
-        //     movable_square::vs::load(device.clone()).expect("failed to create shader module");
-        // let fragment_shader =
-        //     movable_square::fs::load(device.clone()).expect("failed to create shader module");
-
         let viewport = Viewport {
             origin: [0.0, 0.0],
             dimensions: window.inner_size().into(),
@@ -142,10 +131,8 @@ impl Renderer {
             framebuffers,
             allocators,
             viewport,
-            // command_buffers,
             mesh_buffers: HashMap::new(),
             material_pipelines: HashMap::new(),
-            // render_objects: vec![],
         }
     }
 
@@ -174,23 +161,13 @@ impl Renderer {
         self.recreate_swapchain();
         self.viewport.dimensions = self.window.inner_size().into();
 
-        let vertex_shader =
-            basic::vs::load(self.device.clone()).expect("failed to create shader module");
-        let fragment_shader =
-            basic::fs::load(self.device.clone()).expect("failed to create shader module");
-
-        self.material_pipelines.insert(
-            String::from("basic"),
-            vulkano_objects::pipeline::create_pipeline(
+        for (_, v) in &mut self.material_pipelines {
+            v.recreate_pipeline(
                 self.device.clone(),
-                vertex_shader.clone(),
-                fragment_shader.clone(),
                 self.render_pass.clone(),
                 self.viewport.clone(),
-            ),
-        );
-
-        // self.recreate_cb();
+            );
+        }
     }
 
     pub fn get_image_count(&self) -> usize {
@@ -243,9 +220,9 @@ impl Renderer {
         let mut last_mesh = &String::new();
         let mut last_buffer_len = 0;
         for render_obj in render_objects {
-            let pipeline = &self.material_pipelines[&render_obj.material_id];
+            let pipeline = &self.material_pipelines[&render_obj.material_id].get_pipeline();
             if last_mat != &render_obj.material_id {
-                builder.bind_pipeline_graphics(pipeline.clone());
+                builder.bind_pipeline_graphics((*pipeline).clone());
 
                 last_mat = &render_obj.material_id;
             }
@@ -304,7 +281,8 @@ impl Renderer {
             self.render_pass.clone(),
             self.viewport.clone(),
         );
-        self.material_pipelines.insert(id, pipeline);
+        let mat = Material::new(vertex_shader, fragment_shader, pipeline);
+        self.material_pipelines.insert(id, mat);
     }
 
     pub fn add_render_object(
@@ -313,16 +291,15 @@ impl Renderer {
         material_id: String,
         initial_uniform: UniformData,
     ) -> RenderObject<UniformData> {
-        let descriptor_set_layout = self.material_pipelines[&material_id]
-            .layout()
-            .set_layouts()
-            .get(0)
-            .unwrap()
-            .clone();
-
         let uniforms = create_cpu_accessible_uniforms(
             &self.allocators,
-            descriptor_set_layout,
+            self.material_pipelines[&material_id]
+                .get_pipeline()
+                .layout()
+                .set_layouts()
+                .get(0)
+                .unwrap()
+                .clone(),
             self.get_image_count(),
             initial_uniform,
         );

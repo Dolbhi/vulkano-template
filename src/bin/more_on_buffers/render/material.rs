@@ -8,13 +8,21 @@ use vulkano::{
 };
 use vulkano_template::vulkano_objects::pipeline;
 
-struct Material {
+pub struct Material {
     vs: Arc<ShaderModule>,
     fs: Arc<ShaderModule>,
     pipeline: Arc<GraphicsPipeline>,
 }
 
 impl Material {
+    pub fn new(
+        vs: Arc<ShaderModule>,
+        fs: Arc<ShaderModule>,
+        pipeline: Arc<GraphicsPipeline>,
+    ) -> Self {
+        Material { vs, fs, pipeline }
+    }
+
     pub fn get_pipeline(&self) -> &Arc<GraphicsPipeline> {
         &self.pipeline
     }
