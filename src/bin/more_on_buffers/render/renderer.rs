@@ -23,7 +23,7 @@ use vulkano::sync::future::{FenceSignalFuture, JoinFuture, NowFuture};
 use vulkano::sync::{self, FlushError, GpuFuture};
 // use vulkano_template::game_objects::Square;
 use vulkano_template::models::Mesh;
-use vulkano_template::shaders::movable_square;
+use vulkano_template::shaders::basic;
 use vulkano_template::vulkano_objects;
 use vulkano_template::vulkano_objects::allocators::Allocators;
 use vulkano_template::vulkano_objects::buffers::{create_cpu_accessible_uniforms, Buffers};
@@ -170,9 +170,9 @@ impl Renderer {
         self.viewport.dimensions = self.window.inner_size().into();
 
         let vertex_shader =
-            movable_square::vs::load(self.device.clone()).expect("failed to create shader module");
+            basic::vs::load(self.device.clone()).expect("failed to create shader module");
         let fragment_shader =
-            movable_square::fs::load(self.device.clone()).expect("failed to create shader module");
+            basic::fs::load(self.device.clone()).expect("failed to create shader module");
 
         self.material_pipelines.insert(
             String::from("basic"),

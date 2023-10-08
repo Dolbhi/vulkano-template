@@ -1,2 +1,2 @@
-pub mod movable_square;
+pub mod basic;
 pub mod static_triangle;

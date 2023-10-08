@@ -6,7 +6,7 @@ use vulkano::swapchain::AcquireError;
 use vulkano::sync::{FlushError, GpuFuture};
 use vulkano_template::game_objects::Square;
 use vulkano_template::models::{Mesh, SquareModel};
-use vulkano_template::shaders::movable_square;
+use vulkano_template::shaders::basic;
 use winit::event_loop::EventLoop;
 
 use crate::render::renderer::{Fence, Renderer};
@@ -33,10 +33,10 @@ impl RenderLoop {
         let fences: Vec<Option<Arc<Fence>>> = vec![None; frames_in_flight];
 
         // materials
-        let vertex_shader = movable_square::vs::load(renderer.clone_device())
-            .expect("failed to create shader module");
-        let fragment_shader = movable_square::fs::load(renderer.clone_device())
-            .expect("failed to create shader module");
+        let vertex_shader =
+            basic::vs::load(renderer.clone_device()).expect("failed to create shader module");
+        let fragment_shader =
+            basic::fs::load(renderer.clone_device()).expect("failed to create shader module");
 
         let material_id = String::from("basic");
         renderer.init_material(material_id.clone(), vertex_shader, fragment_shader);

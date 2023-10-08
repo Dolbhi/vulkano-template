@@ -1,10 +1,9 @@
 use cgmath::{Matrix4, Rad, SquareMatrix};
 
 use vulkano::buffer::BufferContents;
-use vulkano_template::{shaders::movable_square::vs::Data, vulkano_objects::buffers::Uniform};
+use vulkano_template::{shaders::basic::vs::Data, vulkano_objects::buffers::Uniform};
 
 pub struct RenderObject<U: BufferContents + Clone> {
-    // buffers: Buffers,
     pub mesh_id: String,
     pub material_id: String,
     uniforms: Vec<Uniform<U>>,
@@ -20,10 +19,6 @@ impl<U: BufferContents + Clone> RenderObject<U> {
             transform_matrix: Matrix4::identity(),
         }
     }
-
-    // pub fn get_buffers(&self) -> &Buffers {
-    //     &self.buffers
-    // }
 
     pub fn get_uniforms(&self) -> &Vec<Uniform<U>> {
         &self.uniforms

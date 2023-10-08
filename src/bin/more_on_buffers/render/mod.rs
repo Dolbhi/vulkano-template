@@ -1,8 +1,9 @@
+mod material;
 mod render_loop;
 mod render_object;
 mod renderer;
 
-use vulkano_template::shaders::movable_square;
+use vulkano_template::shaders::basic;
 
 pub use render_loop::RenderLoop;
-pub type UniformData = movable_square::vs::Data;
+pub type UniformData = basic::vs::Data;
