@@ -4,29 +4,34 @@ use std::sync::Arc;
 // use cgmath::Matrix4;
 
 // use vulkano::buffer::BufferContents;
-use vulkano::command_buffer::{
-    AutoCommandBufferBuilder, CommandBufferExecFuture, CommandBufferUsage, RenderPassBeginInfo,
-    SubpassContents,
+use vulkano::{
+    command_buffer::{
+        AutoCommandBufferBuilder, CommandBufferExecFuture, CommandBufferUsage, RenderPassBeginInfo,
+        SubpassContents,
+    },
+    device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
+    image::SwapchainImage,
+    instance::Instance,
+    pipeline::{graphics::viewport::Viewport, GraphicsPipeline, Pipeline, PipelineBindPoint},
+    render_pass::{Framebuffer, RenderPass},
+    shader::ShaderModule,
+    swapchain::{
+        self, AcquireError, PresentFuture, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
+        SwapchainCreationError, SwapchainPresentInfo,
+    },
+    sync::{
+        self,
+        future::{FenceSignalFuture, JoinFuture, NowFuture},
+        FlushError, GpuFuture,
+    },
 };
-use vulkano::device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo};
-use vulkano::image::SwapchainImage;
-use vulkano::instance::Instance;
-use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
-use vulkano::render_pass::{Framebuffer, RenderPass};
-use vulkano::shader::ShaderModule;
-use vulkano::swapchain::{
-    self, AcquireError, PresentFuture, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
-    SwapchainCreationError, SwapchainPresentInfo,
+use vulkano_template::{
+    models::Mesh,
+    shaders::basic,
+    vulkano_objects,
+    vulkano_objects::allocators::Allocators,
+    vulkano_objects::buffers::{create_cpu_accessible_uniforms, Buffers},
 };
-use vulkano::sync::future::{FenceSignalFuture, JoinFuture, NowFuture};
-use vulkano::sync::{self, FlushError, GpuFuture};
-// use vulkano_template::game_objects::Square;
-use vulkano_template::models::Mesh;
-use vulkano_template::shaders::basic;
-use vulkano_template::vulkano_objects;
-use vulkano_template::vulkano_objects::allocators::Allocators;
-use vulkano_template::vulkano_objects::buffers::{create_cpu_accessible_uniforms, Buffers};
 use vulkano_win::VkSurfaceBuild;
 use winit::dpi::LogicalSize;
 use winit::event_loop::EventLoop;
