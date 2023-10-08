@@ -5,13 +5,14 @@ use cgmath::SquareMatrix;
 use vulkano::swapchain::AcquireError;
 use vulkano::sync::{FlushError, GpuFuture};
 use vulkano_template::game_objects::Square;
-use vulkano_template::models::{Mesh, SquareModel};
+use vulkano_template::models::SquareModel;
 use vulkano_template::shaders::basic;
 use winit::event_loop::EventLoop;
 
 use crate::render::renderer::{Fence, Renderer};
 
 // use super::render_object::RenderObject;
+use super::mesh::Mesh;
 use super::render_object::RenderObject;
 use super::UniformData;
 

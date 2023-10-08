@@ -1,9 +1,6 @@
 use std::path::Path;
 
-// use vulkano::buffer::BufferContents;
-
-use crate::models::Model;
-use crate::VertexFull;
+use vulkano_template::{models::Model, VertexFull};
 
 // use tobj::load_obj;
 
@@ -66,11 +63,11 @@ impl Mesh {
         }
     }
 
-    pub fn get_vertices(&self) -> Vec<VertexFull> {
+    pub fn clone_vertices(&self) -> Vec<VertexFull> {
         return self.vertices.clone();
     }
 
-    pub fn get_indicies(&self) -> Vec<u32> {
+    pub fn clone_indicies(&self) -> Vec<u32> {
         return self.indices.clone();
     }
 }

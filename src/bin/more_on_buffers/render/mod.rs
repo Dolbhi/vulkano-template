@@ -1,4 +1,5 @@
 mod material;
+mod mesh;
 mod render_loop;
 mod render_object;
 mod renderer;

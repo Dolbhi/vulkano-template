@@ -23,7 +23,6 @@ use vulkano::{
     },
 };
 use vulkano_template::{
-    models::Mesh,
     vulkano_objects,
     vulkano_objects::allocators::Allocators,
     vulkano_objects::buffers::{create_cpu_accessible_uniforms, Buffers},
@@ -34,6 +33,7 @@ use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowBuilder};
 
 use super::material::Material;
+use super::mesh::Mesh;
 use super::render_object::RenderObject;
 use super::UniformData;
 
@@ -264,7 +264,12 @@ impl Renderer {
     }
 
     pub fn init_mesh(&mut self, id: String, mesh: Mesh) {
-        let buffer = Buffers::initialize_device_local(&self.allocators, self.queue.clone(), mesh);
+        let buffer = Buffers::initialize_device_local(
+            &self.allocators,
+            self.queue.clone(),
+            mesh.clone_vertices(),
+            mesh.clone_indicies(),
+        );
         self.mesh_buffers.insert(id, buffer);
     }
 

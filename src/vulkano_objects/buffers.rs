@@ -14,7 +14,6 @@ use vulkano::sync::GpuFuture;
 use vulkano::DeviceSize;
 
 use super::allocators::Allocators;
-use crate::models::Mesh;
 use crate::VertexFull;
 
 pub type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
@@ -50,15 +49,14 @@ impl Buffers {
         // descriptor_set_layout: Arc<DescriptorSetLayout>,
         // uniform_buffer_count: usize,
         transfer_queue: Arc<Queue>,
-        // vertices: Vec<VertexFull>,
-        // indices: Vec<u32>,
-        mesh: Mesh,
+        vertices: Vec<VertexFull>,
+        indices: Vec<u32>,
+        // mesh: Mesh,
         // initial_uniform: U,
     ) -> Self {
         let (vertex, vertex_future) =
-            create_device_local_vertex(allocators, transfer_queue.clone(), mesh.get_vertices());
-        let (index, index_future) =
-            create_device_local_index(allocators, transfer_queue, mesh.get_indicies());
+            create_device_local_vertex(allocators, transfer_queue.clone(), vertices);
+        let (index, index_future) = create_device_local_index(allocators, transfer_queue, indices);
 
         let fence = vertex_future
             .join(index_future)
