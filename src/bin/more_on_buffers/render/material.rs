@@ -15,8 +15,8 @@ struct Material {
 }
 
 impl Material {
-    pub fn clone_pipeline(&self) -> Arc<GraphicsPipeline> {
-        self.pipeline.clone()
+    pub fn get_pipeline(&self) -> &Arc<GraphicsPipeline> {
+        &self.pipeline
     }
 
     pub fn recreate_pipeline(
