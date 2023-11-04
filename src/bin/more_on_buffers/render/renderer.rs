@@ -26,6 +26,7 @@ use vulkano_template::{
     vulkano_objects,
     vulkano_objects::allocators::Allocators,
     vulkano_objects::buffers::{create_cpu_accessible_uniforms, Buffers},
+    VertexFull,
 };
 use vulkano_win::VkSurfaceBuild;
 use winit::dpi::LogicalSize;
@@ -49,7 +50,7 @@ pub struct Renderer {
     framebuffers: Vec<Arc<Framebuffer>>,
     allocators: Allocators,
     viewport: Viewport,
-    mesh_buffers: HashMap<String, Buffers>,
+    mesh_buffers: HashMap<String, Buffers<VertexFull>>,
     material_pipelines: HashMap<String, Material>,
 }
 
@@ -242,7 +243,7 @@ impl Renderer {
                     PipelineBindPoint::Graphics,
                     pipeline.layout().clone(),
                     0,
-                    render_obj.get_uniforms()[image_i as usize].1.clone(),
+                    render_obj.clone_descriptor(image_i as usize),
                 )
                 .draw_indexed(last_buffer_len as u32, 1, 0, 0, 0)
                 .unwrap();

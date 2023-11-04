@@ -9,23 +9,23 @@ use vulkano::{
     descriptor_set::{layout::DescriptorSetLayout, PersistentDescriptorSet, WriteDescriptorSet},
     device::Queue,
     memory::allocator::{AllocationCreateInfo, MemoryUsage},
+    pipeline::graphics::vertex_input::Vertex,
     sync::{future::NowFuture, GpuFuture},
     DeviceSize,
 };
 
 use super::allocators::Allocators;
-use crate::VertexFull;
 
 pub type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
 
-/// Struct with a vertex, index and uniform buffer, with generic (V)ertices and (U)niforms.
-pub struct Buffers {
-    pub vertex: Subbuffer<[VertexFull]>,
+/// Struct with a vertex and index, using VertexFull for vertices
+pub struct Buffers<V: Vertex + BufferContents> {
+    pub vertex: Subbuffer<[V]>,
     pub index: Subbuffer<[u32]>,
     // pub uniforms: Vec<Uniform<U>>,
 }
 
-impl Buffers {
+impl<V: Vertex + BufferContents> Buffers<V> {
     /// Creates simple vertex, index and uniform buffers of specified model
     // pub fn initialize_host_accessible<M: Model<V, U>>(
     //     allocators: &Allocators,
@@ -49,7 +49,7 @@ impl Buffers {
         // descriptor_set_layout: Arc<DescriptorSetLayout>,
         // uniform_buffer_count: usize,
         transfer_queue: Arc<Queue>,
-        vertices: Vec<VertexFull>,
+        vertices: Vec<V>,
         indices: Vec<u32>,
         // mesh: Mesh,
         // initial_uniform: U,
@@ -77,7 +77,7 @@ impl Buffers {
         }
     }
 
-    pub fn get_vertex(&self) -> Subbuffer<[VertexFull]> {
+    pub fn get_vertex(&self) -> Subbuffer<[V]> {
         self.vertex.clone()
     }
 

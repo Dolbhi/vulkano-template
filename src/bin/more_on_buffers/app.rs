@@ -32,7 +32,7 @@ pub struct App {
 
 impl App {
     pub fn start(event_loop: &EventLoop<()>) -> Self {
-        println!("Welcome to the movable square example!");
+        println!("Welcome to THE RUSTY RENDERER!");
         println!("Press WASD to move and SPACE to change color");
 
         Self {

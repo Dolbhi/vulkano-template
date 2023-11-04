@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use cgmath::{Matrix4, Rad, SquareMatrix};
 
-use vulkano::buffer::BufferContents;
+use vulkano::{buffer::BufferContents, descriptor_set::PersistentDescriptorSet};
 use vulkano_template::{shaders::basic::vs::Data, vulkano_objects::buffers::Uniform};
 
 pub struct RenderObject<U: BufferContents + Clone> {
@@ -20,8 +22,12 @@ impl<U: BufferContents + Clone> RenderObject<U> {
         }
     }
 
-    pub fn get_uniforms(&self) -> &Vec<Uniform<U>> {
-        &self.uniforms
+    // pub fn get_uniforms(&self) -> &Vec<Uniform<U>> {
+    //     &self.uniforms
+    // }
+
+    pub fn clone_descriptor(&self, index: usize) -> Arc<PersistentDescriptorSet> {
+        self.uniforms[index].1.clone()
     }
 
     pub fn update_transform(&mut self, position: [f32; 3], rotation: Rad<f32>) {

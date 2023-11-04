@@ -13,7 +13,7 @@ use vulkano::render_pass::Framebuffer;
 
 use super::allocators::Allocators;
 use super::buffers::{Buffers, Uniform};
-use crate::Vertex2d;
+use crate::{Vertex2d, VertexFull};
 
 pub fn create_only_vertex_command_buffers(
     allocators: &Allocators,
@@ -59,7 +59,7 @@ pub fn create_simple_command_buffers<U: BufferContents + Clone>(
     queue: Arc<Queue>,
     pipeline: Arc<GraphicsPipeline>,
     framebuffers: &[Arc<Framebuffer>],
-    buffers: &Buffers,
+    buffers: &Buffers<VertexFull>,
     uniforms: &Vec<Uniform<U>>,
     // render_object: &RenderObject<U>,
 ) -> Vec<Arc<PrimaryAutoCommandBuffer>> {
