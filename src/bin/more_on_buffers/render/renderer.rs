@@ -179,6 +179,7 @@ impl Renderer {
         self.device.clone()
     }
 
+    /// Gets future where next image in swapchain is ready
     pub fn acquire_swapchain_image(
         &self,
     ) -> Result<(u32, bool, SwapchainAcquireFuture), AcquireError> {
@@ -192,7 +193,7 @@ impl Renderer {
         now
     }
 
-    /// Join given futures which are used to execute the commands and present the swapchain image corresponding to the given image_i
+    /// Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
     pub fn flush_next_future(
         &self,
         previous_future: Box<dyn GpuFuture>,
@@ -221,6 +222,7 @@ impl Renderer {
         let mut last_mesh = &String::new();
         let mut last_buffer_len = 0;
         for render_obj in render_objects {
+            // material (pipeline)
             let pipeline = &self.material_pipelines[&render_obj.material_id].get_pipeline();
             if last_mat != &render_obj.material_id {
                 builder.bind_pipeline_graphics((*pipeline).clone());
@@ -228,6 +230,7 @@ impl Renderer {
                 last_mat = &render_obj.material_id;
             }
 
+            // mesh (vertices and indicies)
             if last_mesh != &render_obj.mesh_id {
                 let buffers = &self.mesh_buffers[&render_obj.mesh_id];
                 let index_buffer = buffers.get_index();
@@ -241,6 +244,7 @@ impl Renderer {
                 last_buffer_len = index_buffer_length;
             }
 
+            // descriptor sets + draw
             builder
                 .bind_descriptor_sets(
                     PipelineBindPoint::Graphics,
@@ -253,6 +257,7 @@ impl Renderer {
         }
         builder.end_render_pass().unwrap();
 
+        // Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
         previous_future
             .join(swapchain_acquire_future)
             .then_execute(self.queue.clone(), builder.build().unwrap())

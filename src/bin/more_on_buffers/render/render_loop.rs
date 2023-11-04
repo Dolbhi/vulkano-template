@@ -96,7 +96,7 @@ impl RenderLoop {
             // self.renderer.recreate_cb();
         }
 
-        // get upcoming image to display as well as corresponding future
+        // get upcoming image to display and future of when it is ready
         let (image_i, suboptimal, acquire_future) = match self.renderer.acquire_swapchain_image() {
             Ok(r) => r,
             Err(AcquireError::OutOfDate) => {
