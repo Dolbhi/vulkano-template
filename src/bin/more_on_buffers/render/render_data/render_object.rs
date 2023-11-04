@@ -9,7 +9,7 @@ pub struct RenderObject<U: BufferContents + Clone> {
     pub mesh_id: String,
     pub material_id: String,
     uniforms: Vec<Uniform<U>>,
-    transform_matrix: Matrix4<f32>,
+    transform: Matrix4<f32>,
 }
 
 impl<U: BufferContents + Clone> RenderObject<U> {
@@ -18,7 +18,7 @@ impl<U: BufferContents + Clone> RenderObject<U> {
             mesh_id,
             material_id,
             uniforms,
-            transform_matrix: Matrix4::identity(),
+            transform: Matrix4::identity(),
         }
     }
 
@@ -34,7 +34,7 @@ impl<U: BufferContents + Clone> RenderObject<U> {
         let rotation = Matrix4::from_axis_angle([0., 1., 0.].into(), rotation);
         let translation = Matrix4::from_translation(position.into());
 
-        self.transform_matrix = translation * rotation;
+        self.transform = translation * rotation;
     }
 }
 
@@ -51,6 +51,6 @@ impl RenderObject<Data> {
         projection.y.y *= -1.;
         let model = Matrix4::from_axis_angle([0., 1., 0.].into(), cam_rot);
 
-        uniform_content.render_matrix = (projection * view * model * self.transform_matrix).into();
+        uniform_content.render_matrix = (projection * view * model * self.transform).into();
     }
 }
