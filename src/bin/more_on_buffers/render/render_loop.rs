@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use cgmath::SquareMatrix;
+use cgmath::{Matrix4, SquareMatrix};
 
 use vulkano::swapchain::AcquireError;
 use vulkano::sync::{FlushError, GpuFuture};
@@ -44,20 +44,20 @@ impl RenderLoop {
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/gun.obj",
         );
-        let mesh = Mesh::from_obj(path);
+        let (vertices, indices) = Mesh::from_obj(path).decompose();
         let gun_id = String::from("gun");
-        renderer.init_mesh(gun_id.clone(), mesh);
+        renderer.init_mesh(gun_id.clone(), vertices, indices);
 
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/suzanne.obj",
         );
-        let mesh = Mesh::from_obj(path);
+        let (vertices, indices) = Mesh::from_obj(path).decompose();
         let suz_id = String::from("suzanne");
-        renderer.init_mesh(suz_id.clone(), mesh);
+        renderer.init_mesh(suz_id.clone(), vertices, indices);
 
-        let square_mesh = Mesh::from_model::<SquareModel>();
+        let (vertices, indices) = Mesh::from_model::<SquareModel>().decompose();
         let square_id = String::from("square");
-        renderer.init_mesh(square_id.clone(), square_mesh);
+        renderer.init_mesh(square_id.clone(), vertices, indices);
 
         // objects
         let initial_uniform = UniformData {
@@ -167,4 +167,10 @@ impl RenderLoop {
         // impacts the next update
         self.window_resized = true;
     }
+}
+
+struct CameraData {
+    view: Matrix4<f32>,
+    proj: Matrix4<f32>,
+    view_proj: Matrix4<f32>,
 }

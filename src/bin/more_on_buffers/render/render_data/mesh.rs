@@ -63,11 +63,15 @@ impl Mesh {
         }
     }
 
-    pub fn clone_vertices(&self) -> Vec<VertexFull> {
-        return self.vertices.clone();
+    pub fn decompose(self) -> (Vec<VertexFull>, Vec<u32>) {
+        (self.vertices, self.indices)
     }
 
-    pub fn clone_indicies(&self) -> Vec<u32> {
-        return self.indices.clone();
-    }
+    // pub fn clone_vertices(&self) -> Vec<VertexFull> {
+    //     return self.vertices.clone();
+    // }
+
+    // pub fn clone_indicies(&self) -> Vec<u32> {
+    //     return self.indices.clone();
+    // }
 }

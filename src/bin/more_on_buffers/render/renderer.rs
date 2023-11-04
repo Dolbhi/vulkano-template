@@ -34,7 +34,7 @@ use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowBuilder};
 
 use super::{
-    render_data::{material::Material, mesh::Mesh, render_object::RenderObject},
+    render_data::{material::Material, render_object::RenderObject},
     UniformData,
 };
 
@@ -250,7 +250,7 @@ impl Renderer {
                     PipelineBindPoint::Graphics,
                     pipeline.layout().clone(),
                     0,
-                    render_obj.clone_descriptor(image_i as usize),
+                    vec![render_obj.clone_descriptor(image_i as usize)],
                 )
                 .draw_indexed(last_buffer_len as u32, 1, 0, 0, 0)
                 .unwrap();
@@ -269,12 +269,14 @@ impl Renderer {
             .then_signal_fence_and_flush()
     }
 
-    pub fn init_mesh(&mut self, id: String, mesh: Mesh) {
+    pub fn init_mesh(&mut self, id: String, vertices: Vec<VertexFull>, indices: Vec<u32>) {
+        // let (vertices, indices) = mesh.decompose();
+
         let buffer = Buffers::initialize_device_local(
             &self.allocators,
             self.queue.clone(),
-            mesh.clone_vertices(),
-            mesh.clone_indicies(),
+            vertices,
+            indices,
         );
         self.mesh_buffers.insert(id, buffer);
     }
