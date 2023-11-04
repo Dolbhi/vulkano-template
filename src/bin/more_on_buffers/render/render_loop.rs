@@ -22,7 +22,6 @@ pub struct RenderLoop {
     fences: Vec<Option<Arc<Fence>>>,
     previous_fence_i: u32,
     total_seconds: f32,
-    controlled_i: usize,
     render_objects: Vec<RenderObject<UniformData>>,
 }
 
@@ -77,7 +76,6 @@ impl RenderLoop {
             fences,
             previous_fence_i: 0,
             total_seconds: 0.0,
-            controlled_i: 0,
             render_objects: vec![controlled_obj, square_obj],
         }
     }
@@ -118,7 +116,7 @@ impl RenderLoop {
         }
 
         // update uniform data
-        self.render_objects[self.controlled_i].update_transform(
+        self.render_objects[0].update_transform(
             [transform_data.position[0], transform_data.position[1], 0.],
             cgmath::Rad(0.),
         );
