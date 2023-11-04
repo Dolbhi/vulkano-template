@@ -9,8 +9,7 @@ use vulkano::sync::{FlushError, GpuFuture};
 use winit::event_loop::EventLoop;
 
 use super::{
-    mesh::Mesh,
-    render_object::RenderObject,
+    render_data::{mesh::Mesh, render_object::RenderObject},
     renderer::{Fence, Renderer},
     UniformData,
 };

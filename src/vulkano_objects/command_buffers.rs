@@ -127,10 +127,3 @@ pub fn create_simple_command_buffers<U: BufferContents + Clone>(
 
 //     Arc::new(command_pool)
 // }
-
-#[derive(BufferContents, Clone)]
-#[repr(C)]
-struct MeshPushConstants {
-    data: [f32; 4],
-    render_matrix: [[f32; 4]; 4],
-}

@@ -33,7 +33,10 @@ use winit::dpi::LogicalSize;
 use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowBuilder};
 
-use super::{material::Material, mesh::Mesh, render_object::RenderObject, UniformData};
+use super::{
+    render_data::{material::Material, mesh::Mesh, render_object::RenderObject},
+    UniformData,
+};
 
 pub type Fence = FenceSignalFuture<
     PresentFuture<CommandBufferExecFuture<JoinFuture<Box<dyn GpuFuture>, SwapchainAcquireFuture>>>,

@@ -1,7 +1,9 @@
-mod material;
-mod mesh;
+mod render_data {
+    pub mod material;
+    pub mod mesh;
+    pub mod render_object;
+}
 mod render_loop;
-mod render_object;
 mod renderer;
 
 use vulkano_template::shaders::basic;
