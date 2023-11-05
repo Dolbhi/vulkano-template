@@ -6,6 +6,8 @@ use winit::event_loop::EventLoop;
 
 use crate::render::RenderLoop;
 
+// TO flush_next_future METHOD ADD PARAMS FOR PASSING CAMERA DESCRIPTOR SET
+
 #[derive(Default, PartialEq)]
 pub enum KeyState {
     Pressed,

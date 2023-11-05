@@ -6,6 +6,7 @@ use vulkano::{
         AutoCommandBufferBuilder, CommandBufferExecFuture, CommandBufferUsage, RenderPassBeginInfo,
         SubpassContents,
     },
+    descriptor_set::PersistentDescriptorSet,
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
     image::SwapchainImage,
     instance::Instance,
@@ -24,8 +25,8 @@ use vulkano::{
 };
 use vulkano_template::{
     vulkano_objects,
-    vulkano_objects::allocators::Allocators,
     vulkano_objects::buffers::{create_cpu_accessible_uniforms, Buffers},
+    vulkano_objects::{allocators::Allocators, buffers::Uniform},
     VertexFull,
 };
 use vulkano_win::VkSurfaceBuild;
@@ -35,7 +36,7 @@ use winit::window::{Window, WindowBuilder};
 
 use super::{
     render_data::{material::Material, render_object::RenderObject},
-    UniformData,
+    CameraData, TransformData,
 };
 
 pub type Fence = FenceSignalFuture<
@@ -199,7 +200,8 @@ impl Renderer {
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
-        render_objects: &Vec<RenderObject<UniformData>>,
+        render_objects: &Vec<RenderObject<TransformData>>,
+        global_descriptor: Arc<PersistentDescriptorSet>,
     ) -> Result<Fence, FlushError> {
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
@@ -223,9 +225,16 @@ impl Renderer {
         let mut last_buffer_len = 0;
         for render_obj in render_objects {
             // material (pipeline)
-            let pipeline = &self.material_pipelines[&render_obj.material_id].get_pipeline();
+            let pipeline = self.material_pipelines[&render_obj.material_id].get_pipeline();
             if last_mat != &render_obj.material_id {
-                builder.bind_pipeline_graphics((*pipeline).clone());
+                builder
+                    .bind_pipeline_graphics(pipeline.clone())
+                    .bind_descriptor_sets(
+                        PipelineBindPoint::Graphics,
+                        pipeline.layout().clone(),
+                        0,
+                        global_descriptor.clone(),
+                    );
 
                 last_mat = &render_obj.material_id;
             }
@@ -249,8 +258,8 @@ impl Renderer {
                 .bind_descriptor_sets(
                     PipelineBindPoint::Graphics,
                     pipeline.layout().clone(),
-                    0,
-                    vec![render_obj.clone_descriptor(image_i as usize)],
+                    1,
+                    render_obj.clone_descriptor(image_i as usize),
                 )
                 .draw_indexed(last_buffer_len as u32, 1, 0, 0, 0)
                 .unwrap();
@@ -299,18 +308,18 @@ impl Renderer {
     }
 
     pub fn add_render_object(
-        &mut self,
+        &self,
         mesh_id: String,
         material_id: String,
-        initial_uniform: UniformData,
-    ) -> RenderObject<UniformData> {
+        initial_uniform: TransformData,
+    ) -> RenderObject<TransformData> {
         let uniforms = create_cpu_accessible_uniforms(
             &self.allocators,
             self.material_pipelines[&material_id]
                 .get_pipeline()
                 .layout()
                 .set_layouts()
-                .get(0)
+                .get(1)
                 .unwrap()
                 .clone(),
             self.get_image_count(),
@@ -323,5 +332,24 @@ impl Renderer {
         // self.render_objects.push(render_obj);
 
         // self.render_objects.len() - 1
+    }
+
+    pub fn create_camera_buffers(
+        &self,
+        material_id: &String,
+        initial_uniform: CameraData,
+    ) -> Vec<Uniform<CameraData>> {
+        create_cpu_accessible_uniforms(
+            &self.allocators,
+            self.material_pipelines[material_id]
+                .get_pipeline()
+                .layout()
+                .set_layouts()
+                .get(0)
+                .unwrap()
+                .clone(),
+            self.get_image_count(),
+            initial_uniform,
+        )
     }
 }

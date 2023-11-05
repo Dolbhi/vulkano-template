@@ -1,17 +1,18 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use cgmath::{Matrix4, SquareMatrix};
+use cgmath::{vec3, Matrix4, Rad, SquareMatrix};
 
 use vulkano::swapchain::AcquireError;
 use vulkano::sync::{FlushError, GpuFuture};
 
+use vulkano_template::vulkano_objects::buffers::Uniform;
 use winit::event_loop::EventLoop;
 
 use super::{
     render_data::{mesh::Mesh, render_object::RenderObject},
     renderer::{Fence, Renderer},
-    UniformData,
+    CameraData, TransformData,
 };
 use vulkano_template::{game_objects::Square, models::SquareModel, shaders::basic};
 
@@ -20,9 +21,10 @@ pub struct RenderLoop {
     recreate_swapchain: bool,
     window_resized: bool,
     fences: Vec<Option<Arc<Fence>>>,
+    camera_descriptor: Vec<Uniform<CameraData>>,
     previous_fence_i: u32,
     total_seconds: f32,
-    render_objects: Vec<RenderObject<UniformData>>,
+    render_objects: Vec<RenderObject<TransformData>>,
 }
 
 impl RenderLoop {
@@ -60,7 +62,7 @@ impl RenderLoop {
         renderer.init_mesh(square_id.clone(), vertices, indices);
 
         // objects
-        let initial_uniform = UniformData {
+        let initial_uniform = TransformData {
             data: [0., 0., 0., 0.],
             render_matrix: (cgmath::Matrix4::identity()).into(),
         };
@@ -69,11 +71,21 @@ impl RenderLoop {
         let mut square_obj = renderer.add_render_object(square_id, material_id, initial_uniform);
         square_obj.update_transform([0., 1., 0.], cgmath::Rad(0.));
 
+        // camera descriptors TODO: create independent layout not based on mat
+        let initial_uniform = CameraData {
+            view: (cgmath::Matrix4::identity()).into(),
+            proj: (cgmath::Matrix4::identity()).into(),
+            view_proj: (cgmath::Matrix4::identity()).into(),
+        };
+        let camera_descriptor =
+            renderer.create_camera_buffers(&String::from("basic"), initial_uniform);
+
         Self {
             renderer,
             recreate_swapchain: false,
             window_resized: false,
             fences,
+            camera_descriptor,
             previous_fence_i: 0,
             total_seconds: 0.0,
             render_objects: vec![controlled_obj, square_obj],
@@ -121,8 +133,26 @@ impl RenderLoop {
             cgmath::Rad(0.),
         );
         for obj in &self.render_objects {
-            obj.update_uniform(image_i, cgmath::Rad(self.total_seconds * 1.));
+            obj.update_uniform(image_i);
         }
+
+        // update camera
+        let cam_pos = vec3(0., 0., 2.);
+        let translation = Matrix4::from_translation(-cam_pos);
+        let rotation =
+            Matrix4::from_axis_angle([0., 1., 0.].into(), cgmath::Rad(self.total_seconds * 1.));
+        let view = translation * rotation;
+
+        let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
+        projection.y.y *= -1.;
+
+        let mut cam_uniform_contents = self.camera_descriptor[image_i as usize]
+            .0
+            .write()
+            .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
+        cam_uniform_contents.view = view.into();
+        cam_uniform_contents.proj = projection.into();
+        cam_uniform_contents.view_proj = (projection * view).into();
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
         let something_needs_all_gpu_resources = false;
@@ -140,11 +170,13 @@ impl RenderLoop {
             // logic that can use every GPU resource (the GPU is sleeping)
         }
 
+        // RENDER
         let result = self.renderer.flush_next_future(
             previous_future,
             acquire_future,
             image_i,
             &self.render_objects,
+            self.camera_descriptor[image_i as usize].1.clone(),
         );
 
         // replace fence of upcoming image with new one
@@ -167,10 +199,4 @@ impl RenderLoop {
         // impacts the next update
         self.window_resized = true;
     }
-}
-
-struct CameraData {
-    view: Matrix4<f32>,
-    proj: Matrix4<f32>,
-    view_proj: Matrix4<f32>,
 }

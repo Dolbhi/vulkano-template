@@ -3,7 +3,9 @@ use std::sync::Arc;
 use cgmath::{Matrix4, Rad, SquareMatrix};
 
 use vulkano::{buffer::BufferContents, descriptor_set::PersistentDescriptorSet};
-use vulkano_template::{shaders::basic::vs::Data, vulkano_objects::buffers::Uniform};
+use vulkano_template::vulkano_objects::buffers::Uniform;
+
+use crate::render::TransformData;
 
 pub struct RenderObject<U: BufferContents + Clone> {
     pub mesh_id: String,
@@ -38,19 +40,13 @@ impl<U: BufferContents + Clone> RenderObject<U> {
     }
 }
 
-impl RenderObject<Data> {
-    pub fn update_uniform(&self, index: u32, cam_rot: cgmath::Rad<f32>) {
+impl RenderObject<TransformData> {
+    pub fn update_uniform(&self, index: u32) {
         let mut uniform_content = self.uniforms[index as usize]
             .0
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to uniform buffer\n{}", e));
 
-        let cam_pos = cgmath::vec3(0., 0., 2.);
-        let view = Matrix4::from_translation(-cam_pos);
-        let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
-        projection.y.y *= -1.;
-        let model = Matrix4::from_axis_angle([0., 1., 0.].into(), cam_rot);
-
-        uniform_content.render_matrix = (projection * view * model * self.transform).into();
+        uniform_content.render_matrix = self.transform.into();
     }
 }

@@ -25,8 +25,3 @@ pub struct VertexFull {
     #[format(R32G32B32_SFLOAT)]
     pub colour: [f32; 3],
 }
-
-// pub struct Mesh {
-//     vertices: Vec<VertexFull>,
-//     // buffer
-// }
