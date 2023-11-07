@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::{collections::hash_map::HashMap, mem::size_of};
 
 use vulkano::{
-    buffer::Subbuffer,
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferExecFuture, CommandBufferUsage, RenderPassBeginInfo,
     },
@@ -24,6 +23,7 @@ use vulkano::{
     },
     Validated, VulkanError,
 };
+use vulkano_template::vulkano_objects::buffers::DynamicBuffer;
 use vulkano_template::{
     shaders::basic::fs::SceneData,
     vulkano_objects::buffers::{create_cpu_accessible_uniforms, Buffers},
@@ -231,7 +231,12 @@ impl Renderer {
         let mut last_mat = &String::new();
         let mut last_mesh = &String::new();
         let mut last_buffer_len = 0;
-        // let align = self.pad_buffer_size(size_of::<SceneData>()) as u32;
+        let align = self.pad_buffer_size(size_of::<SceneData>()) as u32;
+        // println!(
+        //     "Data size: {}, Calculated alignment: {}",
+        //     size_of::<SceneData>(),
+        //     align
+        // );
         for render_obj in render_objects {
             // material (pipeline)
             let pipeline = self.material_pipelines[&render_obj.material_id].get_pipeline();
@@ -243,7 +248,7 @@ impl Renderer {
                         PipelineBindPoint::Graphics,
                         pipeline.layout().clone(),
                         0,
-                        global_descriptor.clone(), //.offsets([image_i * align]),
+                        global_descriptor.clone().offsets([image_i * align]),
                     )
                     .unwrap();
 
@@ -353,19 +358,19 @@ impl Renderer {
         material_id: &String,
         cam_data: CameraData,
         // scene_data: SceneData,
-    ) -> (Subbuffer<[SceneData]>, Vec<Uniform<CameraData>>) {
+    ) -> (DynamicBuffer, Vec<Uniform<CameraData>>) {
         let image_count = self.get_image_count();
-        let scenes_data = (0..image_count)
-            .map(|_| SceneData {
-                fog_color: [0., 0., 0., 0.],
-                fog_distances: [0., 0., 0., 0.],
-                ambient_color: [0., 0., 0., 0.],
-                sunlight_direction: [0., 0., 0., 0.],
-                sunlight_color: [0., 0., 0., 0.],
-            })
-            .collect();
+        // let scenes_data = (0..image_count)
+        //     .map(|_| SceneData {
+        //         fog_color: [0., 0., 0., 0.],
+        //         fog_distances: [0., 0., 0., 0.],
+        //         ambient_color: [0., 0., 0., 0.],
+        //         sunlight_direction: [0., 0., 0., 0.],
+        //         sunlight_color: [0., 0., 0., 0.],
+        //     })
+        //     .collect();
 
-        buffers::create_global_descriptors(
+        buffers::create_global_descriptors::<SceneData, CameraData>(
             &self.allocators,
             self.material_pipelines[material_id]
                 .get_pipeline()
@@ -376,7 +381,7 @@ impl Renderer {
                 .clone(),
             image_count,
             cam_data,
-            scenes_data,
+            self.pad_buffer_size(size_of::<SceneData>()) as usize,
         )
     }
 }

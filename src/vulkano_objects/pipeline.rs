@@ -1,17 +1,22 @@
 use std::sync::Arc;
 
-use vulkano::device::Device;
-use vulkano::pipeline::graphics::color_blend::ColorBlendState;
-use vulkano::pipeline::graphics::depth_stencil::{DepthState, DepthStencilState};
-use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::rasterization::RasterizationState;
-use vulkano::pipeline::graphics::vertex_input::{Vertex, VertexDefinition};
-use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
-use vulkano::pipeline::graphics::GraphicsPipelineCreateInfo;
-use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
-use vulkano::pipeline::{GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo};
-use vulkano::render_pass::{RenderPass, Subpass};
-use vulkano::shader::EntryPoint;
+use vulkano::{
+    descriptor_set::layout::DescriptorType,
+    device::Device,
+    pipeline::graphics::{
+        color_blend::ColorBlendState,
+        depth_stencil::{DepthState, DepthStencilState},
+        vertex_input::{Vertex, VertexDefinition},
+        viewport::{Viewport, ViewportState},
+        GraphicsPipelineCreateInfo,
+    },
+    pipeline::{
+        layout::PipelineDescriptorSetLayoutCreateInfo, GraphicsPipeline, PipelineLayout,
+        PipelineShaderStageCreateInfo,
+    },
+    render_pass::{RenderPass, Subpass},
+    shader::EntryPoint,
+};
 
 use crate::VertexFull;
 
@@ -47,6 +52,7 @@ use crate::VertexFull;
 //     // .unwrap()
 // }
 
+/// Create pipeline made for rarely size changing windows, with the 2nd binding on the 1st set being dynamic
 pub fn window_size_dependent_pipeline(
     device: Arc<Device>,
     vs: EntryPoint,
@@ -100,13 +106,22 @@ pub fn window_size_dependent_pipeline(
         PipelineShaderStageCreateInfo::new(vs),
         PipelineShaderStageCreateInfo::new(fs),
     ];
-    let layout = PipelineLayout::new(
-        device.clone(),
-        PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages)
-            .into_pipeline_layout_create_info(device.clone())
-            .unwrap(),
-    )
-    .unwrap();
+    // set first set, second binding to dynamic
+    let layout = {
+        let mut layout_create_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
+        layout_create_info.set_layouts[0]
+            .bindings
+            .get_mut(&1)
+            .unwrap()
+            .descriptor_type = DescriptorType::UniformBufferDynamic;
+        PipelineLayout::new(
+            device.clone(),
+            layout_create_info
+                .into_pipeline_layout_create_info(device.clone())
+                .unwrap(),
+        )
+        .unwrap()
+    };
     let subpass = Subpass::from(render_pass, 0).unwrap();
 
     GraphicsPipeline::new(
@@ -115,7 +130,7 @@ pub fn window_size_dependent_pipeline(
         GraphicsPipelineCreateInfo {
             stages: stages.into_iter().collect(),
             vertex_input_state: Some(vertex_input_state),
-            input_assembly_state: Some(InputAssemblyState::default()),
+            input_assembly_state: Some(Default::default()),
             viewport_state: Some(ViewportState {
                 viewports: [Viewport {
                     offset: [0.0, 0.0],
@@ -126,7 +141,7 @@ pub fn window_size_dependent_pipeline(
                 .collect(),
                 ..Default::default()
             }),
-            rasterization_state: Some(RasterizationState::default()),
+            rasterization_state: Some(Default::default()),
             depth_stencil_state: Some(DepthStencilState {
                 depth: Some(DepthState::simple()),
                 ..Default::default()

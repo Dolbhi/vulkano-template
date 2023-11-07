@@ -275,31 +275,55 @@ pub fn create_cpu_accessible_uniforms<U: BufferContents + Clone>(
         .collect()
 }
 
-pub fn create_global_descriptors<U: BufferContents + Clone, S: BufferContents>(
+pub struct DynamicBuffer {
+    buffer: Subbuffer<[u8]>,
+    count: usize,
+    align: usize,
+}
+
+impl DynamicBuffer {
+    // pub fn new(buffer: Subbuffer<[u8]>, align) -> Self {
+
+    // }
+
+    pub fn reinterpret<T: BufferContents>(&self, index: usize) -> Subbuffer<T> {
+        let start = (index * self.align) as DeviceSize;
+        let end = start + size_of::<T>() as DeviceSize;
+        self.buffer.clone().slice(start..end).reinterpret::<T>()
+    }
+}
+
+pub fn create_global_descriptors<S: BufferContents, U: BufferContents + Clone>(
     allocators: &Allocators,
     descriptor_set_layout: Arc<DescriptorSetLayout>,
     buffer_count: usize,
     cam_data: U,
-    scene_data: Vec<S>,
-    // align: u32,
-) -> (Subbuffer<[S]>, Vec<Uniform<U>>) {
-    let scenes_buffer = Buffer::from_iter(
-        allocators.memory.clone(),
-        BufferCreateInfo {
-            usage: BufferUsage::UNIFORM_BUFFER,
-            ..Default::default()
-        },
-        AllocationCreateInfo {
-            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-            ..Default::default()
-        },
-        scene_data,
-    )
-    .unwrap();
+    align: usize,
+) -> (DynamicBuffer, Vec<Uniform<U>>) {
+    let scenes_buffer = {
+        let data_size = buffer_count * align;
+        let scene_data: Vec<u8> = (0..data_size).map(|_| 0u8).collect();
+
+        Buffer::from_iter(
+            allocators.memory.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::UNIFORM_BUFFER,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            scene_data,
+        )
+        .unwrap()
+        .into_bytes()
+    };
+    println!("Bytes in scenes buffer: {}", scenes_buffer.len());
 
     let uniforms = (0..buffer_count)
-        .map(|i| {
+        .map(|_i| {
             let cam_buffer = Buffer::from_data(
                 allocators.memory.clone(),
                 BufferCreateInfo {
@@ -321,14 +345,14 @@ pub fn create_global_descriptors<U: BufferContents + Clone, S: BufferContents>(
                 descriptor_set_layout.clone(),
                 [
                     WriteDescriptorSet::buffer(0, cam_buffer.clone()),
-                    WriteDescriptorSet::buffer(1, scenes_buffer.clone().index(i as DeviceSize)),
-                    // WriteDescriptorSet::buffer_with_range(
-                    //     1,
-                    //     DescriptorBufferInfo {
-                    //         buffer: scenes_buffer.clone().into_bytes(),
-                    //         range: 0..size_of::<S>() as DeviceSize,
-                    //     },
-                    // ),
+                    // WriteDescriptorSet::buffer(1, scenes_buffer.clone().index(i as DeviceSize)),
+                    WriteDescriptorSet::buffer_with_range(
+                        1,
+                        DescriptorBufferInfo {
+                            buffer: scenes_buffer.clone(),
+                            range: 0..size_of::<S>() as DeviceSize,
+                        },
+                    ),
                 ],
                 [],
             )
@@ -338,5 +362,12 @@ pub fn create_global_descriptors<U: BufferContents + Clone, S: BufferContents>(
         })
         .collect();
 
-    (scenes_buffer, uniforms)
+    (
+        DynamicBuffer {
+            buffer: scenes_buffer,
+            count: buffer_count,
+            align,
+        },
+        uniforms,
+    )
 }
