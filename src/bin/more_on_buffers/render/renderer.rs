@@ -360,15 +360,6 @@ impl Renderer {
         // scene_data: SceneData,
     ) -> (DynamicBuffer<SceneData>, Vec<Uniform<CameraData>>) {
         let image_count = self.get_image_count();
-        // let scenes_data = (0..image_count)
-        //     .map(|_| SceneData {
-        //         fog_color: [0., 0., 0., 0.],
-        //         fog_distances: [0., 0., 0., 0.],
-        //         ambient_color: [0., 0., 0., 0.],
-        //         sunlight_direction: [0., 0., 0., 0.],
-        //         sunlight_color: [0., 0., 0., 0.],
-        //     })
-        //     .collect();
 
         buffers::create_global_descriptors::<SceneData, CameraData>(
             &self.allocators,
