@@ -1,4 +1,4 @@
-use std::{mem::size_of, sync::Arc};
+use std::{marker::PhantomData, mem::size_of, sync::Arc};
 
 use vulkano::{
     buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer},
@@ -275,18 +275,27 @@ pub fn create_cpu_accessible_uniforms<U: BufferContents + Clone>(
         .collect()
 }
 
-pub struct DynamicBuffer {
+pub struct DynamicBuffer<T: BufferContents> {
     buffer: Subbuffer<[u8]>,
-    count: usize,
+    // count: usize,
     align: usize,
+    marker: PhantomData<T>,
 }
 
-impl DynamicBuffer {
+impl<T: BufferContents> DynamicBuffer<T> {
     // pub fn new(buffer: Subbuffer<[u8]>, align) -> Self {
 
     // }
 
-    pub fn reinterpret<T: BufferContents>(&self, index: usize) -> Subbuffer<T> {
+    pub const fn elem_size() -> usize {
+        size_of::<T>()
+    }
+
+    pub fn align(&self) -> usize {
+        self.align
+    }
+
+    pub fn reinterpret(&self, index: usize) -> Subbuffer<T> {
         let start = (index * self.align) as DeviceSize;
         let end = start + size_of::<T>() as DeviceSize;
         self.buffer.clone().slice(start..end).reinterpret::<T>()
@@ -299,7 +308,7 @@ pub fn create_global_descriptors<S: BufferContents, U: BufferContents + Clone>(
     buffer_count: usize,
     cam_data: U,
     align: usize,
-) -> (DynamicBuffer, Vec<Uniform<U>>) {
+) -> (DynamicBuffer<S>, Vec<Uniform<U>>) {
     let scenes_buffer = {
         let data_size = buffer_count * align;
         let scene_data: Vec<u8> = (0..data_size).map(|_| 0u8).collect();
@@ -365,8 +374,9 @@ pub fn create_global_descriptors<S: BufferContents, U: BufferContents + Clone>(
     (
         DynamicBuffer {
             buffer: scenes_buffer,
-            count: buffer_count,
+            // count: buffer_count,
             align,
+            marker: PhantomData,
         },
         uniforms,
     )

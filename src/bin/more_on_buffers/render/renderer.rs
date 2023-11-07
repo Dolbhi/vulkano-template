@@ -358,7 +358,7 @@ impl Renderer {
         material_id: &String,
         cam_data: CameraData,
         // scene_data: SceneData,
-    ) -> (DynamicBuffer, Vec<Uniform<CameraData>>) {
+    ) -> (DynamicBuffer<SceneData>, Vec<Uniform<CameraData>>) {
         let image_count = self.get_image_count();
         // let scenes_data = (0..image_count)
         //     .map(|_| SceneData {
