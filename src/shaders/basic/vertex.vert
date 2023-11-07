@@ -10,7 +10,7 @@ layout(set = 0, binding = 0) uniform CameraData {
     mat4 view_proj;
 } cameraData;
 
-layout(set = 1, binding = 0) uniform Data {
+layout(set = 1, binding = 0) uniform ObjectData {
     // vec3 color;
 	vec4 data;
 	mat4 render_matrix;

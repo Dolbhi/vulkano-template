@@ -1,10 +1,7 @@
-use std::sync::Arc;
-use std::{collections::hash_map::HashMap, mem::size_of};
+use std::{collections::hash_map::HashMap, mem::size_of, sync::Arc};
 
 use vulkano::{
-    command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferExecFuture, CommandBufferUsage, RenderPassBeginInfo,
-    },
+    command_buffer::{self, RenderPassBeginInfo},
     descriptor_set::{DescriptorSet, PersistentDescriptorSet},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
     image::Image,
@@ -23,25 +20,32 @@ use vulkano::{
     },
     Validated, VulkanError,
 };
-use vulkano_template::vulkano_objects::buffers::DynamicBuffer;
 use vulkano_template::{
-    shaders::basic::fs::SceneData,
-    vulkano_objects::buffers::{create_cpu_accessible_uniforms, Buffers},
-    vulkano_objects::{self, buffers},
-    vulkano_objects::{allocators::Allocators, buffers::Uniform},
+    shaders::basic::{
+        fs::SceneData,
+        vs::{CameraData, ObjectData},
+    },
+    vulkano_objects::{
+        self,
+        allocators::Allocators,
+        buffers::{self, create_cpu_accessible_uniforms, Buffers, DynamicBuffer, Uniform},
+    },
     VertexFull,
 };
-use winit::dpi::LogicalSize;
-use winit::event_loop::EventLoop;
-use winit::window::{Window, WindowBuilder};
-
-use super::{
-    render_data::{material::Material, render_object::RenderObject},
-    CameraData, TransformData,
+use winit::{
+    dpi::LogicalSize,
+    event_loop::EventLoop,
+    window::{Window, WindowBuilder},
 };
 
+use super::render_data::{material::Material, render_object::RenderObject};
+
 pub type Fence = FenceSignalFuture<
-    PresentFuture<CommandBufferExecFuture<JoinFuture<Box<dyn GpuFuture>, SwapchainAcquireFuture>>>,
+    PresentFuture<
+        command_buffer::CommandBufferExecFuture<
+            JoinFuture<Box<dyn GpuFuture>, SwapchainAcquireFuture>,
+        >,
+    >,
 >;
 
 pub struct Renderer {
@@ -208,13 +212,13 @@ impl Renderer {
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
-        render_objects: &Vec<RenderObject<TransformData>>,
+        render_objects: &Vec<RenderObject<ObjectData>>,
         global_descriptor: Arc<PersistentDescriptorSet>,
     ) -> Result<Fence, Validated<VulkanError>> {
-        let mut builder = AutoCommandBufferBuilder::primary(
+        let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
             self.queue.queue_family_index(),
-            CommandBufferUsage::OneTimeSubmit,
+            command_buffer::CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
 
@@ -330,8 +334,8 @@ impl Renderer {
         &self,
         mesh_id: String,
         material_id: String,
-        initial_uniform: TransformData,
-    ) -> RenderObject<TransformData> {
+        initial_uniform: ObjectData,
+    ) -> RenderObject<ObjectData> {
         let uniforms = create_cpu_accessible_uniforms(
             &self.allocators,
             self.material_pipelines[&material_id]

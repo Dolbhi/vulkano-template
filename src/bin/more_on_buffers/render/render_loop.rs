@@ -6,7 +6,10 @@ use cgmath::{vec3, Matrix4, Rad, SquareMatrix};
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use vulkano_template::{
-    shaders::basic::fs::SceneData,
+    shaders::basic::{
+        fs::SceneData,
+        vs::{CameraData, ObjectData},
+    },
     vulkano_objects::buffers::{DynamicBuffer, Uniform},
 };
 use winit::event_loop::EventLoop;
@@ -14,7 +17,6 @@ use winit::event_loop::EventLoop;
 use super::{
     render_data::{mesh::Mesh, render_object::RenderObject},
     renderer::{Fence, Renderer},
-    CameraData, TransformData,
 };
 use vulkano_template::{game_objects::Square, models::SquareModel, shaders::basic};
 
@@ -27,7 +29,7 @@ pub struct RenderLoop {
     scenes_buffer: DynamicBuffer<SceneData>,
     previous_fence_i: u32,
     total_seconds: f32,
-    render_objects: Vec<RenderObject<TransformData>>,
+    render_objects: Vec<RenderObject<ObjectData>>,
 }
 
 impl RenderLoop {
@@ -69,11 +71,11 @@ impl RenderLoop {
         renderer.init_mesh(square_id.clone(), vertices, indices);
 
         // objects
-        let initial_uniform = TransformData {
+        let initial_uniform = ObjectData {
             data: [0., 0., 0., 0.],
             render_matrix: (cgmath::Matrix4::identity()).into(),
         };
-        let mut render_objects = Vec::<RenderObject<TransformData>>::with_capacity(9);
+        let mut render_objects = Vec::<RenderObject<ObjectData>>::with_capacity(9);
         let controlled_obj =
             renderer.add_render_object(suz_id, material_id.clone(), initial_uniform);
         render_objects.push(controlled_obj);
