@@ -3,8 +3,7 @@ use std::sync::Arc;
 
 use cgmath::{vec3, Matrix4, Rad, SquareMatrix};
 
-use vulkano::swapchain::AcquireError;
-use vulkano::sync::{FlushError, GpuFuture};
+use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use vulkano_template::vulkano_objects::buffers::Uniform;
 use winit::event_loop::EventLoop;
@@ -34,10 +33,14 @@ impl RenderLoop {
         let fences: Vec<Option<Arc<Fence>>> = vec![None; frames_in_flight];
 
         // materials
-        let vertex_shader =
-            basic::vs::load(renderer.clone_device()).expect("failed to create shader module");
-        let fragment_shader =
-            basic::fs::load(renderer.clone_device()).expect("failed to create shader module");
+        let vertex_shader = basic::vs::load(renderer.clone_device())
+            .expect("failed to create shader module")
+            .entry_point("main")
+            .unwrap();
+        let fragment_shader = basic::fs::load(renderer.clone_device())
+            .expect("failed to create shader module")
+            .entry_point("main")
+            .unwrap();
 
         let material_id = String::from("basic");
         renderer.init_material(material_id.clone(), vertex_shader, fragment_shader);
@@ -111,7 +114,7 @@ impl RenderLoop {
         // get upcoming image to display and future of when it is ready
         let (image_i, suboptimal, acquire_future) = match self.renderer.acquire_swapchain_image() {
             Ok(r) => r,
-            Err(AcquireError::OutOfDate) => {
+            Err(Validated::Error(VulkanError::OutOfDate)) => {
                 self.recreate_swapchain = true;
                 return;
             }
@@ -146,13 +149,15 @@ impl RenderLoop {
         let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
         projection.y.y *= -1.;
 
-        let mut cam_uniform_contents = self.camera_descriptor[image_i as usize]
-            .0
-            .write()
-            .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
-        cam_uniform_contents.view = view.into();
-        cam_uniform_contents.proj = projection.into();
-        cam_uniform_contents.view_proj = (projection * view).into();
+        {
+            let mut cam_uniform_contents = self.camera_descriptor[image_i as usize]
+                .0
+                .write()
+                .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
+            cam_uniform_contents.view = view.into();
+            cam_uniform_contents.proj = projection.into();
+            cam_uniform_contents.view_proj = (projection * view).into();
+        }
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
         let something_needs_all_gpu_resources = false;
@@ -182,7 +187,7 @@ impl RenderLoop {
         // replace fence of upcoming image with new one
         self.fences[image_i as usize] = match result {
             Ok(fence) => Some(Arc::new(fence)),
-            Err(FlushError::OutOfDate) => {
+            Err(Validated::Error(VulkanError::OutOfDate)) => {
                 self.recreate_swapchain = true;
                 None
             }

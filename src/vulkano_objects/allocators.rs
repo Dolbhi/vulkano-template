@@ -6,17 +6,20 @@ use vulkano::device::Device;
 use vulkano::memory::allocator::StandardMemoryAllocator;
 
 pub struct Allocators {
-    pub memory: StandardMemoryAllocator,
+    pub memory: Arc<StandardMemoryAllocator>,
     pub command_buffer: StandardCommandBufferAllocator,
-    pub descriptor_set: StandardDescriptorSetAllocator,
+    pub descriptor_set: Arc<StandardDescriptorSetAllocator>,
 }
 
 impl Allocators {
     pub fn new(device: Arc<Device>) -> Self {
         Allocators {
-            memory: StandardMemoryAllocator::new_default(device.clone()),
+            memory: Arc::new(StandardMemoryAllocator::new_default(device.clone())),
             command_buffer: StandardCommandBufferAllocator::new(device.clone(), Default::default()),
-            descriptor_set: StandardDescriptorSetAllocator::new(device),
+            descriptor_set: Arc::new(StandardDescriptorSetAllocator::new(
+                device,
+                Default::default(),
+            )),
         }
     }
 }

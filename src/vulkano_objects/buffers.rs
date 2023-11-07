@@ -8,7 +8,7 @@ use vulkano::{
     },
     descriptor_set::{layout::DescriptorSetLayout, PersistentDescriptorSet, WriteDescriptorSet},
     device::Queue,
-    memory::allocator::{AllocationCreateInfo, MemoryUsage},
+    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     pipeline::graphics::vertex_input::Vertex,
     sync::{future::NowFuture, GpuFuture},
     DeviceSize,
@@ -119,13 +119,13 @@ fn create_device_local_vertex<V: BufferContents>(
     vertices: Vec<V>,
 ) -> (Subbuffer<[V]>, CommandBufferExecFuture<NowFuture>) {
     let buffer = Buffer::new_slice(
-        &allocators.memory,
+        allocators.memory.clone(),
         BufferCreateInfo {
             usage: BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
             ..Default::default()
         },
         AllocationCreateInfo {
-            usage: MemoryUsage::DeviceOnly,
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
             ..Default::default()
         },
         vertices.len() as DeviceSize,
@@ -133,13 +133,14 @@ fn create_device_local_vertex<V: BufferContents>(
     .unwrap();
 
     let staging_buffer = Buffer::from_iter(
-        &allocators.memory,
+        allocators.memory.clone(),
         BufferCreateInfo {
             usage: BufferUsage::TRANSFER_SRC,
             ..Default::default()
         },
         AllocationCreateInfo {
-            usage: MemoryUsage::Upload,
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
             ..Default::default()
         },
         vertices,
@@ -190,13 +191,13 @@ fn create_device_local_index(
     indices: Vec<u32>,
 ) -> (Subbuffer<[u32]>, CommandBufferExecFuture<NowFuture>) {
     let buffer = Buffer::new_slice(
-        &allocators.memory,
+        allocators.memory.clone(),
         BufferCreateInfo {
             usage: BufferUsage::INDEX_BUFFER | BufferUsage::TRANSFER_DST,
             ..Default::default()
         },
         AllocationCreateInfo {
-            usage: MemoryUsage::DeviceOnly,
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
             ..Default::default()
         },
         indices.len() as DeviceSize,
@@ -204,13 +205,14 @@ fn create_device_local_index(
     .unwrap();
 
     let staging_buffer = Buffer::from_iter(
-        &allocators.memory,
+        allocators.memory.clone(),
         BufferCreateInfo {
             usage: BufferUsage::TRANSFER_SRC,
             ..Default::default()
         },
         AllocationCreateInfo {
-            usage: MemoryUsage::Upload,
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
             ..Default::default()
         },
         indices,
@@ -242,13 +244,14 @@ pub fn create_cpu_accessible_uniforms<U: BufferContents + Clone>(
     (0..buffer_count)
         .map(|_| {
             let buffer = Buffer::from_data(
-                &allocators.memory,
+                allocators.memory.clone(),
                 BufferCreateInfo {
                     usage: BufferUsage::UNIFORM_BUFFER,
                     ..Default::default()
                 },
                 AllocationCreateInfo {
-                    usage: MemoryUsage::Upload,
+                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                     ..Default::default()
                 },
                 initial_uniform.clone(),
@@ -260,6 +263,7 @@ pub fn create_cpu_accessible_uniforms<U: BufferContents + Clone>(
                 &allocators.descriptor_set,
                 descriptor_set_layout.clone(),
                 [WriteDescriptorSet::buffer(0, buffer.clone())],
+                [],
             )
             .unwrap();
 

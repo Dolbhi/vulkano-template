@@ -46,6 +46,7 @@ impl App {
 
     pub fn update(&mut self, duration_since_last_update: &Duration) {
         let seconds_passed = (duration_since_last_update.as_micros() as f32) / 1000000.0;
+        // println!("Current time: {}", seconds_passed);
 
         self.update_movement(seconds_passed);
 

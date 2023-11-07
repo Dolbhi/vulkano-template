@@ -4,22 +4,18 @@ use vulkano::{
     device::Device,
     pipeline::{graphics::viewport::Viewport, GraphicsPipeline},
     render_pass::RenderPass,
-    shader::ShaderModule,
+    shader::EntryPoint,
 };
 use vulkano_template::vulkano_objects::pipeline;
 
 pub struct Material {
-    vs: Arc<ShaderModule>,
-    fs: Arc<ShaderModule>,
+    vs: EntryPoint,
+    fs: EntryPoint,
     pipeline: Arc<GraphicsPipeline>,
 }
 
 impl Material {
-    pub fn new(
-        vs: Arc<ShaderModule>,
-        fs: Arc<ShaderModule>,
-        pipeline: Arc<GraphicsPipeline>,
-    ) -> Self {
+    pub fn new(vs: EntryPoint, fs: EntryPoint, pipeline: Arc<GraphicsPipeline>) -> Self {
         Material { vs, fs, pipeline }
     }
 
@@ -33,12 +29,12 @@ impl Material {
         render_pass: Arc<RenderPass>,
         viewport: Viewport,
     ) {
-        self.pipeline = pipeline::create_pipeline(
+        self.pipeline = pipeline::window_size_dependent_pipeline(
             device,
             self.vs.clone(),
             self.fs.clone(),
-            render_pass,
             viewport,
+            render_pass,
         );
     }
 }

@@ -6,9 +6,9 @@ const LIST_AVAILABLE_LAYERS: bool = false;
 const ENABLE_VALIDATION_LAYERS: bool = false;
 const VALIDATION_LAYERS: &[&str] = &["VK_LAYER_LUNARG_api_dump"];
 
-pub fn get_instance() -> Arc<Instance> {
+pub fn get_instance(event_loop: &winit::event_loop::EventLoop<()>) -> Arc<Instance> {
     let library = vulkano::VulkanLibrary::new().expect("no local Vulkan library/DLL");
-    let required_extensions = vulkano_win::required_extensions(&library);
+    let required_extensions = vulkano::swapchain::Surface::required_extensions(event_loop); // vulkano_win::required_extensions(&library);
 
     if LIST_AVAILABLE_LAYERS {
         let layers: Vec<_> = library.layer_properties().unwrap().collect();

@@ -4,24 +4,24 @@ use std::sync::Arc;
 use vulkano::{
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferExecFuture, CommandBufferUsage, RenderPassBeginInfo,
-        SubpassContents,
     },
     descriptor_set::PersistentDescriptorSet,
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
-    image::SwapchainImage,
+    image::Image,
     instance::Instance,
     pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint},
     render_pass::{Framebuffer, RenderPass},
-    shader::ShaderModule,
+    shader::EntryPoint,
     swapchain::{
-        self, AcquireError, PresentFuture, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
-        SwapchainCreationError, SwapchainPresentInfo,
+        self, PresentFuture, Surface, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
+        SwapchainPresentInfo,
     },
     sync::{
         self,
         future::{FenceSignalFuture, JoinFuture, NowFuture},
-        FlushError, GpuFuture,
+        GpuFuture,
     },
+    Validated, VulkanError,
 };
 use vulkano_template::{
     vulkano_objects,
@@ -29,7 +29,6 @@ use vulkano_template::{
     vulkano_objects::{allocators::Allocators, buffers::Uniform},
     VertexFull,
 };
-use vulkano_win::VkSurfaceBuild;
 use winit::dpi::LogicalSize;
 use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowBuilder};
@@ -49,7 +48,7 @@ pub struct Renderer {
     device: Arc<Device>,
     queue: Arc<Queue>,
     swapchain: Arc<Swapchain>,
-    images: Vec<Arc<SwapchainImage>>,
+    images: Vec<Arc<Image>>,
     render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>,
     allocators: Allocators,
@@ -60,18 +59,10 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn initialize(event_loop: &EventLoop<()>) -> Self {
-        let instance = vulkano_objects::instance::get_instance();
+        let instance = vulkano_objects::instance::get_instance(event_loop);
 
-        let surface = WindowBuilder::new()
-            .build_vk_surface(event_loop, instance.clone())
-            .unwrap();
-
-        let window = surface
-            .object()
-            .unwrap()
-            .clone()
-            .downcast::<Window>()
-            .unwrap();
+        let window = Arc::new(WindowBuilder::new().build(&event_loop).unwrap());
+        let surface = Surface::from_window(instance.clone(), window.clone()).unwrap();
 
         window.set_title("Movable Square");
         window.set_inner_size(LogicalSize::new(600.0f32, 600.0));
@@ -117,9 +108,9 @@ impl Renderer {
         );
 
         let viewport = Viewport {
-            origin: [0.0, 0.0],
-            dimensions: window.inner_size().into(),
-            depth_range: 0.0..1.0,
+            offset: [0.0, 0.0],
+            extent: window.inner_size().into(),
+            depth_range: 0.0..=1.0,
         };
 
         Self {
@@ -145,7 +136,7 @@ impl Renderer {
             ..self.swapchain.create_info()
         }) {
             Ok(r) => r,
-            Err(SwapchainCreationError::ImageExtentNotSupported { .. }) => return,
+            // Err(SwapchainCreationError::ImageExtentNotSupported { .. }) => return,
             Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
         };
 
@@ -161,7 +152,7 @@ impl Renderer {
     /// recreates swapchain and framebuffers, followed by the pipeline with new viewport dimensions
     pub fn handle_window_resize(&mut self) {
         self.recreate_swapchain();
-        self.viewport.dimensions = self.window.inner_size().into();
+        self.viewport.extent = self.window.inner_size().into();
 
         for (_, v) in &mut self.material_pipelines {
             v.recreate_pipeline(
@@ -183,7 +174,7 @@ impl Renderer {
     /// Gets future where next image in swapchain is ready
     pub fn acquire_swapchain_image(
         &self,
-    ) -> Result<(u32, bool, SwapchainAcquireFuture), AcquireError> {
+    ) -> Result<(u32, bool, SwapchainAcquireFuture), Validated<VulkanError>> {
         swapchain::acquire_next_image(self.swapchain.clone(), None)
     }
 
@@ -202,7 +193,7 @@ impl Renderer {
         image_i: u32,
         render_objects: &Vec<RenderObject<TransformData>>,
         global_descriptor: Arc<PersistentDescriptorSet>,
-    ) -> Result<Fence, FlushError> {
+    ) -> Result<Fence, Validated<VulkanError>> {
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
             self.queue.queue_family_index(),
@@ -216,7 +207,7 @@ impl Renderer {
                     clear_values: vec![Some([0.1, 0.1, 0.1, 1.0].into()), Some(1.0.into())],
                     ..RenderPassBeginInfo::framebuffer(self.framebuffers[image_i as usize].clone())
                 },
-                SubpassContents::Inline,
+                Default::default(),
             )
             .unwrap();
 
@@ -229,12 +220,14 @@ impl Renderer {
             if last_mat != &render_obj.material_id {
                 builder
                     .bind_pipeline_graphics(pipeline.clone())
+                    .unwrap()
                     .bind_descriptor_sets(
                         PipelineBindPoint::Graphics,
                         pipeline.layout().clone(),
                         0,
                         global_descriptor.clone(),
-                    );
+                    )
+                    .unwrap();
 
                 last_mat = &render_obj.material_id;
             }
@@ -247,7 +240,9 @@ impl Renderer {
 
                 builder
                     .bind_vertex_buffers(0, buffers.get_vertex())
-                    .bind_index_buffer(index_buffer);
+                    .unwrap()
+                    .bind_index_buffer(index_buffer)
+                    .unwrap();
 
                 last_mesh = &render_obj.mesh_id;
                 last_buffer_len = index_buffer_length;
@@ -261,10 +256,11 @@ impl Renderer {
                     1,
                     render_obj.clone_descriptor(image_i as usize),
                 )
+                .unwrap()
                 .draw_indexed(last_buffer_len as u32, 1, 0, 0, 0)
                 .unwrap();
         }
-        builder.end_render_pass().unwrap();
+        builder.end_render_pass(Default::default()).unwrap();
 
         // Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
         previous_future
@@ -293,15 +289,15 @@ impl Renderer {
     pub fn init_material(
         &mut self,
         id: String,
-        vertex_shader: Arc<ShaderModule>,
-        fragment_shader: Arc<ShaderModule>,
+        vertex_shader: EntryPoint,
+        fragment_shader: EntryPoint,
     ) {
-        let pipeline = vulkano_objects::pipeline::create_pipeline(
+        let pipeline = vulkano_objects::pipeline::window_size_dependent_pipeline(
             self.device.clone(),
             vertex_shader.clone(),
             fragment_shader.clone(),
-            self.render_pass.clone(),
             self.viewport.clone(),
+            self.render_pass.clone(),
         );
         let mat = Material::new(vertex_shader, fragment_shader, pipeline);
         self.material_pipelines.insert(id, mat);

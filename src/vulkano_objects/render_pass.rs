@@ -10,16 +10,16 @@ pub fn create_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc
         device,
         attachments: {
             color: {
-                load: Clear,
-                store: Store,
                 format: swapchain.image_format(),
                 samples: 1,
+                load_op: Clear,
+                store_op: Store,
             },
             depth_stencil: {
-                load: Clear,
-                store: DontCare,
                 format: Format::D32_SFLOAT,
                 samples: 1,
+                load_op: Clear,
+                store_op: DontCare,
             }
         },
         pass: {

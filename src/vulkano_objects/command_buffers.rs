@@ -4,7 +4,6 @@ use std::sync::Arc;
 use vulkano::buffer::{BufferContents, Subbuffer};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, RenderPassBeginInfo,
-    SubpassContents,
 };
 // use vulkano::descriptor_set::{self, PersistentDescriptorSet};
 use vulkano::device::Queue;
@@ -38,17 +37,20 @@ pub fn create_only_vertex_command_buffers(
                         clear_values: vec![Some([0.1, 0.1, 0.1, 1.0].into())],
                         ..RenderPassBeginInfo::framebuffer(framebuffer.clone())
                     },
-                    SubpassContents::Inline,
+                    Default::default(),
+                    // SubpassContents::Inline,
                 )
                 .unwrap()
                 .bind_pipeline_graphics(pipeline.clone())
+                .unwrap()
                 .bind_vertex_buffers(0, vertex_buffer.clone())
+                .unwrap()
                 .draw(vertex_buffer.len() as u32, 1, 0, 0)
                 .unwrap()
-                .end_render_pass()
+                .end_render_pass(Default::default())
                 .unwrap();
 
-            Arc::new(builder.build().unwrap())
+            builder.build().unwrap()
         })
         .collect()
 }
@@ -83,24 +85,29 @@ pub fn create_simple_command_buffers<U: BufferContents + Clone>(
                         clear_values: vec![Some([0.1, 0.1, 0.1, 1.0].into()), Some(1.0.into())],
                         ..RenderPassBeginInfo::framebuffer(framebuffer.clone())
                     },
-                    SubpassContents::Inline,
+                    Default::default(),
+                    // SubpassContents::Inline,
                 )
                 .unwrap()
                 .bind_pipeline_graphics(pipeline.clone())
+                .unwrap()
                 .bind_descriptor_sets(
                     PipelineBindPoint::Graphics,
                     pipeline.layout().clone(),
                     0,
                     uniforms[i].1.clone(),
                 )
+                .unwrap()
                 .bind_vertex_buffers(0, buffers.get_vertex())
+                .unwrap()
                 .bind_index_buffer(index_buffer)
+                .unwrap()
                 .draw_indexed(index_buffer_length as u32, 1, 0, 0, 0)
                 .unwrap()
-                .end_render_pass()
+                .end_render_pass(Default::default())
                 .unwrap();
 
-            Arc::new(builder.build().unwrap())
+            builder.build().unwrap()
         })
         .collect()
 }

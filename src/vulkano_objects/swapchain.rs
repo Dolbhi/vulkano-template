@@ -4,8 +4,7 @@ use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::Device;
 use vulkano::format::Format;
 use vulkano::image::view::ImageView;
-use vulkano::image::{AttachmentImage, ImageAccess};
-use vulkano::image::{ImageUsage, SwapchainImage};
+use vulkano::image::{Image, ImageCreateInfo, ImageType, ImageUsage};
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
 use vulkano::swapchain::{Surface, Swapchain, SwapchainCreateInfo};
 
@@ -17,24 +16,22 @@ pub fn create_swapchain(
     physical_device: &Arc<PhysicalDevice>,
     device: Arc<Device>,
     surface: Arc<Surface>,
-) -> (Arc<Swapchain>, Vec<Arc<SwapchainImage>>) {
+) -> (Arc<Swapchain>, Vec<Arc<Image>>) {
     let caps = physical_device
         .surface_capabilities(&surface, Default::default())
         .expect("failed to get surface capabilities");
 
     let composite_alpha = caps.supported_composite_alpha.into_iter().next().unwrap();
-    let image_format = Some(
-        physical_device
-            .surface_formats(&surface, Default::default())
-            .unwrap()[0]
-            .0,
-    );
+    let image_format = physical_device
+        .surface_formats(&surface, Default::default())
+        .unwrap()[0]
+        .0;
 
     Swapchain::new(
         device,
         surface.clone(),
         SwapchainCreateInfo {
-            min_image_count: caps.min_image_count,
+            min_image_count: caps.min_image_count.max(2),
             image_format,
             image_extent: surface
                 .object()
@@ -53,16 +50,21 @@ pub fn create_swapchain(
 }
 
 pub fn create_framebuffers_from_swapchain_images(
-    images: &[Arc<SwapchainImage>],
+    images: &[Arc<Image>],
     render_pass: Arc<RenderPass>,
     memory_allocator: &Allocators,
 ) -> Vec<Arc<Framebuffer>> {
     let depth_attachment = ImageView::new_default(
-        AttachmentImage::with_usage(
-            &memory_allocator.memory,
-            images[0].dimensions().width_height(),
-            Format::D32_SFLOAT,
-            ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
+        Image::new(
+            memory_allocator.memory.clone(),
+            ImageCreateInfo {
+                image_type: ImageType::Dim2d,
+                format: Format::D32_SFLOAT,
+                extent: images[0].extent(),
+                usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
+                ..Default::default()
+            },
+            Default::default(),
         )
         .unwrap(),
     )
