@@ -95,6 +95,35 @@ impl RenderLoop {
         }
     }
 
+    fn update_render_objects(&mut self, transform_data: &Square, image_i: u32) {
+        // update uniform data
+        self.render_objects[0].update_transform(
+            [transform_data.position[0], transform_data.position[1], 0.],
+            cgmath::Rad(0.),
+        );
+        for obj in &self.render_objects {
+            obj.update_uniform(image_i);
+        }
+
+        // update camera
+        let cam_pos = vec3(0., 0., 2.);
+        let translation = Matrix4::from_translation(-cam_pos);
+        let rotation =
+            Matrix4::from_axis_angle([0., 1., 0.].into(), cgmath::Rad(self.total_seconds * 1.));
+        let view = translation * rotation;
+
+        let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
+        projection.y.y *= -1.;
+
+        let mut cam_uniform_contents = self.camera_descriptor[image_i as usize]
+            .0
+            .write()
+            .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
+        cam_uniform_contents.view = view.into();
+        cam_uniform_contents.proj = projection.into();
+        cam_uniform_contents.view_proj = (projection * view).into();
+    }
+
     /// update renderer and draw upcoming image
     pub fn update(&mut self, transform_data: &Square, seconds_passed: f32) {
         // stuff
@@ -120,7 +149,6 @@ impl RenderLoop {
             }
             Err(e) => panic!("Failed to acquire next image: {:?}", e),
         };
-
         if suboptimal {
             self.recreate_swapchain = true;
         }
@@ -130,34 +158,7 @@ impl RenderLoop {
             image_fence.wait(None).unwrap();
         }
 
-        // update uniform data
-        self.render_objects[0].update_transform(
-            [transform_data.position[0], transform_data.position[1], 0.],
-            cgmath::Rad(0.),
-        );
-        for obj in &self.render_objects {
-            obj.update_uniform(image_i);
-        }
-
-        // update camera
-        let cam_pos = vec3(0., 0., 2.);
-        let translation = Matrix4::from_translation(-cam_pos);
-        let rotation =
-            Matrix4::from_axis_angle([0., 1., 0.].into(), cgmath::Rad(self.total_seconds * 1.));
-        let view = translation * rotation;
-
-        let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
-        projection.y.y *= -1.;
-
-        {
-            let mut cam_uniform_contents = self.camera_descriptor[image_i as usize]
-                .0
-                .write()
-                .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
-            cam_uniform_contents.view = view.into();
-            cam_uniform_contents.proj = projection.into();
-            cam_uniform_contents.view_proj = (projection * view).into();
-        }
+        self.update_render_objects(transform_data, image_i);
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
         let something_needs_all_gpu_resources = false;
@@ -170,7 +171,6 @@ impl RenderLoop {
                 fence.boxed()
             }
         };
-
         if something_needs_all_gpu_resources {
             // logic that can use every GPU resource (the GPU is sleeping)
         }
@@ -183,7 +183,6 @@ impl RenderLoop {
             &self.render_objects,
             self.camera_descriptor[image_i as usize].1.clone(),
         );
-
         // replace fence of upcoming image with new one
         self.fences[image_i as usize] = match result {
             Ok(fence) => Some(Arc::new(fence)),
@@ -196,7 +195,6 @@ impl RenderLoop {
                 None
             }
         };
-
         self.previous_fence_i = image_i;
     }
 
