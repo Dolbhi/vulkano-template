@@ -73,10 +73,20 @@ impl RenderLoop {
             data: [0., 0., 0., 0.],
             render_matrix: (cgmath::Matrix4::identity()).into(),
         };
+        let mut render_objects = Vec::<RenderObject<TransformData>>::with_capacity(9);
         let controlled_obj =
             renderer.add_render_object(suz_id, material_id.clone(), initial_uniform);
-        let mut square_obj = renderer.add_render_object(square_id, material_id, initial_uniform);
-        square_obj.update_transform([0., 1., 0.], cgmath::Rad(0.));
+        render_objects.push(controlled_obj);
+        for (x, y) in (-1..2)
+            .flat_map(|x| (-1..2).map(move |y| (x.clone(), y)))
+            .filter(|a| *a != (0, 0))
+        {
+            let mut square_obj =
+                renderer.add_render_object(square_id.clone(), material_id.clone(), initial_uniform);
+            square_obj.update_transform([x as f32, y as f32, 0.], cgmath::Rad(0.));
+            render_objects.push(square_obj)
+        }
+        println!("Total render objs: {}", render_objects.len());
 
         // camera descriptors TODO: create independent layout not based on mat
         let initial_uniform = CameraData {
@@ -96,7 +106,7 @@ impl RenderLoop {
             scenes_buffer,
             previous_fence_i: 0,
             total_seconds: 0.0,
-            render_objects: vec![controlled_obj, square_obj],
+            render_objects,
         }
     }
 
