@@ -8,7 +8,7 @@ use vulkano::memory::allocator::StandardMemoryAllocator;
 pub struct Allocators {
     pub memory: Arc<StandardMemoryAllocator>,
     pub command_buffer: StandardCommandBufferAllocator,
-    pub descriptor_set: Arc<StandardDescriptorSetAllocator>,
+    pub descriptor_set: StandardDescriptorSetAllocator,
 }
 
 impl Allocators {
@@ -16,10 +16,7 @@ impl Allocators {
         Allocators {
             memory: Arc::new(StandardMemoryAllocator::new_default(device.clone())),
             command_buffer: StandardCommandBufferAllocator::new(device.clone(), Default::default()),
-            descriptor_set: Arc::new(StandardDescriptorSetAllocator::new(
-                device,
-                Default::default(),
-            )),
+            descriptor_set: StandardDescriptorSetAllocator::new(device, Default::default()),
         }
     }
 }

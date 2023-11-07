@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{mem::size_of, sync::Arc};
 
 use vulkano::{
     buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer},
@@ -6,7 +6,10 @@ use vulkano::{
         AutoCommandBufferBuilder, CommandBufferExecFuture, CommandBufferUsage, CopyBufferInfo,
         PrimaryCommandBufferAbstract,
     },
-    descriptor_set::{layout::DescriptorSetLayout, PersistentDescriptorSet, WriteDescriptorSet},
+    descriptor_set::{
+        layout::DescriptorSetLayout, DescriptorBufferInfo, PersistentDescriptorSet,
+        WriteDescriptorSet,
+    },
     device::Queue,
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     pipeline::graphics::vertex_input::Vertex,
@@ -270,4 +273,70 @@ pub fn create_cpu_accessible_uniforms<U: BufferContents + Clone>(
             (buffer, descriptor_set)
         })
         .collect()
+}
+
+pub fn create_global_descriptors<U: BufferContents + Clone, S: BufferContents>(
+    allocators: &Allocators,
+    descriptor_set_layout: Arc<DescriptorSetLayout>,
+    buffer_count: usize,
+    cam_data: U,
+    scene_data: Vec<S>,
+    // align: u32,
+) -> (Subbuffer<[S]>, Vec<Uniform<U>>) {
+    let scenes_buffer = Buffer::from_iter(
+        allocators.memory.clone(),
+        BufferCreateInfo {
+            usage: BufferUsage::UNIFORM_BUFFER,
+            ..Default::default()
+        },
+        AllocationCreateInfo {
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+            ..Default::default()
+        },
+        scene_data,
+    )
+    .unwrap();
+
+    let uniforms = (0..buffer_count)
+        .map(|i| {
+            let cam_buffer = Buffer::from_data(
+                allocators.memory.clone(),
+                BufferCreateInfo {
+                    usage: BufferUsage::UNIFORM_BUFFER,
+                    ..Default::default()
+                },
+                AllocationCreateInfo {
+                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                    ..Default::default()
+                },
+                cam_data.clone(),
+            )
+            .unwrap();
+
+            // descriptor set is how we interface data between the buffer and the pipeline
+            let descriptor_set = PersistentDescriptorSet::new(
+                &allocators.descriptor_set,
+                descriptor_set_layout.clone(),
+                [
+                    WriteDescriptorSet::buffer(0, cam_buffer.clone()),
+                    WriteDescriptorSet::buffer(1, scenes_buffer.clone().index(i as DeviceSize)),
+                    // WriteDescriptorSet::buffer_with_range(
+                    //     1,
+                    //     DescriptorBufferInfo {
+                    //         buffer: scenes_buffer.clone().into_bytes(),
+                    //         range: 0..size_of::<S>() as DeviceSize,
+                    //     },
+                    // ),
+                ],
+                [],
+            )
+            .unwrap();
+
+            (cam_buffer, descriptor_set)
+        })
+        .collect();
+
+    (scenes_buffer, uniforms)
 }

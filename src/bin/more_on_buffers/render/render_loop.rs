@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use cgmath::{vec3, Matrix4, Rad, SquareMatrix};
 
-use vulkano::{sync::GpuFuture, Validated, VulkanError};
+use vulkano::{buffer::Subbuffer, sync::GpuFuture, Validated, VulkanError};
 
-use vulkano_template::vulkano_objects::buffers::Uniform;
+use vulkano_template::{shaders::basic::fs::SceneData, vulkano_objects::buffers::Uniform};
 use winit::event_loop::EventLoop;
 
 use super::{
@@ -21,6 +21,7 @@ pub struct RenderLoop {
     window_resized: bool,
     fences: Vec<Option<Arc<Fence>>>,
     camera_descriptor: Vec<Uniform<CameraData>>,
+    scenes_buffer: Subbuffer<[SceneData]>,
     previous_fence_i: u32,
     total_seconds: f32,
     render_objects: Vec<RenderObject<TransformData>>,
@@ -80,8 +81,8 @@ impl RenderLoop {
             proj: (cgmath::Matrix4::identity()).into(),
             view_proj: (cgmath::Matrix4::identity()).into(),
         };
-        let camera_descriptor =
-            renderer.create_camera_buffers(&String::from("basic"), initial_uniform);
+        let (scenes_buffer, camera_descriptor) =
+            renderer.create_scene_buffers(&String::from("basic"), initial_uniform);
 
         Self {
             renderer,
@@ -89,6 +90,7 @@ impl RenderLoop {
             window_resized: false,
             fences,
             camera_descriptor,
+            scenes_buffer,
             previous_fence_i: 0,
             total_seconds: 0.0,
             render_objects: vec![controlled_obj, square_obj],
@@ -111,7 +113,6 @@ impl RenderLoop {
         let rotation =
             Matrix4::from_axis_angle([0., 1., 0.].into(), cgmath::Rad(self.total_seconds * 1.));
         let view = translation * rotation;
-
         let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
         projection.y.y *= -1.;
 
@@ -122,6 +123,14 @@ impl RenderLoop {
         cam_uniform_contents.view = view.into();
         cam_uniform_contents.proj = projection.into();
         cam_uniform_contents.view_proj = (projection * view).into();
+
+        // update scene data
+        let current_scene = self.scenes_buffer.clone().index(image_i.into());
+        let mut scene_uniform_contents = current_scene
+            .write()
+            .unwrap_or_else(|e| panic!("Failed to write to scene uniform buffer\n{}", e));
+        scene_uniform_contents.ambient_color =
+            [self.total_seconds.sin(), 0., self.total_seconds.cos(), 1.];
     }
 
     /// update renderer and draw upcoming image

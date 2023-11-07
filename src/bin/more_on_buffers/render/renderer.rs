@@ -1,11 +1,12 @@
-use std::collections::hash_map::HashMap;
 use std::sync::Arc;
+use std::{collections::hash_map::HashMap, mem::size_of};
 
 use vulkano::{
+    buffer::Subbuffer,
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferExecFuture, CommandBufferUsage, RenderPassBeginInfo,
     },
-    descriptor_set::PersistentDescriptorSet,
+    descriptor_set::{DescriptorSet, PersistentDescriptorSet},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
     image::Image,
     instance::Instance,
@@ -24,8 +25,9 @@ use vulkano::{
     Validated, VulkanError,
 };
 use vulkano_template::{
-    vulkano_objects,
+    shaders::basic::fs::SceneData,
     vulkano_objects::buffers::{create_cpu_accessible_uniforms, Buffers},
+    vulkano_objects::{self, buffers},
     vulkano_objects::{allocators::Allocators, buffers::Uniform},
     VertexFull,
 };
@@ -64,7 +66,7 @@ impl Renderer {
         let window = Arc::new(WindowBuilder::new().build(&event_loop).unwrap());
         let surface = Surface::from_window(instance.clone(), window.clone()).unwrap();
 
-        window.set_title("Movable Square");
+        window.set_title("Rusty Renderer");
         window.set_inner_size(LogicalSize::new(600.0f32, 600.0));
 
         let device_extensions = DeviceExtensions {
@@ -112,6 +114,8 @@ impl Renderer {
             extent: window.inner_size().into(),
             depth_range: 0.0..=1.0,
         };
+
+        println!("[Renderer info] swapchain image count: {}", images.len());
 
         Self {
             _instance: instance,
@@ -185,6 +189,19 @@ impl Renderer {
         now
     }
 
+    fn pad_buffer_size(&self, size: usize) -> usize {
+        let min_dynamic_align = self
+            .device
+            .physical_device()
+            .properties()
+            .min_uniform_buffer_offset_alignment
+            .as_devicesize() as usize;
+
+        // Round size up to the next multiple of align.
+        // size_of::<B>()
+        (size + min_dynamic_align - 1) & !(min_dynamic_align - 1)
+    }
+
     /// Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
     pub fn flush_next_future(
         &self,
@@ -214,6 +231,7 @@ impl Renderer {
         let mut last_mat = &String::new();
         let mut last_mesh = &String::new();
         let mut last_buffer_len = 0;
+        // let align = self.pad_buffer_size(size_of::<SceneData>()) as u32;
         for render_obj in render_objects {
             // material (pipeline)
             let pipeline = self.material_pipelines[&render_obj.material_id].get_pipeline();
@@ -225,7 +243,7 @@ impl Renderer {
                         PipelineBindPoint::Graphics,
                         pipeline.layout().clone(),
                         0,
-                        global_descriptor.clone(),
+                        global_descriptor.clone(), //.offsets([image_i * align]),
                     )
                     .unwrap();
 
@@ -330,12 +348,24 @@ impl Renderer {
         // self.render_objects.len() - 1
     }
 
-    pub fn create_camera_buffers(
+    pub fn create_scene_buffers(
         &self,
         material_id: &String,
-        initial_uniform: CameraData,
-    ) -> Vec<Uniform<CameraData>> {
-        create_cpu_accessible_uniforms(
+        cam_data: CameraData,
+        // scene_data: SceneData,
+    ) -> (Subbuffer<[SceneData]>, Vec<Uniform<CameraData>>) {
+        let image_count = self.get_image_count();
+        let scenes_data = (0..image_count)
+            .map(|_| SceneData {
+                fog_color: [0., 0., 0., 0.],
+                fog_distances: [0., 0., 0., 0.],
+                ambient_color: [0., 0., 0., 0.],
+                sunlight_direction: [0., 0., 0., 0.],
+                sunlight_color: [0., 0., 0., 0.],
+            })
+            .collect();
+
+        buffers::create_global_descriptors(
             &self.allocators,
             self.material_pipelines[material_id]
                 .get_pipeline()
@@ -344,8 +374,9 @@ impl Renderer {
                 .get(0)
                 .unwrap()
                 .clone(),
-            self.get_image_count(),
-            initial_uniform,
+            image_count,
+            cam_data,
+            scenes_data,
         )
     }
 }
