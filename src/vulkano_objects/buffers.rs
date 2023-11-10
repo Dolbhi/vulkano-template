@@ -57,9 +57,20 @@ impl<V: Vertex + BufferContents> Buffers<V> {
         // mesh: Mesh,
         // initial_uniform: U,
     ) -> Self {
-        let (vertex, vertex_future) =
-            create_device_local_vertex(allocators, transfer_queue.clone(), vertices);
-        let (index, index_future) = create_device_local_index(allocators, transfer_queue, indices);
+        let (vertex, vertex_future) = create_device_local_buffer(
+            allocators,
+            transfer_queue.clone(),
+            vertices,
+            BufferUsage::VERTEX_BUFFER,
+        );
+        // create_device_local_vertex(allocators, transfer_queue.clone(), vertices);
+        let (index, index_future) = create_device_local_buffer(
+            allocators,
+            transfer_queue.clone(),
+            indices,
+            BufferUsage::INDEX_BUFFER,
+        );
+        // create_device_local_index(allocators, transfer_queue, indices);
 
         let fence = vertex_future
             .join(index_future)
@@ -115,56 +126,6 @@ impl<V: Vertex + BufferContents> Buffers<V> {
 //     .unwrap()
 // }
 
-/// returns a device only vertex buffer and a future that copies data to it
-fn create_device_local_vertex<V: BufferContents>(
-    allocators: &Allocators,
-    queue: Arc<Queue>,
-    vertices: Vec<V>,
-) -> (Subbuffer<[V]>, CommandBufferExecFuture<NowFuture>) {
-    let buffer = Buffer::new_slice(
-        allocators.memory.clone(),
-        BufferCreateInfo {
-            usage: BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
-            ..Default::default()
-        },
-        AllocationCreateInfo {
-            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-            ..Default::default()
-        },
-        vertices.len() as DeviceSize,
-    )
-    .unwrap();
-
-    let staging_buffer = Buffer::from_iter(
-        allocators.memory.clone(),
-        BufferCreateInfo {
-            usage: BufferUsage::TRANSFER_SRC,
-            ..Default::default()
-        },
-        AllocationCreateInfo {
-            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-            ..Default::default()
-        },
-        vertices,
-    )
-    .unwrap();
-
-    let mut builder = AutoCommandBufferBuilder::primary(
-        &allocators.command_buffer,
-        queue.queue_family_index(),
-        CommandBufferUsage::OneTimeSubmit,
-    )
-    .unwrap();
-    builder
-        .copy_buffer(CopyBufferInfo::buffers(staging_buffer, buffer.clone()))
-        .unwrap();
-
-    let future = builder.build().unwrap().execute(queue).unwrap();
-
-    (buffer, future)
-}
-
 /// returns simple cpu accessible index buffer
 // fn create_cpu_accessible_index<V, U, M>(allocators: &Allocators) -> Subbuffer<[u16]>
 // where
@@ -187,23 +148,24 @@ fn create_device_local_vertex<V: BufferContents>(
 //     .unwrap()
 // }
 
-/// returns a device only index buffer and a future that copies data to it
-fn create_device_local_index(
+/// returns a device only buffer and a future that copies data to it
+fn create_device_local_buffer<T: BufferContents>(
     allocators: &Allocators,
     queue: Arc<Queue>,
-    indices: Vec<u32>,
-) -> (Subbuffer<[u32]>, CommandBufferExecFuture<NowFuture>) {
+    values: Vec<T>,
+    usage: BufferUsage,
+) -> (Subbuffer<[T]>, CommandBufferExecFuture<NowFuture>) {
     let buffer = Buffer::new_slice(
         allocators.memory.clone(),
         BufferCreateInfo {
-            usage: BufferUsage::INDEX_BUFFER | BufferUsage::TRANSFER_DST,
+            usage: usage | BufferUsage::TRANSFER_DST,
             ..Default::default()
         },
         AllocationCreateInfo {
             memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
             ..Default::default()
         },
-        indices.len() as DeviceSize,
+        values.len() as DeviceSize,
     )
     .unwrap();
 
@@ -218,7 +180,7 @@ fn create_device_local_index(
                 | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
             ..Default::default()
         },
-        indices,
+        values,
     )
     .unwrap();
 
@@ -298,7 +260,7 @@ impl<T: BufferContents> DynamicBuffer<T> {
     pub fn reinterpret(&self, index: usize) -> Subbuffer<T> {
         let start = (index * self.align) as DeviceSize;
         let end = start + size_of::<T>() as DeviceSize;
-        self.buffer.clone().slice(start..end).reinterpret::<T>()
+        self.buffer.clone().slice(start..end).reinterpret()
     }
 }
 
