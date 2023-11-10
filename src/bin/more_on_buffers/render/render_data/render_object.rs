@@ -3,7 +3,7 @@ use std::sync::Arc;
 use cgmath::{Matrix4, Rad, SquareMatrix};
 
 use vulkano::{buffer::BufferContents, descriptor_set::PersistentDescriptorSet};
-use vulkano_template::{shaders::basic::vs::ObjectData, vulkano_objects::buffers::Uniform};
+use vulkano_template::{shaders::basic::vs::GPUObjectData, vulkano_objects::buffers::Uniform};
 
 pub struct RenderObject<U: BufferContents + Clone> {
     pub mesh_id: String,
@@ -38,7 +38,7 @@ impl<U: BufferContents + Clone> RenderObject<U> {
     }
 }
 
-impl RenderObject<ObjectData> {
+impl RenderObject<GPUObjectData> {
     pub fn update_uniform(&self, index: u32) {
         let mut uniform_content = self.uniforms[index as usize]
             .0

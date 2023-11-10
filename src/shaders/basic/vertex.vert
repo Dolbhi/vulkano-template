@@ -4,13 +4,13 @@ layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
 layout(location = 2) in vec3 colour;
 
-layout(set = 0, binding = 0) uniform CameraData {
+layout(set = 0, binding = 0) uniform GPUCameraData {
     mat4 view;
     mat4 proj;
     mat4 view_proj;
 } cameraData;
 
-layout(set = 1, binding = 0) uniform ObjectData {
+layout(set = 1, binding = 0) uniform GPUObjectData {
     // vec3 color;
 	vec4 data;
 	mat4 render_matrix;

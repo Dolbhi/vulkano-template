@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use vulkano::{buffer::Subbuffer, descriptor_set::PersistentDescriptorSet};
-use vulkano_template::shaders::basic::vs::CameraData;
+use vulkano_template::shaders::basic::vs::GPUCameraData;
 
 use crate::render::renderer::Fence;
 
 pub struct FrameData {
     pub fence: Option<Arc<Fence>>,
-    camera_buffer: Subbuffer<CameraData>,
+    camera_buffer: Subbuffer<GPUCameraData>,
     global_descriptor: Arc<PersistentDescriptorSet>,
     // storage?
 }

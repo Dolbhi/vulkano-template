@@ -22,8 +22,8 @@ use vulkano::{
 };
 use vulkano_template::{
     shaders::basic::{
-        fs::SceneData,
-        vs::{CameraData, ObjectData},
+        fs::GPUSceneData,
+        vs::{GPUCameraData, GPUObjectData},
     },
     vulkano_objects::{
         self,
@@ -212,7 +212,7 @@ impl Renderer {
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
-        render_objects: &Vec<RenderObject<ObjectData>>,
+        render_objects: &Vec<RenderObject<GPUObjectData>>,
         global_descriptor: Arc<PersistentDescriptorSet>,
     ) -> Result<Fence, Validated<VulkanError>> {
         let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
@@ -235,10 +235,10 @@ impl Renderer {
         let mut last_mat = &String::new();
         let mut last_mesh = &String::new();
         let mut last_buffer_len = 0;
-        let align = self.pad_buffer_size(size_of::<SceneData>()) as u32;
+        let align = self.pad_buffer_size(size_of::<GPUSceneData>()) as u32;
         // println!(
         //     "Data size: {}, Calculated alignment: {}",
-        //     size_of::<SceneData>(),
+        //     size_of::<GPUSceneData>(),
         //     align
         // );
         for render_obj in render_objects {
@@ -334,8 +334,8 @@ impl Renderer {
         &self,
         mesh_id: String,
         material_id: String,
-        initial_uniform: ObjectData,
-    ) -> RenderObject<ObjectData> {
+        initial_uniform: GPUObjectData,
+    ) -> RenderObject<GPUObjectData> {
         let uniforms = create_cpu_accessible_uniforms(
             &self.allocators,
             self.material_pipelines[&material_id]
@@ -360,12 +360,12 @@ impl Renderer {
     pub fn create_scene_buffers(
         &self,
         material_id: &String,
-        cam_data: CameraData,
-        // scene_data: SceneData,
-    ) -> (DynamicBuffer<SceneData>, Vec<Uniform<CameraData>>) {
+        cam_data: GPUCameraData,
+        // scene_data: GPUSceneData,
+    ) -> (DynamicBuffer<GPUSceneData>, Vec<Uniform<GPUCameraData>>) {
         let image_count = self.get_image_count();
 
-        buffers::create_global_descriptors::<SceneData, CameraData>(
+        buffers::create_global_descriptors::<GPUSceneData, GPUCameraData>(
             &self.allocators,
             self.material_pipelines[material_id]
                 .get_pipeline()
@@ -376,7 +376,7 @@ impl Renderer {
                 .clone(),
             image_count,
             cam_data,
-            self.pad_buffer_size(size_of::<SceneData>()) as usize,
+            self.pad_buffer_size(size_of::<GPUSceneData>()) as usize,
         )
     }
 }

@@ -7,8 +7,8 @@ use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use vulkano_template::{
     shaders::basic::{
-        fs::SceneData,
-        vs::{CameraData, ObjectData},
+        fs::GPUSceneData,
+        vs::{GPUCameraData, GPUObjectData},
     },
     vulkano_objects::buffers::{DynamicBuffer, Uniform},
 };
@@ -25,11 +25,11 @@ pub struct RenderLoop {
     recreate_swapchain: bool,
     window_resized: bool,
     fences: Vec<Option<Arc<Fence>>>,
-    camera_descriptor: Vec<Uniform<CameraData>>,
-    scenes_buffer: DynamicBuffer<SceneData>,
+    camera_descriptor: Vec<Uniform<GPUCameraData>>,
+    scenes_buffer: DynamicBuffer<GPUSceneData>,
     previous_fence_i: u32,
     total_seconds: f32,
-    render_objects: Vec<RenderObject<ObjectData>>,
+    render_objects: Vec<RenderObject<GPUObjectData>>,
 }
 
 impl RenderLoop {
@@ -71,11 +71,11 @@ impl RenderLoop {
         renderer.init_mesh(square_id.clone(), vertices, indices);
 
         // objects
-        let initial_uniform = ObjectData {
+        let initial_uniform = GPUObjectData {
             data: [0., 0., 0., 0.],
             render_matrix: (cgmath::Matrix4::identity()).into(),
         };
-        let mut render_objects = Vec::<RenderObject<ObjectData>>::with_capacity(9);
+        let mut render_objects = Vec::<RenderObject<GPUObjectData>>::with_capacity(9);
         let controlled_obj =
             renderer.add_render_object(suz_id, material_id.clone(), initial_uniform);
         render_objects.push(controlled_obj);
@@ -91,7 +91,7 @@ impl RenderLoop {
         println!("Total render objs: {}", render_objects.len());
 
         // camera descriptors TODO: create independent layout not based on mat
-        let initial_uniform = CameraData {
+        let initial_uniform = GPUCameraData {
             view: (cgmath::Matrix4::identity()).into(),
             proj: (cgmath::Matrix4::identity()).into(),
             view_proj: (cgmath::Matrix4::identity()).into(),
