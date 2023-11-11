@@ -10,13 +10,13 @@ use vulkano_template::{
         fs::GPUSceneData,
         vs::{GPUCameraData, GPUObjectData},
     },
-    vulkano_objects::buffers::{DynamicBuffer, Uniform},
+    vulkano_objects::buffers::DynamicBuffer,
 };
 use winit::event_loop::EventLoop;
 
 use super::{
-    render_data::{mesh::Mesh, render_object::RenderObject},
-    renderer::{Fence, Renderer},
+    render_data::{frame_data::FrameData, mesh::Mesh, render_object::RenderObject},
+    renderer::Renderer,
 };
 use vulkano_template::{game_objects::Square, models::SquareModel, shaders::basic};
 
@@ -24,10 +24,9 @@ pub struct RenderLoop {
     renderer: Renderer,
     recreate_swapchain: bool,
     window_resized: bool,
-    fences: Vec<Option<Arc<Fence>>>,
-    camera_descriptor: Vec<Uniform<GPUCameraData>>,
+    frames: Vec<FrameData>,
+    previous_frame_i: u32,
     scenes_buffer: DynamicBuffer<GPUSceneData>,
-    previous_fence_i: u32,
     total_seconds: f32,
     render_objects: Vec<RenderObject<GPUObjectData>>,
 }
@@ -35,8 +34,8 @@ pub struct RenderLoop {
 impl RenderLoop {
     pub fn new(event_loop: &EventLoop<()>) -> Self {
         let mut renderer = Renderer::initialize(event_loop);
-        let frames_in_flight = renderer.get_image_count();
-        let fences: Vec<Option<Arc<Fence>>> = vec![None; frames_in_flight];
+        // let frames_in_flight = renderer.get_image_count();
+        // let fences: Vec<Option<Arc<Fence>>> = vec![None; frames_in_flight];
 
         // materials
         let vertex_shader = basic::vs::load(renderer.clone_device())
@@ -96,17 +95,24 @@ impl RenderLoop {
             proj: (cgmath::Matrix4::identity()).into(),
             view_proj: (cgmath::Matrix4::identity()).into(),
         };
-        let (scenes_buffer, camera_descriptor) =
+        let (scenes_buffer, scene_uniforms) =
             renderer.create_scene_buffers(&String::from("basic"), initial_uniform);
+
+        // create frame data
+        let frames = scene_uniforms
+            .into_iter()
+            .map(|(camera_buffer, global_descriptor)| {
+                FrameData::new(camera_buffer, global_descriptor)
+            })
+            .collect();
 
         Self {
             renderer,
             recreate_swapchain: false,
             window_resized: false,
-            fences,
-            camera_descriptor,
+            frames,
             scenes_buffer,
-            previous_fence_i: 0,
+            previous_frame_i: 0,
             total_seconds: 0.0,
             render_objects,
         }
@@ -130,14 +136,14 @@ impl RenderLoop {
         let view = translation * rotation;
         let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
         projection.y.y *= -1.;
-
-        let mut cam_uniform_contents = self.camera_descriptor[image_i as usize]
-            .0
-            .write()
-            .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
-        cam_uniform_contents.view = view.into();
-        cam_uniform_contents.proj = projection.into();
-        cam_uniform_contents.view_proj = (projection * view).into();
+        self.frames[image_i as usize].update_camera_data(view, projection);
+        // let mut cam_uniform_contents = self.camera_descriptor[image_i as usize]
+        //     .0
+        //     .write()
+        //     .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
+        // cam_uniform_contents.view = view.into();
+        // cam_uniform_contents.proj = projection.into();
+        // cam_uniform_contents.view_proj = (projection * view).into();
 
         // update scene data
         let current_scene = self.scenes_buffer.reinterpret(image_i as usize); //clone().index(image_i.into());
@@ -178,7 +184,7 @@ impl RenderLoop {
         }
 
         // wait for upcoming image to be ready (it should be by this point)
-        if let Some(image_fence) = &self.fences[image_i as usize] {
+        if let Some(image_fence) = &self.frames[image_i as usize].fence {
             image_fence.wait(None).unwrap();
         }
 
@@ -186,7 +192,7 @@ impl RenderLoop {
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
         let something_needs_all_gpu_resources = false;
-        let previous_future = match self.fences[self.previous_fence_i as usize].clone() {
+        let previous_future = match self.frames[self.previous_frame_i as usize].fence.clone() {
             None => self.renderer.synchronize().boxed(),
             Some(fence) => {
                 if something_needs_all_gpu_resources {
@@ -205,10 +211,12 @@ impl RenderLoop {
             acquire_future,
             image_i,
             &self.render_objects,
-            self.camera_descriptor[image_i as usize].1.clone(),
+            self.frames[image_i as usize]
+                .get_global_descriptor()
+                .clone(),
         );
         // replace fence of upcoming image with new one
-        self.fences[image_i as usize] = match result {
+        self.frames[image_i as usize].fence = match result {
             Ok(fence) => Some(Arc::new(fence)),
             Err(Validated::Error(VulkanError::OutOfDate)) => {
                 self.recreate_swapchain = true;
@@ -219,7 +227,7 @@ impl RenderLoop {
                 None
             }
         };
-        self.previous_fence_i = image_i;
+        self.previous_frame_i = image_i;
     }
 
     pub fn handle_window_resize(&mut self) {

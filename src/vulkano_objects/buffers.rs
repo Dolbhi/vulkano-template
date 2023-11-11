@@ -46,16 +46,12 @@ impl<V: Vertex + BufferContents> Buffers<V> {
     //     }
     // }
 
-    /// Creates device local vertex, index and uniform buffers of specified model
+    /// Creates device local vertex and index buffers of specified model
     pub fn initialize_device_local(
         allocators: &Allocators,
-        // descriptor_set_layout: Arc<DescriptorSetLayout>,
-        // uniform_buffer_count: usize,
         transfer_queue: Arc<Queue>,
         vertices: Vec<V>,
         indices: Vec<u32>,
-        // mesh: Mesh,
-        // initial_uniform: U,
     ) -> Self {
         let (vertex, vertex_future) = create_device_local_buffer(
             allocators,
@@ -63,32 +59,20 @@ impl<V: Vertex + BufferContents> Buffers<V> {
             vertices,
             BufferUsage::VERTEX_BUFFER,
         );
-        // create_device_local_vertex(allocators, transfer_queue.clone(), vertices);
         let (index, index_future) = create_device_local_buffer(
             allocators,
             transfer_queue.clone(),
             indices,
             BufferUsage::INDEX_BUFFER,
         );
-        // create_device_local_index(allocators, transfer_queue, indices);
 
         let fence = vertex_future
             .join(index_future)
             .then_signal_fence_and_flush()
             .unwrap();
-
         fence.wait(None).unwrap();
 
-        Self {
-            vertex,
-            index,
-            // uniforms: create_cpu_accessible_uniforms::<U>(
-            //     allocators,
-            //     descriptor_set_layout,
-            //     uniform_buffer_count,
-            //     initial_uniform,
-            // ),
-        }
+        Self { vertex, index }
     }
 
     pub fn get_vertex(&self) -> Subbuffer<[V]> {
@@ -98,10 +82,6 @@ impl<V: Vertex + BufferContents> Buffers<V> {
     pub fn get_index(&self) -> Subbuffer<[u32]> {
         self.index.clone()
     }
-
-    // pub fn get_uniform_descriptor_set(&self, i: usize) -> Arc<PersistentDescriptorSet> {
-    //     self.uniforms[i].1.clone()
-    // }
 }
 
 /// returns simple cpu accessible vertex buffer
@@ -342,4 +322,40 @@ pub fn create_global_descriptors<S: BufferContents, U: BufferContents + Clone>(
         },
         uniforms,
     )
+}
+
+pub fn create_storage_buffers<T: BufferContents>(
+    allocators: &Allocators,
+    descriptor_set_layout: Arc<DescriptorSetLayout>,
+    buffer_count: usize,
+    object_count: usize,
+) -> Vec<Uniform<[T]>> {
+    (0..buffer_count)
+        .map(|_| {
+            let storage_buffer = Buffer::new_slice(
+                allocators.memory.clone(),
+                BufferCreateInfo {
+                    usage: BufferUsage::STORAGE_BUFFER,
+                    ..Default::default()
+                },
+                AllocationCreateInfo {
+                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                    ..Default::default()
+                },
+                object_count as DeviceSize,
+            )
+            .unwrap();
+
+            let descriptor_set = PersistentDescriptorSet::new(
+                &allocators.descriptor_set,
+                descriptor_set_layout.clone(),
+                [WriteDescriptorSet::buffer(0, storage_buffer.clone())],
+                [],
+            )
+            .unwrap();
+
+            (storage_buffer, descriptor_set)
+        })
+        .collect()
 }
