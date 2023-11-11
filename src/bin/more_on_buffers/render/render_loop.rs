@@ -111,8 +111,8 @@ impl RenderLoop {
             recreate_swapchain: false,
             window_resized: false,
             frames,
-            scenes_buffer,
             previous_frame_i: 0,
+            scenes_buffer,
             total_seconds: 0.0,
             render_objects,
         }
