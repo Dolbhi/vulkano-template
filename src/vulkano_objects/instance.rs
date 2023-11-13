@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use vulkano::instance::{Instance, InstanceCreateInfo, LayerProperties};
+use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo, LayerProperties};
 
 const LIST_AVAILABLE_LAYERS: bool = false;
 const ENABLE_VALIDATION_LAYERS: bool = false;
@@ -20,7 +20,7 @@ pub fn get_instance(event_loop: &winit::event_loop::EventLoop<()>) -> Arc<Instan
     }
 
     let mut create_info = InstanceCreateInfo {
-        // enumerate_portability: true,
+        flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
         enabled_extensions: required_extensions,
         ..Default::default()
     };

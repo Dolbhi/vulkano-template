@@ -1,15 +1,12 @@
-use std::path::Path;
 use std::sync::Arc;
+use std::{iter::zip, path::Path};
 
 use cgmath::{vec3, Matrix4, Rad, SquareMatrix};
 
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use vulkano_template::{
-    shaders::basic::{
-        fs::GPUSceneData,
-        vs::{GPUCameraData, GPUObjectData},
-    },
+    shaders::basic::{fs::GPUSceneData, vs::GPUCameraData},
     vulkano_objects::buffers::DynamicBuffer,
 };
 use winit::event_loop::EventLoop;
@@ -28,14 +25,12 @@ pub struct RenderLoop {
     previous_frame_i: u32,
     scenes_buffer: DynamicBuffer<GPUSceneData>,
     total_seconds: f32,
-    render_objects: Vec<RenderObject<GPUObjectData>>,
+    render_objects: Vec<RenderObject>,
 }
 
 impl RenderLoop {
     pub fn new(event_loop: &EventLoop<()>) -> Self {
         let mut renderer = Renderer::initialize(event_loop);
-        // let frames_in_flight = renderer.get_image_count();
-        // let fences: Vec<Option<Arc<Fence>>> = vec![None; frames_in_flight];
 
         // materials
         let vertex_shader = basic::vs::load(renderer.clone_device())
@@ -70,20 +65,14 @@ impl RenderLoop {
         renderer.init_mesh(square_id.clone(), vertices, indices);
 
         // objects
-        let initial_uniform = GPUObjectData {
-            data: [0., 0., 0., 0.],
-            render_matrix: (cgmath::Matrix4::identity()).into(),
-        };
-        let mut render_objects = Vec::<RenderObject<GPUObjectData>>::with_capacity(9);
-        let controlled_obj =
-            renderer.add_render_object(suz_id, material_id.clone(), initial_uniform);
+        let mut render_objects = Vec::<RenderObject>::with_capacity(9);
+        let controlled_obj = RenderObject::new(suz_id, material_id.clone());
         render_objects.push(controlled_obj);
         for (x, y) in (-1..2)
             .flat_map(|x| (-1..2).map(move |y| (x.clone(), y)))
             .filter(|a| *a != (0, 0))
         {
-            let mut square_obj =
-                renderer.add_render_object(square_id.clone(), material_id.clone(), initial_uniform);
+            let mut square_obj = RenderObject::new(square_id.clone(), material_id.clone());
             square_obj.update_transform([x as f32, y as f32, 0.], cgmath::Rad(0.));
             render_objects.push(square_obj)
         }
@@ -98,12 +87,21 @@ impl RenderLoop {
         let (scenes_buffer, scene_uniforms) =
             renderer.create_scene_buffers(&String::from("basic"), initial_uniform);
 
+        let object_uniforms = renderer.create_object_buffers(&String::from("basic"));
+
         // create frame data
-        let frames = scene_uniforms
+        let frames = zip(scene_uniforms, object_uniforms)
             .into_iter()
-            .map(|(camera_buffer, global_descriptor)| {
-                FrameData::new(camera_buffer, global_descriptor)
-            })
+            .map(
+                |((camera_buffer, global_descriptor), (storage_buffer, object_descriptor))| {
+                    FrameData::new(
+                        camera_buffer,
+                        global_descriptor,
+                        storage_buffer,
+                        object_descriptor,
+                    )
+                },
+            )
             .collect();
 
         Self {
@@ -119,14 +117,12 @@ impl RenderLoop {
     }
 
     fn update_render_objects(&mut self, transform_data: &Square, image_i: u32) {
-        // update uniform data
+        // update object data
         self.render_objects[0].update_transform(
             [transform_data.position[0], transform_data.position[1], 0.],
             cgmath::Rad(0.),
         );
-        for obj in &self.render_objects {
-            obj.update_uniform(image_i);
-        }
+        self.frames[image_i as usize].update_objects_data(&mut self.render_objects);
 
         // update camera
         let cam_pos = vec3(0., 0., 2.);
@@ -137,13 +133,6 @@ impl RenderLoop {
         let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
         projection.y.y *= -1.;
         self.frames[image_i as usize].update_camera_data(view, projection);
-        // let mut cam_uniform_contents = self.camera_descriptor[image_i as usize]
-        //     .0
-        //     .write()
-        //     .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
-        // cam_uniform_contents.view = view.into();
-        // cam_uniform_contents.proj = projection.into();
-        // cam_uniform_contents.view_proj = (projection * view).into();
 
         // update scene data
         let current_scene = self.scenes_buffer.reinterpret(image_i as usize); //clone().index(image_i.into());
@@ -213,6 +202,9 @@ impl RenderLoop {
             &self.render_objects,
             self.frames[image_i as usize]
                 .get_global_descriptor()
+                .clone(),
+            self.frames[image_i as usize]
+                .get_objects_descriptor()
                 .clone(),
         );
         // replace fence of upcoming image with new one

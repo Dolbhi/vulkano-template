@@ -28,7 +28,7 @@ use vulkano_template::{
     vulkano_objects::{
         self,
         allocators::Allocators,
-        buffers::{self, create_cpu_accessible_uniforms, Buffers, DynamicBuffer, Uniform},
+        buffers::{self, create_storage_buffers, Buffers, DynamicBuffer, Uniform},
     },
     VertexFull,
 };
@@ -75,6 +75,7 @@ impl Renderer {
 
         let device_extensions = DeviceExtensions {
             khr_swapchain: true,
+            khr_shader_draw_parameters: true,
             ..DeviceExtensions::empty()
         };
 
@@ -212,8 +213,9 @@ impl Renderer {
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
-        render_objects: &Vec<RenderObject<GPUObjectData>>,
+        render_objects: &Vec<RenderObject>,
         global_descriptor: Arc<PersistentDescriptorSet>,
+        objects_descriptor: Arc<PersistentDescriptorSet>,
     ) -> Result<Fence, Validated<VulkanError>> {
         let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
@@ -232,6 +234,7 @@ impl Renderer {
             )
             .unwrap();
 
+        let mut index = 0;
         let mut last_mat = &String::new();
         let mut last_mesh = &String::new();
         let mut last_buffer_len = 0;
@@ -281,11 +284,12 @@ impl Renderer {
                     PipelineBindPoint::Graphics,
                     pipeline.layout().clone(),
                     1,
-                    render_obj.clone_descriptor(image_i as usize),
+                    objects_descriptor.clone(),
                 )
                 .unwrap()
-                .draw_indexed(last_buffer_len as u32, 1, 0, 0, 0)
+                .draw_indexed(last_buffer_len as u32, 1, 0, 0, index)
                 .unwrap();
+            index += 1;
         }
         builder.end_render_pass(Default::default()).unwrap();
 
@@ -330,33 +334,6 @@ impl Renderer {
         self.material_pipelines.insert(id, mat);
     }
 
-    pub fn add_render_object(
-        &self,
-        mesh_id: String,
-        material_id: String,
-        initial_uniform: GPUObjectData,
-    ) -> RenderObject<GPUObjectData> {
-        let uniforms = create_cpu_accessible_uniforms(
-            &self.allocators,
-            self.material_pipelines[&material_id]
-                .get_pipeline()
-                .layout()
-                .set_layouts()
-                .get(1)
-                .unwrap()
-                .clone(),
-            self.get_image_count(),
-            initial_uniform,
-        );
-
-        // let render_obj =
-        RenderObject::new(mesh_id, material_id, uniforms)
-
-        // self.render_objects.push(render_obj);
-
-        // self.render_objects.len() - 1
-    }
-
     pub fn create_scene_buffers(
         &self,
         material_id: &String,
@@ -377,6 +354,21 @@ impl Renderer {
             image_count,
             cam_data,
             self.pad_buffer_size(size_of::<GPUSceneData>()) as usize,
+        )
+    }
+
+    pub fn create_object_buffers(&self, material_id: &String) -> Vec<Uniform<[GPUObjectData]>> {
+        create_storage_buffers(
+            &self.allocators,
+            self.material_pipelines[material_id]
+                .get_pipeline()
+                .layout()
+                .set_layouts()
+                .get(1)
+                .unwrap()
+                .clone(),
+            self.get_image_count(),
+            10000,
         )
     }
 }

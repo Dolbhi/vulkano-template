@@ -10,18 +10,21 @@ layout(set = 0, binding = 0) uniform GPUCameraData {
     mat4 view_proj;
 } cameraData;
 
-layout(set = 1, binding = 0) uniform GPUObjectData {
+struct GPUObjectData {
     // vec3 color;
 	vec4 data;
 	mat4 render_matrix;
-} uniforms;
+};
+
+layout(set = 1, binding = 0) readonly buffer ObjectBuffer {
+    GPUObjectData objects[];
+} objectBuffer;
 
 layout(location = 0) out vec3 outColor;
 
 void main() {
-    outColor = colour;
     vec4 localPos = vec4(position, 1.0);
-    localPos = cameraData.view_proj * uniforms.render_matrix * localPos;
+    localPos = cameraData.view_proj * objectBuffer.objects[gl_BaseInstance].render_matrix * localPos;
     
     gl_Position = vec4(
         localPos.x,
@@ -29,4 +32,5 @@ void main() {
         localPos.z, 
         localPos.w
     );
+    outColor = colour;
 }

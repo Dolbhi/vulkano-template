@@ -106,7 +106,7 @@ pub fn window_size_dependent_pipeline(
         PipelineShaderStageCreateInfo::new(vs),
         PipelineShaderStageCreateInfo::new(fs),
     ];
-    // set first set, second binding to dynamic
+    // set set 0, binding 1 to dynamic
     let layout = {
         let mut layout_create_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
         layout_create_info.set_layouts[0]

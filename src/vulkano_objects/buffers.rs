@@ -225,10 +225,6 @@ pub struct DynamicBuffer<T: BufferContents> {
 }
 
 impl<T: BufferContents> DynamicBuffer<T> {
-    // pub fn new(buffer: Subbuffer<[u8]>, align) -> Self {
-
-    // }
-
     pub const fn elem_size() -> usize {
         size_of::<T>()
     }
@@ -271,7 +267,7 @@ pub fn create_global_descriptors<S: BufferContents, U: BufferContents + Clone>(
         .unwrap()
         .into_bytes()
     };
-    println!("Bytes in scenes buffer: {}", scenes_buffer.len());
+    // println!("Bytes in scenes buffer: {}", scenes_buffer.len());
 
     let uniforms = (0..buffer_count)
         .map(|_i| {
