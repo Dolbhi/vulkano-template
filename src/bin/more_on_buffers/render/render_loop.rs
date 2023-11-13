@@ -122,7 +122,7 @@ impl RenderLoop {
             [transform_data.position[0], transform_data.position[1], 0.],
             cgmath::Rad(0.),
         );
-        self.frames[image_i as usize].update_objects_data(&mut self.render_objects);
+        self.frames[image_i as usize].update_objects_data(&self.render_objects);
 
         // update camera
         let cam_pos = vec3(0., 0., 2.);

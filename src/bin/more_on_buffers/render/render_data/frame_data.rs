@@ -43,7 +43,7 @@ impl FrameData {
         cam_uniform_contents.view_proj = (proj * view).into();
     }
 
-    pub fn update_objects_data(&mut self, render_objects: &mut Vec<RenderObject>) {
+    pub fn update_objects_data(&mut self, render_objects: &Vec<RenderObject>) {
         let mut storage_buffer_contents = self
             .objects_buffer
             .write()
