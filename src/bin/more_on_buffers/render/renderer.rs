@@ -120,7 +120,7 @@ impl Renderer {
             depth_range: 0.0..=1.0,
         };
 
-        println!("[Renderer info] swapchain image count: {}", images.len());
+        println!("[Renderer info]\nswapchain image count: {}", images.len());
 
         Self {
             _instance: instance,
@@ -234,7 +234,6 @@ impl Renderer {
             )
             .unwrap();
 
-        let mut index = 0;
         let mut last_mat = &String::new();
         let mut last_mesh = &String::new();
         let mut last_buffer_len = 0;
@@ -244,7 +243,7 @@ impl Renderer {
         //     size_of::<GPUSceneData>(),
         //     align
         // );
-        for render_obj in render_objects {
+        for (index, render_obj) in render_objects.iter().enumerate() {
             // material (pipeline)
             let pipeline = self.material_pipelines[&render_obj.material_id].get_pipeline();
             if last_mat != &render_obj.material_id {
@@ -256,6 +255,13 @@ impl Renderer {
                         pipeline.layout().clone(),
                         0,
                         global_descriptor.clone().offsets([image_i * align]),
+                    )
+                    .unwrap()
+                    .bind_descriptor_sets(
+                        PipelineBindPoint::Graphics,
+                        pipeline.layout().clone(),
+                        1,
+                        objects_descriptor.clone(),
                     )
                     .unwrap();
 
@@ -278,18 +284,10 @@ impl Renderer {
                 last_buffer_len = index_buffer_length;
             }
 
-            // descriptor sets + draw
+            // draw
             builder
-                .bind_descriptor_sets(
-                    PipelineBindPoint::Graphics,
-                    pipeline.layout().clone(),
-                    1,
-                    objects_descriptor.clone(),
-                )
-                .unwrap()
-                .draw_indexed(last_buffer_len as u32, 1, 0, 0, index)
+                .draw_indexed(last_buffer_len as u32, 1, 0, 0, index as u32)
                 .unwrap();
-            index += 1;
         }
         builder.end_render_pass(Default::default()).unwrap();
 

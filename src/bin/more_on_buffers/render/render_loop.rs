@@ -46,22 +46,28 @@ impl RenderLoop {
         renderer.init_material(material_id.clone(), vertex_shader, fragment_shader);
 
         // meshes
+        //      gun
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/gun.obj",
         );
         let (vertices, indices) = Mesh::from_obj(path).decompose();
         let gun_id = String::from("gun");
+
         renderer.init_mesh(gun_id.clone(), vertices, indices);
 
+        //      suzanne
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/suzanne.obj",
         );
         let (vertices, indices) = Mesh::from_obj(path).decompose();
         let suz_id = String::from("suzanne");
+
         renderer.init_mesh(suz_id.clone(), vertices, indices);
 
+        //      square
         let (vertices, indices) = Mesh::from_model::<SquareModel>().decompose();
         let square_id = String::from("square");
+
         renderer.init_mesh(square_id.clone(), vertices, indices);
 
         // objects
@@ -116,13 +122,15 @@ impl RenderLoop {
         }
     }
 
-    fn update_render_objects(&mut self, transform_data: &Square, image_i: u32) {
+    fn update_gpu_data(&mut self, transform_data: &Square, image_i: u32) {
+        let image_i = image_i as usize;
+
         // update object data
         self.render_objects[0].update_transform(
             [transform_data.position[0], transform_data.position[1], 0.],
             cgmath::Rad(0.),
         );
-        self.frames[image_i as usize].update_objects_data(&self.render_objects);
+        self.frames[image_i].update_objects_data(&self.render_objects);
 
         // update camera
         let cam_pos = vec3(0., 0., 2.);
@@ -132,10 +140,10 @@ impl RenderLoop {
         let view = translation * rotation;
         let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
         projection.y.y *= -1.;
-        self.frames[image_i as usize].update_camera_data(view, projection);
+        self.frames[image_i].update_camera_data(view, projection);
 
         // update scene data
-        let current_scene = self.scenes_buffer.reinterpret(image_i as usize); //clone().index(image_i.into());
+        let current_scene = self.scenes_buffer.reinterpret(image_i);
         let mut scene_uniform_contents = current_scene
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to scene uniform buffer\n{}", e));
@@ -177,7 +185,7 @@ impl RenderLoop {
             image_fence.wait(None).unwrap();
         }
 
-        self.update_render_objects(transform_data, image_i);
+        self.update_gpu_data(transform_data, image_i);
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
         let something_needs_all_gpu_resources = false;

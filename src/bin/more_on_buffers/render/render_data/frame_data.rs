@@ -49,9 +49,8 @@ impl FrameData {
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
 
-        for i in 0..render_objects.len() {
-            storage_buffer_contents[i].render_matrix =
-                render_objects[i].get_transform_matrix().into();
+        for (i, render_object) in render_objects.iter().enumerate() {
+            storage_buffer_contents[i].render_matrix = render_object.get_transform_matrix().into();
         }
     }
 
