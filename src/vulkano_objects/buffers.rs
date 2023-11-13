@@ -220,21 +220,23 @@ pub fn create_cpu_accessible_uniforms<U: BufferContents + Clone>(
 pub struct DynamicBuffer<T: BufferContents> {
     buffer: Subbuffer<[u8]>,
     // count: usize,
-    align: usize,
+    align: DeviceSize,
     marker: PhantomData<T>,
 }
 
 impl<T: BufferContents> DynamicBuffer<T> {
-    pub const fn elem_size() -> usize {
-        size_of::<T>()
-    }
+    // pub fn new()
 
-    pub fn align(&self) -> usize {
+    // pub const fn elem_size() -> usize {
+    //     size_of::<T>()
+    // }
+
+    pub fn align(&self) -> DeviceSize {
         self.align
     }
 
     pub fn reinterpret(&self, index: usize) -> Subbuffer<T> {
-        let start = (index * self.align) as DeviceSize;
+        let start = self.align * index as DeviceSize;
         let end = start + size_of::<T>() as DeviceSize;
         self.buffer.clone().slice(start..end).reinterpret()
     }
@@ -245,13 +247,12 @@ pub fn create_global_descriptors<S: BufferContents, U: BufferContents + Clone>(
     descriptor_set_layout: Arc<DescriptorSetLayout>,
     buffer_count: usize,
     cam_data: U,
-    align: usize,
+    align: DeviceSize,
 ) -> (DynamicBuffer<S>, Vec<Uniform<U>>) {
     let scenes_buffer = {
-        let data_size = buffer_count * align;
-        let scene_data: Vec<u8> = (0..data_size).map(|_| 0u8).collect();
+        let data_size = (buffer_count as DeviceSize) * align;
 
-        Buffer::from_iter(
+        Buffer::new_slice::<u8>(
             allocators.memory.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::UNIFORM_BUFFER,
@@ -262,10 +263,9 @@ pub fn create_global_descriptors<S: BufferContents, U: BufferContents + Clone>(
                     | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
-            scene_data,
+            data_size,
         )
         .unwrap()
-        .into_bytes()
     };
     // println!("Bytes in scenes buffer: {}", scenes_buffer.len());
 

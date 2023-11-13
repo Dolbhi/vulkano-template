@@ -18,7 +18,7 @@ use vulkano::{
         future::{FenceSignalFuture, JoinFuture, NowFuture},
         GpuFuture,
     },
-    Validated, VulkanError,
+    DeviceSize, Validated, VulkanError,
 };
 use vulkano_template::{
     shaders::basic::{
@@ -194,13 +194,13 @@ impl Renderer {
         now
     }
 
-    fn pad_buffer_size(&self, size: usize) -> usize {
+    fn pad_buffer_size(&self, size: DeviceSize) -> DeviceSize {
         let min_dynamic_align = self
             .device
             .physical_device()
             .properties()
             .min_uniform_buffer_offset_alignment
-            .as_devicesize() as usize;
+            .as_devicesize();
 
         // Round size up to the next multiple of align.
         // size_of::<B>()
@@ -237,7 +237,7 @@ impl Renderer {
         let mut last_mat = &String::new();
         let mut last_mesh = &String::new();
         let mut last_buffer_len = 0;
-        let align = self.pad_buffer_size(size_of::<GPUSceneData>()) as u32;
+        let align = self.pad_buffer_size(size_of::<GPUSceneData>() as DeviceSize);
         // println!(
         //     "Data size: {}, Calculated alignment: {}",
         //     size_of::<GPUSceneData>(),
@@ -254,7 +254,7 @@ impl Renderer {
                         PipelineBindPoint::Graphics,
                         pipeline.layout().clone(),
                         0,
-                        global_descriptor.clone().offsets([image_i * align]),
+                        global_descriptor.clone().offsets([image_i * align as u32]),
                     )
                     .unwrap()
                     .bind_descriptor_sets(
@@ -351,7 +351,7 @@ impl Renderer {
                 .clone(),
             image_count,
             cam_data,
-            self.pad_buffer_size(size_of::<GPUSceneData>()) as usize,
+            self.pad_buffer_size(size_of::<GPUSceneData>() as DeviceSize),
         )
     }
 
