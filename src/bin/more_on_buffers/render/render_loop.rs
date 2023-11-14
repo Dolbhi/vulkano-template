@@ -140,7 +140,7 @@ impl RenderLoop {
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to scene uniform buffer\n{}", e));
         camera_uniform_contents.view = view.into();
-        // camera_uniform_contents.proj = projection.into();
+        // camera_uniform_contents.proj = projection.into(); // range.end <= buffer.size() error if size_of::<data> == alignment
         camera_uniform_contents.view_proj = (projection * view).into();
 
         // update scene data
