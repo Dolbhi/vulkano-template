@@ -292,19 +292,17 @@ pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
 ) {
     let camera_dynamic = DynamicBuffer::<C>::new(allocators, buffer_count as DeviceSize, device);
     // println!(
-    //     "[Camera dynamics] data size: {}, alignment: {}, buffer size: {}, range end: {}",
+    //     "[Camera dynamics] data size: {}, alignment: {}, buffer size: {}",
     //     size_of::<C>(),
     //     camera_dynamic.align,
     //     camera_dynamic.buffer.size(),
-    //     (0..size_of::<C>() as DeviceSize).end,
     // );
     let scene_dynamic = DynamicBuffer::<S>::new(allocators, buffer_count as DeviceSize, device);
     // println!(
-    //     "[Scene dynamics] data size: {}, alignment: {}, buffer size: {}, range end: {}",
+    //     "[Scene dynamics] data size: {}, alignment: {}, buffer size: {}",
     //     size_of::<S>(),
     //     scene_dynamic.align,
     //     scene_dynamic.buffer.size(),
-    //     (0..size_of::<S>() as DeviceSize).end,
     // );
 
     // descriptor set is how we interface data between the buffer and the pipeline
