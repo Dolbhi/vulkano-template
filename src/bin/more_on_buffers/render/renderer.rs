@@ -1,6 +1,7 @@
 use std::{collections::hash_map::HashMap, sync::Arc};
 
 use vulkano::{
+    buffer::Subbuffer,
     command_buffer::{self, RenderPassBeginInfo},
     descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
@@ -28,7 +29,7 @@ use vulkano_template::{
     vulkano_objects::{
         self,
         allocators::Allocators,
-        buffers::{self, create_storage_buffers, Buffers, DynamicBuffer, Uniform},
+        buffers::{self, create_storage_buffers, Buffers, Uniform},
     },
     VertexFull,
 };
@@ -335,8 +336,8 @@ impl Renderer {
         &self,
         material_id: &String,
     ) -> (
-        DynamicBuffer<GPUCameraData>,
-        DynamicBuffer<GPUSceneData>,
+        u64,
+        Vec<(Subbuffer<GPUCameraData>, Subbuffer<GPUSceneData>)>,
         Arc<PersistentDescriptorSet>,
     ) {
         let image_count = self.get_image_count();

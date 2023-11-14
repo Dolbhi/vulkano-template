@@ -1,3 +1,4 @@
+use std::iter::zip;
 // use std::mem::size_of;
 use std::path::Path;
 use std::sync::Arc;
@@ -5,12 +6,9 @@ use std::sync::Arc;
 use cgmath::{vec3, Matrix4, Rad};
 
 use vulkano::descriptor_set::{DescriptorSet, PersistentDescriptorSet};
+use vulkano::DeviceSize;
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
-use vulkano_template::{
-    shaders::basic::{fs::GPUSceneData, vs::GPUCameraData},
-    vulkano_objects::buffers::DynamicBuffer,
-};
 use winit::event_loop::EventLoop;
 
 use super::{
@@ -25,9 +23,8 @@ pub struct RenderLoop {
     window_resized: bool,
     frames: Vec<FrameData>,
     previous_frame_i: u32,
-    camera_dynamic: DynamicBuffer<GPUCameraData>,
-    scene_dynamic: DynamicBuffer<GPUSceneData>,
     global_descriptor: Arc<PersistentDescriptorSet>,
+    global_alignment: DeviceSize,
     total_seconds: f32,
     render_objects: Vec<RenderObject>,
 }
@@ -89,17 +86,19 @@ impl RenderLoop {
         println!("Total render objs: {}", render_objects.len());
 
         // global descriptors TODO: 1. Group dyanamics into its own struct 2. create independent layout not based on mat
-        let (camera_dynamic, scene_dynamic, global_descriptor) =
+        let (global_alignment, global_buffers, global_descriptor) =
             renderer.create_scene_buffers(&String::from("basic"));
 
         let object_uniforms = renderer.create_object_buffers(&String::from("basic"));
 
         // create frame data
-        let frames = object_uniforms
+        let frames = zip(global_buffers, object_uniforms)
             .into_iter()
-            .map(|(storage_buffer, object_descriptor)| {
-                FrameData::new(storage_buffer, object_descriptor)
-            })
+            .map(
+                |((cam_buffer, scene_buffer), (storage_buffer, object_descriptor))| {
+                    FrameData::new(cam_buffer, scene_buffer, storage_buffer, object_descriptor)
+                },
+            )
             .collect();
 
         Self {
@@ -108,9 +107,8 @@ impl RenderLoop {
             window_resized: false,
             frames,
             previous_frame_i: 0,
-            camera_dynamic,
-            scene_dynamic,
             global_descriptor,
+            global_alignment,
             total_seconds: 0.0,
             render_objects,
         }
@@ -135,22 +133,15 @@ impl RenderLoop {
         let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
         projection.y.y *= -1.;
 
-        let current_camera = self.camera_dynamic.reinterpret(image_i);
-        let mut camera_uniform_contents = current_camera
-            .write()
-            .unwrap_or_else(|e| panic!("Failed to write to scene uniform buffer\n{}", e));
-        camera_uniform_contents.view = view.into();
-        // camera_uniform_contents.proj = projection.into(); // range.end <= buffer.size() error if size_of::<data> == alignment
-        camera_uniform_contents.view_proj = (projection * view).into();
+        self.frames[image_i].update_camera_data(view, projection);
 
         // update scene data
-        let current_scene = self.scene_dynamic.reinterpret(image_i);
-        let mut scene_uniform_contents = current_scene
-            .write()
-            .unwrap_or_else(|e| panic!("Failed to write to scene uniform buffer\n{}", e));
-
-        scene_uniform_contents.ambient_color =
-            [self.total_seconds.sin(), 0., self.total_seconds.cos(), 1.];
+        self.frames[image_i].update_scene_data([
+            self.total_seconds.sin(),
+            0.,
+            self.total_seconds.cos(),
+            1.,
+        ]);
     }
 
     /// update renderer and draw upcoming image
@@ -220,8 +211,8 @@ impl RenderLoop {
             image_i,
             &self.render_objects,
             self.global_descriptor.clone().offsets([
-                self.camera_dynamic.align() as u32 * image_i,
-                self.scene_dynamic.align() as u32 * image_i,
+                self.global_alignment as u32 * image_i,
+                self.global_alignment as u32 * image_i,
             ]),
             self.frames[image_i as usize]
                 .get_objects_descriptor()
