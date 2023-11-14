@@ -115,14 +115,14 @@ impl RenderLoop {
     }
 
     fn update_gpu_data(&mut self, transform_data: &Square, image_i: u32) {
-        let image_i = image_i as usize;
+        let frame = &mut self.frames[image_i as usize];
 
         // update object data
         self.render_objects[0].update_transform(
             [transform_data.position[0], transform_data.position[1], 0.],
             cgmath::Rad(0.),
         );
-        self.frames[image_i].update_objects_data(&self.render_objects);
+        frame.update_objects_data(&self.render_objects);
 
         // update camera
         let cam_pos = vec3(0., 0., 2.);
@@ -133,15 +133,10 @@ impl RenderLoop {
         let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
         projection.y.y *= -1.;
 
-        self.frames[image_i].update_camera_data(view, projection);
+        frame.update_camera_data(view, projection);
 
         // update scene data
-        self.frames[image_i].update_scene_data([
-            self.total_seconds.sin(),
-            0.,
-            self.total_seconds.cos(),
-            1.,
-        ]);
+        frame.update_scene_data([self.total_seconds.sin(), 0., self.total_seconds.cos(), 1.]);
     }
 
     /// update renderer and draw upcoming image
