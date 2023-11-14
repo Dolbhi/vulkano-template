@@ -4,11 +4,13 @@ use vulkano_template::{models::Model, VertexFull};
 
 // use tobj::load_obj;
 
-pub struct Mesh {
-    vertices: Vec<VertexFull>,
-    indices: Vec<u32>,
-    // buffer: Buffers,
-}
+pub struct Mesh(pub Vec<VertexFull>, pub Vec<u32>);
+
+// pub struct Mesh {
+// vertices: Vec<VertexFull>,
+// indices: Vec<u32>,
+// // buffer: Buffers,
+// }
 
 impl Mesh {
     pub fn from_obj(file_name: &Path) -> Self {
@@ -50,21 +52,11 @@ impl Mesh {
             })
         }
 
-        Mesh {
-            vertices,
-            indices: mesh.indices.clone(),
-        }
+        Mesh(vertices, mesh.indices.clone())
     }
 
     pub fn from_model<M: Model<VertexFull>>() -> Self {
-        Mesh {
-            vertices: M::get_vertices(),
-            indices: M::get_indices(),
-        }
-    }
-
-    pub fn decompose(self) -> (Vec<VertexFull>, Vec<u32>) {
-        (self.vertices, self.indices)
+        Mesh(M::get_vertices(), M::get_indices())
     }
 
     // pub fn clone_vertices(&self) -> Vec<VertexFull> {

@@ -51,7 +51,7 @@ impl RenderLoop {
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/gun.obj",
         );
-        let (vertices, indices) = Mesh::from_obj(path).decompose();
+        let Mesh(vertices, indices) = Mesh::from_obj(path);
         let gun_id = String::from("gun");
 
         renderer.init_mesh(gun_id.clone(), vertices, indices);
@@ -60,13 +60,13 @@ impl RenderLoop {
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/suzanne.obj",
         );
-        let (vertices, indices) = Mesh::from_obj(path).decompose();
+        let Mesh(vertices, indices) = Mesh::from_obj(path);
         let suz_id = String::from("suzanne");
 
         renderer.init_mesh(suz_id.clone(), vertices, indices);
 
         //      square
-        let (vertices, indices) = Mesh::from_model::<SquareModel>().decompose();
+        let Mesh(vertices, indices) = Mesh::from_model::<SquareModel>();
         let square_id = String::from("square");
 
         renderer.init_mesh(square_id.clone(), vertices, indices);
@@ -75,6 +75,7 @@ impl RenderLoop {
         let mut render_objects = Vec::<RenderObject>::with_capacity(9);
         let controlled_obj = RenderObject::new(suz_id, material_id.clone());
         render_objects.push(controlled_obj);
+
         for (x, y) in (-1..2)
             .flat_map(|x| (-1..2).map(move |y| (x.clone(), y)))
             .filter(|a| *a != (0, 0))
@@ -83,7 +84,16 @@ impl RenderLoop {
             square_obj.update_transform([x as f32, y as f32, 0.], cgmath::Rad(0.));
             render_objects.push(square_obj)
         }
-        println!("Total render objs: {}", render_objects.len());
+
+        // for (x, y) in (-1..2)
+        //     .flat_map(|x| (-1..2).map(move |y| (x.clone(), y)))
+        //     .filter(|a| *a != (0, 0))
+        // {
+        //     let mut gun_obj = RenderObject::new(gun_id.clone(), material_id.clone());
+        //     gun_obj.update_transform([x as f32, y as f32, 1.], cgmath::Rad(0.));
+        //     render_objects.push(gun_obj)
+        // }
+        // println!("Total render objs: {}", render_objects.len());
 
         // global descriptors TODO: 1. Group dyanamics into its own struct 2. create independent layout not based on mat
         let (global_alignment, global_buffers, global_descriptor) =
