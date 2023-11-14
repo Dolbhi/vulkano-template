@@ -1,8 +1,10 @@
+// use std::mem::size_of;
+use std::path::Path;
 use std::sync::Arc;
-use std::{iter::zip, path::Path};
 
-use cgmath::{vec3, Matrix4, Rad, SquareMatrix};
+use cgmath::{vec3, Matrix4, Rad};
 
+use vulkano::descriptor_set::{DescriptorSet, PersistentDescriptorSet};
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use vulkano_template::{
@@ -23,7 +25,9 @@ pub struct RenderLoop {
     window_resized: bool,
     frames: Vec<FrameData>,
     previous_frame_i: u32,
-    scenes_buffer: DynamicBuffer<GPUSceneData>,
+    camera_dynamic: DynamicBuffer<GPUCameraData>,
+    scene_dynamic: DynamicBuffer<GPUSceneData>,
+    global_descriptor: Arc<PersistentDescriptorSet>,
     total_seconds: f32,
     render_objects: Vec<RenderObject>,
 }
@@ -84,30 +88,18 @@ impl RenderLoop {
         }
         println!("Total render objs: {}", render_objects.len());
 
-        // camera descriptors TODO: create independent layout not based on mat
-        let initial_uniform = GPUCameraData {
-            view: (cgmath::Matrix4::identity()).into(),
-            proj: (cgmath::Matrix4::identity()).into(),
-            view_proj: (cgmath::Matrix4::identity()).into(),
-        };
-        let (scenes_buffer, scene_uniforms) =
-            renderer.create_scene_buffers(&String::from("basic"), initial_uniform);
+        // global descriptors TODO: 1. Group dyanamics into its own struct 2. create independent layout not based on mat
+        let (camera_dynamic, scene_dynamic, global_descriptor) =
+            renderer.create_scene_buffers(&String::from("basic"));
 
         let object_uniforms = renderer.create_object_buffers(&String::from("basic"));
 
         // create frame data
-        let frames = zip(scene_uniforms, object_uniforms)
+        let frames = object_uniforms
             .into_iter()
-            .map(
-                |((camera_buffer, global_descriptor), (storage_buffer, object_descriptor))| {
-                    FrameData::new(
-                        camera_buffer,
-                        global_descriptor,
-                        storage_buffer,
-                        object_descriptor,
-                    )
-                },
-            )
+            .map(|(storage_buffer, object_descriptor)| {
+                FrameData::new(storage_buffer, object_descriptor)
+            })
             .collect();
 
         Self {
@@ -116,7 +108,9 @@ impl RenderLoop {
             window_resized: false,
             frames,
             previous_frame_i: 0,
-            scenes_buffer,
+            camera_dynamic,
+            scene_dynamic,
+            global_descriptor,
             total_seconds: 0.0,
             render_objects,
         }
@@ -140,13 +134,21 @@ impl RenderLoop {
         let view = translation * rotation;
         let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
         projection.y.y *= -1.;
-        self.frames[image_i].update_camera_data(view, projection);
+
+        let current_camera = self.camera_dynamic.reinterpret(image_i);
+        let mut camera_uniform_contents = current_camera
+            .write()
+            .unwrap_or_else(|e| panic!("Failed to write to scene uniform buffer\n{}", e));
+        camera_uniform_contents.view = view.into();
+        // camera_uniform_contents.proj = projection.into();
+        camera_uniform_contents.view_proj = (projection * view).into();
 
         // update scene data
-        let current_scene = self.scenes_buffer.reinterpret(image_i);
+        let current_scene = self.scene_dynamic.reinterpret(image_i);
         let mut scene_uniform_contents = current_scene
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to scene uniform buffer\n{}", e));
+
         scene_uniform_contents.ambient_color =
             [self.total_seconds.sin(), 0., self.total_seconds.cos(), 1.];
     }
@@ -203,14 +205,24 @@ impl RenderLoop {
         }
 
         // RENDER
+        // println!("[Pre-render state] seconds_passed: {}, image_i: {}, window_resized: {}, recreate_swapchain: {}", seconds_passed, image_i, self.window_resized, self.recreate_swapchain);
+        // println!(
+        //     "[Camera dynamics] data size: {}, alignment: {}, buffer size: {}, range end: {}, offset: {}",
+        //     size_of::<GPUCameraData>(),
+        //     self.camera_dynamic.align(),
+        //     self.camera_dynamic.clone_buffer().size(),
+        //     (0..size_of::<GPUCameraData>()).end,
+        //     self.camera_dynamic.align() as u32 * image_i,
+        // );
         let result = self.renderer.flush_next_future(
             previous_future,
             acquire_future,
             image_i,
             &self.render_objects,
-            self.frames[image_i as usize]
-                .get_global_descriptor()
-                .clone(),
+            self.global_descriptor.clone().offsets([
+                self.camera_dynamic.align() as u32 * image_i,
+                self.scene_dynamic.align() as u32 * image_i,
+            ]),
             self.frames[image_i as usize]
                 .get_objects_descriptor()
                 .clone(),

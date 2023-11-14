@@ -225,7 +225,7 @@ pub struct DynamicBuffer<T: BufferContents> {
 }
 
 impl<T: BufferContents> DynamicBuffer<T> {
-    pub fn new(allocators: &Allocators, count: DeviceSize, device: &Arc<Device>) -> Self {
+    fn new(allocators: &Allocators, count: DeviceSize, device: &Arc<Device>) -> Self {
         let align = Self::calculate_align(device);
         let data_size = count * align;
 
@@ -251,12 +251,8 @@ impl<T: BufferContents> DynamicBuffer<T> {
         }
     }
 
-    // pub const fn elem_size() -> usize {
-    //     size_of::<T>()
-    // }
-
-    fn clone_buffer(&self) -> Subbuffer<[u8]> {
-        self.buffer.clone()
+    const fn elem_size() -> DeviceSize {
+        size_of::<T>() as DeviceSize
     }
 
     fn calculate_align(device: &Arc<Device>) -> DeviceSize {
@@ -267,10 +263,12 @@ impl<T: BufferContents> DynamicBuffer<T> {
             .as_devicesize();
 
         // Round size up to the next multiple of align.
-        // size_of::<B>()
-        (size_of::<T>() as DeviceSize + min_dynamic_align - 1) & !(min_dynamic_align - 1)
+        (Self::elem_size() + min_dynamic_align - 1) & !(min_dynamic_align - 1)
     }
 
+    pub fn clone_buffer(&self) -> Subbuffer<[u8]> {
+        self.buffer.clone()
+    }
     pub fn align(&self) -> DeviceSize {
         self.align
     }
@@ -282,56 +280,59 @@ impl<T: BufferContents> DynamicBuffer<T> {
     }
 }
 
-pub fn create_global_descriptors<S: BufferContents, U: BufferContents + Clone>(
+pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
     allocators: &Allocators,
+    device: &Arc<Device>,
     descriptor_set_layout: Arc<DescriptorSetLayout>,
     buffer_count: usize,
-    cam_data: U,
-    device: &Arc<Device>,
-) -> (DynamicBuffer<S>, Vec<Uniform<U>>) {
-    let scenes_buffer = DynamicBuffer::<S>::new(allocators, buffer_count as DeviceSize, device);
+) -> (
+    DynamicBuffer<C>,
+    DynamicBuffer<S>,
+    Arc<PersistentDescriptorSet>,
+) {
+    let camera_dynamic = DynamicBuffer::<C>::new(allocators, buffer_count as DeviceSize, device);
+    // println!(
+    //     "[Camera dynamics] data size: {}, alignment: {}, buffer size: {}, range end: {}",
+    //     size_of::<C>(),
+    //     camera_dynamic.align,
+    //     camera_dynamic.buffer.size(),
+    //     (0..size_of::<C>() as DeviceSize).end,
+    // );
+    let scene_dynamic = DynamicBuffer::<S>::new(allocators, buffer_count as DeviceSize, device);
+    // println!(
+    //     "[Scene dynamics] data size: {}, alignment: {}, buffer size: {}, range end: {}",
+    //     size_of::<S>(),
+    //     scene_dynamic.align,
+    //     scene_dynamic.buffer.size(),
+    //     (0..size_of::<S>() as DeviceSize).end,
+    // );
 
-    let uniforms = (0..buffer_count)
-        .map(|_i| {
-            let cam_buffer = Buffer::from_data(
-                allocators.memory.clone(),
-                BufferCreateInfo {
-                    usage: BufferUsage::UNIFORM_BUFFER,
-                    ..Default::default()
+    // descriptor set is how we interface data between the buffer and the pipeline
+    let descriptor_set = PersistentDescriptorSet::new(
+        &allocators.descriptor_set,
+        descriptor_set_layout.clone(),
+        [
+            WriteDescriptorSet::buffer_with_range(
+                0,
+                DescriptorBufferInfo {
+                    buffer: camera_dynamic.buffer.clone(),
+                    range: 0..size_of::<C>() as DeviceSize,
                 },
-                AllocationCreateInfo {
-                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                    ..Default::default()
+            ),
+            // WriteDescriptorSet::buffer(1, scenes_buffer.clone().index(i as DeviceSize)),
+            WriteDescriptorSet::buffer_with_range(
+                1,
+                DescriptorBufferInfo {
+                    buffer: scene_dynamic.buffer.clone(),
+                    range: 0..size_of::<S>() as DeviceSize,
                 },
-                cam_data.clone(),
-            )
-            .unwrap();
+            ),
+        ],
+        [],
+    )
+    .unwrap();
 
-            // descriptor set is how we interface data between the buffer and the pipeline
-            let descriptor_set = PersistentDescriptorSet::new(
-                &allocators.descriptor_set,
-                descriptor_set_layout.clone(),
-                [
-                    WriteDescriptorSet::buffer(0, cam_buffer.clone()),
-                    // WriteDescriptorSet::buffer(1, scenes_buffer.clone().index(i as DeviceSize)),
-                    WriteDescriptorSet::buffer_with_range(
-                        1,
-                        DescriptorBufferInfo {
-                            buffer: scenes_buffer.clone_buffer(),
-                            range: 0..size_of::<S>() as DeviceSize,
-                        },
-                    ),
-                ],
-                [],
-            )
-            .unwrap();
-
-            (cam_buffer, descriptor_set)
-        })
-        .collect();
-
-    (scenes_buffer, uniforms)
+    (camera_dynamic, scene_dynamic, descriptor_set)
 }
 
 pub fn create_storage_buffers<T: BufferContents>(

@@ -106,14 +106,20 @@ pub fn window_size_dependent_pipeline(
         PipelineShaderStageCreateInfo::new(vs),
         PipelineShaderStageCreateInfo::new(fs),
     ];
-    // set set 0, binding 1 to dynamic
+    // set set 0, binding 1 and 2 to dynamic
     let layout = {
         let mut layout_create_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
+        layout_create_info.set_layouts[0]
+            .bindings
+            .get_mut(&0)
+            .unwrap()
+            .descriptor_type = DescriptorType::UniformBufferDynamic;
         layout_create_info.set_layouts[0]
             .bindings
             .get_mut(&1)
             .unwrap()
             .descriptor_type = DescriptorType::UniformBufferDynamic;
+
         PipelineLayout::new(
             device.clone(),
             layout_create_info

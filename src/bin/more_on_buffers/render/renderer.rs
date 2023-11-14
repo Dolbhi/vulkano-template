@@ -1,8 +1,8 @@
-use std::{collections::hash_map::HashMap, mem::size_of, sync::Arc};
+use std::{collections::hash_map::HashMap, sync::Arc};
 
 use vulkano::{
     command_buffer::{self, RenderPassBeginInfo},
-    descriptor_set::{DescriptorSet, PersistentDescriptorSet},
+    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
     image::Image,
     instance::Instance,
@@ -18,7 +18,7 @@ use vulkano::{
         future::{FenceSignalFuture, JoinFuture, NowFuture},
         GpuFuture,
     },
-    DeviceSize, Validated, VulkanError,
+    Validated, VulkanError,
 };
 use vulkano_template::{
     shaders::basic::{
@@ -194,18 +194,18 @@ impl Renderer {
         now
     }
 
-    fn pad_buffer_size(&self, size: DeviceSize) -> DeviceSize {
-        let min_dynamic_align = self
-            .device
-            .physical_device()
-            .properties()
-            .min_uniform_buffer_offset_alignment
-            .as_devicesize();
+    // fn pad_buffer_size(&self, size: DeviceSize) -> DeviceSize {
+    //     let min_dynamic_align = self
+    //         .device
+    //         .physical_device()
+    //         .properties()
+    //         .min_uniform_buffer_offset_alignment
+    //         .as_devicesize();
 
-        // Round size up to the next multiple of align.
-        // size_of::<B>()
-        (size + min_dynamic_align - 1) & !(min_dynamic_align - 1)
-    }
+    //     // Round size up to the next multiple of align.
+    //     // size_of::<B>()
+    //     (size + min_dynamic_align - 1) & !(min_dynamic_align - 1)
+    // }
 
     /// Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
     pub fn flush_next_future(
@@ -214,7 +214,7 @@ impl Renderer {
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
         render_objects: &Vec<RenderObject>,
-        global_descriptor: Arc<PersistentDescriptorSet>,
+        global_descriptor: DescriptorSetWithOffsets,
         objects_descriptor: Arc<PersistentDescriptorSet>,
     ) -> Result<Fence, Validated<VulkanError>> {
         let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
@@ -237,7 +237,6 @@ impl Renderer {
         let mut last_mat = &String::new();
         let mut last_mesh = &String::new();
         let mut last_buffer_len = 0;
-        let align = self.pad_buffer_size(size_of::<GPUSceneData>() as DeviceSize);
         // println!(
         //     "Data size: {}, Calculated alignment: {}",
         //     size_of::<GPUSceneData>(),
@@ -254,7 +253,7 @@ impl Renderer {
                         PipelineBindPoint::Graphics,
                         pipeline.layout().clone(),
                         0,
-                        global_descriptor.clone().offsets([image_i * align as u32]),
+                        global_descriptor.clone(),
                     )
                     .unwrap()
                     .bind_descriptor_sets(
@@ -335,13 +334,16 @@ impl Renderer {
     pub fn create_scene_buffers(
         &self,
         material_id: &String,
-        cam_data: GPUCameraData,
-        // scene_data: GPUSceneData,
-    ) -> (DynamicBuffer<GPUSceneData>, Vec<Uniform<GPUCameraData>>) {
+    ) -> (
+        DynamicBuffer<GPUCameraData>,
+        DynamicBuffer<GPUSceneData>,
+        Arc<PersistentDescriptorSet>,
+    ) {
         let image_count = self.get_image_count();
 
-        buffers::create_global_descriptors::<GPUSceneData, GPUCameraData>(
+        buffers::create_global_descriptors::<GPUCameraData, GPUSceneData>(
             &self.allocators,
+            &self.device,
             self.material_pipelines[material_id]
                 .get_pipeline()
                 .layout()
@@ -350,8 +352,6 @@ impl Renderer {
                 .unwrap()
                 .clone(),
             image_count,
-            cam_data,
-            &self.device,
         )
     }
 

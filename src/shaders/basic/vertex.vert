@@ -6,7 +6,7 @@ layout(location = 2) in vec3 colour;
 
 layout(set = 0, binding = 0) uniform GPUCameraData {
     mat4 view;
-    mat4 proj;
+    // mat4 proj;
     mat4 view_proj;
 } cameraData;
 
