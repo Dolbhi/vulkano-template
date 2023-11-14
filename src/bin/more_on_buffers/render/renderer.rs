@@ -351,7 +351,7 @@ impl Renderer {
                 .clone(),
             image_count,
             cam_data,
-            self.pad_buffer_size(size_of::<GPUSceneData>() as DeviceSize),
+            &self.device,
         )
     }
 

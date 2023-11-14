@@ -10,7 +10,7 @@ use vulkano::{
         layout::DescriptorSetLayout, DescriptorBufferInfo, PersistentDescriptorSet,
         WriteDescriptorSet,
     },
-    device::Queue,
+    device::{Device, Queue},
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     pipeline::graphics::vertex_input::Vertex,
     sync::{future::NowFuture, GpuFuture},
@@ -225,11 +225,51 @@ pub struct DynamicBuffer<T: BufferContents> {
 }
 
 impl<T: BufferContents> DynamicBuffer<T> {
-    // pub fn new()
+    pub fn new(allocators: &Allocators, count: DeviceSize, device: &Arc<Device>) -> Self {
+        let align = Self::calculate_align(device);
+        let data_size = count * align;
+
+        let buffer = Buffer::new_slice::<u8>(
+            allocators.memory.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::UNIFORM_BUFFER,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            data_size,
+        )
+        .unwrap();
+
+        DynamicBuffer {
+            buffer,
+            align,
+            marker: PhantomData,
+        }
+    }
 
     // pub const fn elem_size() -> usize {
     //     size_of::<T>()
     // }
+
+    fn clone_buffer(&self) -> Subbuffer<[u8]> {
+        self.buffer.clone()
+    }
+
+    fn calculate_align(device: &Arc<Device>) -> DeviceSize {
+        let min_dynamic_align = device
+            .physical_device()
+            .properties()
+            .min_uniform_buffer_offset_alignment
+            .as_devicesize();
+
+        // Round size up to the next multiple of align.
+        // size_of::<B>()
+        (size_of::<T>() as DeviceSize + min_dynamic_align - 1) & !(min_dynamic_align - 1)
+    }
 
     pub fn align(&self) -> DeviceSize {
         self.align
@@ -247,27 +287,9 @@ pub fn create_global_descriptors<S: BufferContents, U: BufferContents + Clone>(
     descriptor_set_layout: Arc<DescriptorSetLayout>,
     buffer_count: usize,
     cam_data: U,
-    align: DeviceSize,
+    device: &Arc<Device>,
 ) -> (DynamicBuffer<S>, Vec<Uniform<U>>) {
-    let scenes_buffer = {
-        let data_size = (buffer_count as DeviceSize) * align;
-
-        Buffer::new_slice::<u8>(
-            allocators.memory.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::UNIFORM_BUFFER,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            data_size,
-        )
-        .unwrap()
-    };
-    // println!("Bytes in scenes buffer: {}", scenes_buffer.len());
+    let scenes_buffer = DynamicBuffer::<S>::new(allocators, buffer_count as DeviceSize, device);
 
     let uniforms = (0..buffer_count)
         .map(|_i| {
@@ -296,7 +318,7 @@ pub fn create_global_descriptors<S: BufferContents, U: BufferContents + Clone>(
                     WriteDescriptorSet::buffer_with_range(
                         1,
                         DescriptorBufferInfo {
-                            buffer: scenes_buffer.clone(),
+                            buffer: scenes_buffer.clone_buffer(),
                             range: 0..size_of::<S>() as DeviceSize,
                         },
                     ),
@@ -309,15 +331,7 @@ pub fn create_global_descriptors<S: BufferContents, U: BufferContents + Clone>(
         })
         .collect();
 
-    (
-        DynamicBuffer {
-            buffer: scenes_buffer,
-            // count: buffer_count,
-            align,
-            marker: PhantomData,
-        },
-        uniforms,
-    )
+    (scenes_buffer, uniforms)
 }
 
 pub fn create_storage_buffers<T: BufferContents>(
