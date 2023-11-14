@@ -29,7 +29,7 @@ use vulkano_template::{
     vulkano_objects::{
         self,
         allocators::Allocators,
-        buffers::{self, create_storage_buffers, Buffers, Uniform},
+        buffers::{self, create_storage_buffers, Buffers},
     },
     VertexFull,
 };
@@ -356,7 +356,10 @@ impl Renderer {
         )
     }
 
-    pub fn create_object_buffers(&self, material_id: &String) -> Vec<Uniform<[GPUObjectData]>> {
+    pub fn create_object_buffers(
+        &self,
+        material_id: &String,
+    ) -> Vec<(Subbuffer<[GPUObjectData]>, Arc<PersistentDescriptorSet>)> {
         create_storage_buffers(
             &self.allocators,
             self.material_pipelines[material_id]

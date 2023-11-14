@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, mem::size_of, sync::Arc};
+use std::{mem::size_of, sync::Arc};
 
 use vulkano::{
     buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer},
@@ -19,7 +19,7 @@ use vulkano::{
 
 use super::allocators::Allocators;
 
-pub type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
+type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
 
 /// Struct with a vertex and index, using VertexFull for vertices
 pub struct Buffers<V: Vertex + BufferContents> {
@@ -179,105 +179,42 @@ fn create_device_local_buffer<T: BufferContents>(
     (buffer, future)
 }
 
-/// returns uniform buffers with corresponding descriptor sets for interfacing
-pub fn create_cpu_accessible_uniforms<U: BufferContents + Clone>(
-    allocators: &Allocators,
-    descriptor_set_layout: Arc<DescriptorSetLayout>,
-    buffer_count: usize,
-    initial_uniform: U,
-) -> Vec<Uniform<U>> {
-    (0..buffer_count)
-        .map(|_| {
-            let buffer = Buffer::from_data(
-                allocators.memory.clone(),
-                BufferCreateInfo {
-                    usage: BufferUsage::UNIFORM_BUFFER,
-                    ..Default::default()
-                },
-                AllocationCreateInfo {
-                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                    ..Default::default()
-                },
-                initial_uniform.clone(),
-            )
-            .unwrap();
-
-            // descriptor set is how we interface data between the buffer and the pipeline
-            let descriptor_set = PersistentDescriptorSet::new(
-                &allocators.descriptor_set,
-                descriptor_set_layout.clone(),
-                [WriteDescriptorSet::buffer(0, buffer.clone())],
-                [],
-            )
-            .unwrap();
-
-            (buffer, descriptor_set)
-        })
-        .collect()
-}
-
-// pub struct DynamicBuffer<T: BufferContents> {
-//     buffer: Subbuffer<[u8]>,
-//     // count: usize,
-//     align: DeviceSize,
-//     marker: PhantomData<T>,
-// }
-
-// impl<T: BufferContents> DynamicBuffer<T> {
-//     fn new(allocators: &Allocators, count: DeviceSize, device: &Arc<Device>) -> Self {
-//         let align = Self::calculate_align(device);
-//         let data_size = count * align;
-
-//         let buffer = Buffer::new_slice::<u8>(
-//             allocators.memory.clone(),
-//             BufferCreateInfo {
-//                 usage: BufferUsage::UNIFORM_BUFFER,
-//                 ..Default::default()
-//             },
-//             AllocationCreateInfo {
-//                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-//                     | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-//                 ..Default::default()
-//             },
-//             data_size,
-//         )
-//         .unwrap();
-
-//         DynamicBuffer {
-//             buffer,
-//             align,
-//             marker: PhantomData,
-//         }
-//     }
-
-//     const fn elem_size() -> DeviceSize {
-//         size_of::<T>() as DeviceSize
-//     }
-
-//     fn calculate_align(device: &Arc<Device>) -> DeviceSize {
-//         let min_dynamic_align = device
-//             .physical_device()
-//             .properties()
-//             .min_uniform_buffer_offset_alignment
-//             .as_devicesize();
-
-//         // Round size up to the next multiple of align.
-//         (Self::elem_size() + min_dynamic_align - 1) & !(min_dynamic_align - 1)
-//     }
-
-//     pub fn clone_buffer(&self) -> Subbuffer<[u8]> {
-//         self.buffer.clone()
-//     }
-//     pub fn align(&self) -> DeviceSize {
-//         self.align
-//     }
-
-//     pub fn reinterpret(&self, index: usize) -> Subbuffer<T> {
-//         let start = self.align * index as DeviceSize;
-//         let end = start + size_of::<T>() as DeviceSize;
-//         self.buffer.clone().slice(start..end).reinterpret()
-//     }
+// /// returns uniform buffers with corresponding descriptor sets for interfacing
+// pub fn create_cpu_accessible_uniforms<U: BufferContents + Clone>(
+//     allocators: &Allocators,
+//     descriptor_set_layout: Arc<DescriptorSetLayout>,
+//     buffer_count: usize,
+//     initial_uniform: U,
+// ) -> Vec<Uniform<U>> {
+//     (0..buffer_count)
+//         .map(|_| {
+//             let buffer = Buffer::from_data(
+//                 allocators.memory.clone(),
+//                 BufferCreateInfo {
+//                     usage: BufferUsage::UNIFORM_BUFFER,
+//                     ..Default::default()
+//                 },
+//                 AllocationCreateInfo {
+//                     memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+//                         | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+//                     ..Default::default()
+//                 },
+//                 initial_uniform.clone(),
+//             )
+//             .unwrap();
+//
+//             // descriptor set is how we interface data between the buffer and the pipeline
+//             let descriptor_set = PersistentDescriptorSet::new(
+//                 &allocators.descriptor_set,
+//                 descriptor_set_layout.clone(),
+//                 [WriteDescriptorSet::buffer(0, buffer.clone())],
+//                 [],
+//             )
+//             .unwrap();
+//
+//             (buffer, descriptor_set)
+//         })
+//         .collect()
 // }
 
 pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
