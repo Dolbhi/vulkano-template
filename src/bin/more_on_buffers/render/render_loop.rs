@@ -3,8 +3,6 @@ use std::iter::zip;
 use std::path::Path;
 use std::sync::Arc;
 
-use cgmath::Matrix4;
-
 use vulkano::descriptor_set::{DescriptorSet, PersistentDescriptorSet};
 use vulkano::DeviceSize;
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
@@ -129,15 +127,7 @@ impl RenderLoop {
         frame.update_objects_data(&self.render_objects);
 
         // update camera
-        let cam_pos = camera_data.position;
-        let translation = Matrix4::from_translation(-cam_pos);
-        // let rotation =
-        //     Matrix4::from_axis_angle([0., 1., 0.].into(), cgmath::Rad(self.total_seconds * 1.));
-        let view = camera_data.view_matrix() * translation;
-        let mut projection = cgmath::perspective(camera_data.fov, 1., 0.1, 200.);
-        projection.y.y *= -1.;
-
-        frame.update_camera_data(view, projection);
+        frame.update_camera_data(camera_data.view_matrix(), camera_data.projection_matrix(1.));
 
         // update scene data
         frame.update_scene_data([self.total_seconds.sin(), 0., self.total_seconds.cos(), 1.]);

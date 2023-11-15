@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use cgmath::{num_traits::clamp, Euler, Matrix3, Matrix4, Rad, SquareMatrix, Transform, Vector3};
+use cgmath::{num_traits::clamp, Euler, Matrix3, Matrix4, Rad, Vector3};
 
 const CAM_SPEED: f32 = 1.3;
 const MOUSE_SENSITIVITY: f32 = 0.01;
@@ -51,6 +51,12 @@ impl Camera {
 
     pub fn view_matrix(&self) -> Matrix4<f32> {
         Matrix4::from(Euler::new(-self.rotation.x, -self.rotation.y, Rad(0.)))
+            * Matrix4::from_translation(-self.position)
+    }
+    pub fn projection_matrix(&self, aspect: f32) -> Matrix4<f32> {
+        let mut projection = cgmath::perspective(self.fov, aspect, 0.1, 200.);
+        projection.y.y *= -1.;
+        projection
     }
 }
 
@@ -62,7 +68,7 @@ impl Default for Camera {
             position: Vector3 {
                 x: 0.,
                 y: 0.,
-                z: 0.,
+                z: 1.,
             },
         }
     }
