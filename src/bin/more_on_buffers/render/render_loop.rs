@@ -133,7 +133,7 @@ impl RenderLoop {
         let translation = Matrix4::from_translation(-cam_pos);
         // let rotation =
         //     Matrix4::from_axis_angle([0., 1., 0.].into(), cgmath::Rad(self.total_seconds * 1.));
-        let view = camera_data.rotation_matrix() * translation;
+        let view = camera_data.view_matrix() * translation;
         let mut projection = cgmath::perspective(camera_data.fov, 1., 0.1, 200.);
         projection.y.y *= -1.;
 

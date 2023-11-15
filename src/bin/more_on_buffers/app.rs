@@ -79,6 +79,10 @@ impl App {
 
     pub fn handle_mouse_input(&mut self, dx: f32, dy: f32) {
         self.camera.rotate(dx, dy);
+        // println!(
+        //     "[Camera Rotation] x: {}, y: {}, z: {}",
+        //     self.camera.rotation.x.0, self.camera.rotation.y.0, self.camera.rotation.z.0
+        // );
     }
 
     pub fn handle_keyboard_input(&mut self, key_code: VirtualKeyCode, state: ElementState) {

@@ -19,3 +19,4 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [ ] Textures
 - [ ] Dynamic meshes
 - [ ] Render object streaming
+- [ ] Crashes when minimised
