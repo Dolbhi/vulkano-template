@@ -3,7 +3,7 @@ pub mod render;
 
 use std::time::Instant;
 
-use winit::event::{Event, WindowEvent};
+use winit::event::{DeviceEvent, Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::app::App;
@@ -33,6 +33,12 @@ fn main() {
             if let Some(key_code) = input.virtual_keycode {
                 app.handle_keyboard_input(key_code, input.state)
             }
+        }
+        Event::DeviceEvent {
+            event: DeviceEvent::MouseMotion { delta },
+            ..
+        } => {
+            app.handle_mouse_input(delta.0 as f32, delta.1 as f32);
         }
         Event::MainEventsCleared => {
             let this_frame_time = Instant::now();

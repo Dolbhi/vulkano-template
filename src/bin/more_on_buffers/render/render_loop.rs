@@ -3,7 +3,7 @@ use std::iter::zip;
 use std::path::Path;
 use std::sync::Arc;
 
-use cgmath::{vec3, Matrix4, Rad};
+use cgmath::Matrix4;
 
 use vulkano::descriptor_set::{DescriptorSet, PersistentDescriptorSet};
 use vulkano::DeviceSize;
@@ -15,7 +15,7 @@ use super::{
     render_data::{frame_data::FrameData, mesh::Mesh, render_object::RenderObject},
     renderer::Renderer,
 };
-use vulkano_template::{game_objects::Square, models::SquareModel, shaders::basic};
+use vulkano_template::{game_objects::Camera, models::SquareModel, shaders::basic};
 
 pub struct RenderLoop {
     renderer: Renderer,
@@ -76,12 +76,9 @@ impl RenderLoop {
         let controlled_obj = RenderObject::new(suz_id, material_id.clone());
         render_objects.push(controlled_obj);
 
-        for (x, y) in (-1..2)
-            .flat_map(|x| (-1..2).map(move |y| (x.clone(), y)))
-            .filter(|a| *a != (0, 0))
-        {
+        for (x, y, z) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
             let mut square_obj = RenderObject::new(square_id.clone(), material_id.clone());
-            square_obj.update_transform([x as f32, y as f32, 0.], cgmath::Rad(0.));
+            square_obj.update_transform([x as f32, y as f32, z as f32], cgmath::Rad(0.));
             render_objects.push(square_obj)
         }
 
@@ -124,23 +121,20 @@ impl RenderLoop {
         }
     }
 
-    fn update_gpu_data(&mut self, transform_data: &Square, image_i: u32) {
+    fn update_gpu_data(&mut self, camera_data: &Camera, image_i: u32) {
         let frame = &mut self.frames[image_i as usize];
 
         // update object data
-        self.render_objects[0].update_transform(
-            [transform_data.position[0], transform_data.position[1], 0.],
-            cgmath::Rad(0.),
-        );
+        self.render_objects[0].update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));
         frame.update_objects_data(&self.render_objects);
 
         // update camera
-        let cam_pos = vec3(0., 0., 2.);
+        let cam_pos = camera_data.position;
         let translation = Matrix4::from_translation(-cam_pos);
-        let rotation =
-            Matrix4::from_axis_angle([0., 1., 0.].into(), cgmath::Rad(self.total_seconds * 1.));
-        let view = translation * rotation;
-        let mut projection = cgmath::perspective(Rad(1.2), 1., 0.1, 200.);
+        // let rotation =
+        //     Matrix4::from_axis_angle([0., 1., 0.].into(), cgmath::Rad(self.total_seconds * 1.));
+        let view = camera_data.rotation_matrix() * translation;
+        let mut projection = cgmath::perspective(camera_data.fov, 1., 0.1, 200.);
         projection.y.y *= -1.;
 
         frame.update_camera_data(view, projection);
@@ -150,7 +144,7 @@ impl RenderLoop {
     }
 
     /// update renderer and draw upcoming image
-    pub fn update(&mut self, transform_data: &Square, seconds_passed: f32) {
+    pub fn update(&mut self, transform_data: &Camera, seconds_passed: f32) {
         // stuff
         self.total_seconds += seconds_passed;
 

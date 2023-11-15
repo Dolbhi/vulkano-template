@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use vulkano_template::game_objects::Square;
+use vulkano_template::game_objects::Camera;
 use winit::event::{ElementState, VirtualKeyCode};
 use winit::event_loop::EventLoop;
 
@@ -24,11 +24,12 @@ struct Keys {
     s: KeyState,
     d: KeyState,
     space: KeyState,
+    shift: KeyState,
 }
 
 pub struct App {
     render_loop: RenderLoop,
-    square: Square,
+    camera: Camera,
     keys: Keys,
 }
 
@@ -39,7 +40,7 @@ impl App {
 
         Self {
             render_loop: RenderLoop::new(event_loop),
-            square: Square::new(),
+            camera: Camera::default(),
             keys: Keys::default(),
         }
     }
@@ -50,22 +51,34 @@ impl App {
 
         self.update_movement(seconds_passed);
 
-        self.render_loop.update(&self.square, seconds_passed);
+        self.render_loop.update(&self.camera, seconds_passed);
     }
 
     fn update_movement(&mut self, seconds_passed: f32) {
+        if self.keys.space == Pressed && self.keys.shift == Released {
+            self.camera.move_up(seconds_passed)
+        }
+        if self.keys.shift == Pressed && self.keys.space == Released {
+            self.camera.move_down(seconds_passed)
+        }
+
         if self.keys.w == Pressed && self.keys.s == Released {
-            self.square.move_up(seconds_passed)
+            self.camera.move_forward(seconds_passed)
         }
         if self.keys.s == Pressed && self.keys.w == Released {
-            self.square.move_down(seconds_passed)
+            self.camera.move_back(seconds_passed)
         }
+
         if self.keys.a == Pressed && self.keys.d == Released {
-            self.square.move_left(seconds_passed)
+            self.camera.move_left(seconds_passed)
         }
         if self.keys.d == Pressed && self.keys.a == Released {
-            self.square.move_right(seconds_passed)
+            self.camera.move_right(seconds_passed)
         }
+    }
+
+    pub fn handle_mouse_input(&mut self, dx: f32, dy: f32) {
+        self.camera.rotate(dx, dy);
     }
 
     pub fn handle_keyboard_input(&mut self, key_code: VirtualKeyCode, state: ElementState) {
@@ -75,16 +88,18 @@ impl App {
         };
 
         match key_code {
-            VirtualKeyCode::Space => {
-                if state == Pressed && self.keys.space == Released {
-                    // self.square.change_to_random_color();
-                }
-                self.keys.space = state;
-            }
+            // VirtualKeyCode::Space => {
+            //     if state == Pressed && self.keys.space == Released {
+            //         // self.square.change_to_random_color();
+            //     }
+            //     self.keys.space = state;
+            // }
             VirtualKeyCode::W => self.keys.w = state,
             VirtualKeyCode::A => self.keys.a = state,
             VirtualKeyCode::S => self.keys.s = state,
             VirtualKeyCode::D => self.keys.d = state,
+            VirtualKeyCode::Space => self.keys.space = state,
+            VirtualKeyCode::LShift => self.keys.shift = state,
             _ => {}
         }
     }
