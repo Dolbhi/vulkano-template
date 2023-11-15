@@ -36,7 +36,7 @@ use vulkano_template::{
 use winit::{
     dpi::LogicalSize,
     event_loop::EventLoop,
-    window::{Window, WindowBuilder},
+    window::{CursorGrabMode, Window, WindowBuilder},
 };
 
 use super::render_data::{material::Material, render_object::RenderObject};
@@ -71,8 +71,14 @@ impl Renderer {
         let window = Arc::new(WindowBuilder::new().build(&event_loop).unwrap());
         let surface = Surface::from_window(instance.clone(), window.clone()).unwrap();
 
+        // window settings
         window.set_title("Rusty Renderer");
         window.set_inner_size(LogicalSize::new(600.0f32, 600.0));
+        window.set_cursor_visible(false);
+        window
+            .set_cursor_grab(CursorGrabMode::Confined)
+            .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
+            .unwrap();
 
         let device_extensions = DeviceExtensions {
             khr_swapchain: true,

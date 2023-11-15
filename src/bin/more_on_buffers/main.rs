@@ -26,6 +26,13 @@ fn main() {
         } => {
             app.handle_window_resize();
         }
+
+        Event::WindowEvent {
+            event: WindowEvent::Focused(focused),
+            ..
+        } => {
+            app.handle_focused(focused);
+        }
         Event::WindowEvent {
             event: WindowEvent::KeyboardInput { input, .. },
             ..
