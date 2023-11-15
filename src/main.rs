@@ -1,12 +1,9 @@
-pub mod app;
-pub mod render;
-
 use std::time::Instant;
 
 use winit::event::{DeviceEvent, Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use crate::app::App;
+use vulkano_template::app::App;
 
 fn main() {
     let event_loop = EventLoop::new();

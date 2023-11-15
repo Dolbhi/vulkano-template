@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use cgmath::Matrix4;
-use vulkano::{buffer::Subbuffer, descriptor_set::PersistentDescriptorSet};
-use vulkano_template::shaders::basic::{
+use crate::shaders::basic::{
     fs::GPUSceneData,
     vs::{GPUCameraData, GPUObjectData},
 };
+use cgmath::Matrix4;
+use vulkano::{buffer::Subbuffer, descriptor_set::PersistentDescriptorSet};
 
 use crate::render::renderer::Fence;
 

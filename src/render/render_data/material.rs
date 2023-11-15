@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
+use crate::vulkano_objects::pipeline;
 use vulkano::{
     device::Device,
     pipeline::{graphics::viewport::Viewport, GraphicsPipeline},
     render_pass::RenderPass,
     shader::EntryPoint,
 };
-use vulkano_template::vulkano_objects::pipeline;
 
 pub struct Material {
     vs: EntryPoint,

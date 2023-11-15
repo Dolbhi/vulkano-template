@@ -1,5 +1,17 @@
 use std::{collections::hash_map::HashMap, sync::Arc};
 
+use crate::{
+    shaders::basic::{
+        fs::GPUSceneData,
+        vs::{GPUCameraData, GPUObjectData},
+    },
+    vulkano_objects::{
+        self,
+        allocators::Allocators,
+        buffers::{self, create_storage_buffers, Buffers},
+    },
+    VertexFull,
+};
 use vulkano::{
     buffer::Subbuffer,
     command_buffer::{self, RenderPassBeginInfo},
@@ -20,18 +32,6 @@ use vulkano::{
         GpuFuture,
     },
     Validated, VulkanError,
-};
-use vulkano_template::{
-    shaders::basic::{
-        fs::GPUSceneData,
-        vs::{GPUCameraData, GPUObjectData},
-    },
-    vulkano_objects::{
-        self,
-        allocators::Allocators,
-        buffers::{self, create_storage_buffers, Buffers},
-    },
-    VertexFull,
 };
 use winit::{
     dpi::LogicalSize,

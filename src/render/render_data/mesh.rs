@@ -1,16 +1,10 @@
 use std::path::Path;
 
-use vulkano_template::{models::Model, VertexFull};
+use crate::VertexFull;
 
 // use tobj::load_obj;
 
 pub struct Mesh(pub Vec<VertexFull>, pub Vec<u32>);
-
-// pub struct Mesh {
-// vertices: Vec<VertexFull>,
-// indices: Vec<u32>,
-// // buffer: Buffers,
-// }
 
 impl Mesh {
     pub fn from_obj(file_name: &Path) -> Self {
@@ -54,16 +48,4 @@ impl Mesh {
 
         Mesh(vertices, mesh.indices.clone())
     }
-
-    pub fn from_model<M: Model<VertexFull>>() -> Self {
-        Mesh(M::get_vertices(), M::get_indices())
-    }
-
-    // pub fn clone_vertices(&self) -> Vec<VertexFull> {
-    //     return self.vertices.clone();
-    // }
-
-    // pub fn clone_indicies(&self) -> Vec<u32> {
-    //     return self.indices.clone();
-    // }
 }

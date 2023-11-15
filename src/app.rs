@@ -1,10 +1,9 @@
 use std::time::Duration;
 
-use vulkano_template::game_objects::Camera;
 use winit::event::{ElementState, VirtualKeyCode};
 use winit::event_loop::EventLoop;
 
-use crate::render::RenderLoop;
+use crate::{game_objects::Camera, render::RenderLoop};
 
 // TO flush_next_future METHOD ADD PARAMS FOR PASSING CAMERA DESCRIPTOR SET
 

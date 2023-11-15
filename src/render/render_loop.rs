@@ -13,7 +13,8 @@ use super::{
     render_data::{frame_data::FrameData, mesh::Mesh, render_object::RenderObject},
     renderer::Renderer,
 };
-use vulkano_template::{game_objects::Camera, models::SquareModel, shaders::basic};
+use crate::VertexFull;
+use crate::{game_objects::Camera, shaders::basic};
 
 pub struct RenderLoop {
     renderer: Renderer,
@@ -64,7 +65,29 @@ impl RenderLoop {
         renderer.init_mesh(suz_id.clone(), vertices, indices);
 
         //      square
-        let Mesh(vertices, indices) = Mesh::from_model::<SquareModel>();
+        let vertices = vec![
+            VertexFull {
+                position: [-0.25, -0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+            },
+            VertexFull {
+                position: [0.25, -0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+            },
+            VertexFull {
+                position: [-0.25, 0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+            },
+            VertexFull {
+                position: [0.25, 0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+            },
+        ];
+        let indices = vec![0, 1, 2, 1, 2, 3];
         let square_id = String::from("square");
 
         renderer.init_mesh(square_id.clone(), vertices, indices);

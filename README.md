@@ -6,17 +6,30 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [Vulkano Book](https://github.com/vulkano-rs/vulkano-book/): This renderer is a fork of the tutorial source code
 - [VulkanGuide](https://vkguide.dev/): Focused Vulkan guide on renderers for game engines
 
-### To Do
-- [x] .obj loading
-- [x] Object data storage buffer
-- [x] Dynamic buffers for global data
+## To Do
+### Misc.
 - [ ] Link to LinkedIn
 	- [ ] Finish ReadMe
+- [ ] Combine render_data::material with vulkano_objects::pipeline?
+- [ ] Combine render_data::mesh with vulkano_objects::buffers?
+
+### Features
+- [x] Multiple mesh rendering
+- [x] Multiple pipeline rendering
+- [x] Realtime object rendering
+	- [ ] Render object streaming
+- [x] .obj loading
+- [x] Global data dynamic buffer
+- [x] Object data storage buffer
 - [ ] Lighting (Deferred rendering)
 	- [ ] Multiple subpasses?
 - [ ] GUI
-- [ ] Camera control
+- [x] Camera control
+- [ ] View aspect adjust with window aspect
 - [ ] Textures
 - [ ] Dynamic meshes
-- [ ] Render object streaming
+- [ ] Anti-aliasing
+
+### Issues
 - [ ] Crashes when minimised
+- [ ] Crashes when closed after resize?

@@ -84,50 +84,6 @@ impl<V: Vertex + BufferContents> Buffers<V> {
     }
 }
 
-/// returns simple cpu accessible vertex buffer
-// fn create_cpu_accessible_vertex<V, U, M>(allocators: &Allocators) -> Subbuffer<[V]>
-// where
-//     V: BufferContents,
-//     U: BufferContents,
-//     M: Model<V, U>,
-// {
-//     Buffer::from_iter(
-//         &allocators.memory,
-//         BufferCreateInfo {
-//             usage: BufferUsage::VERTEX_BUFFER,
-//             ..Default::default()
-//         },
-//         AllocationCreateInfo {
-//             usage: MemoryUsage::Upload,
-//             ..Default::default()
-//         },
-//         M::get_vertices(),
-//     )
-//     .unwrap()
-// }
-
-/// returns simple cpu accessible index buffer
-// fn create_cpu_accessible_index<V, U, M>(allocators: &Allocators) -> Subbuffer<[u16]>
-// where
-//     V: BufferContents,
-//     U: BufferContents,
-//     M: Model<V, U>,
-// {
-//     Buffer::from_iter(
-//         &allocators.memory,
-//         BufferCreateInfo {
-//             usage: BufferUsage::INDEX_BUFFER,
-//             ..Default::default()
-//         },
-//         AllocationCreateInfo {
-//             usage: MemoryUsage::Upload,
-//             ..Default::default()
-//         },
-//         M::get_indices(),
-//     )
-//     .unwrap()
-// }
-
 /// returns a device only buffer and a future that copies data to it
 fn create_device_local_buffer<T: BufferContents>(
     allocators: &Allocators,
