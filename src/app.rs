@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use winit::event::{ElementState, VirtualKeyCode};
 use winit::event_loop::EventLoop;
+use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::{game_objects::Camera, render::RenderLoop};
 
@@ -92,7 +92,7 @@ impl App {
         // );
     }
 
-    pub fn handle_keyboard_input(&mut self, key_code: VirtualKeyCode, state: ElementState) {
+    pub fn handle_keyboard_input(&mut self, key_code: KeyCode, state: ElementState) {
         if !self.focused {
             return;
         }
@@ -109,17 +109,21 @@ impl App {
             //     }
             //     self.keys.space = state;
             // }
-            VirtualKeyCode::W => self.keys.w = state,
-            VirtualKeyCode::A => self.keys.a = state,
-            VirtualKeyCode::S => self.keys.s = state,
-            VirtualKeyCode::D => self.keys.d = state,
-            VirtualKeyCode::Space => self.keys.space = state,
-            VirtualKeyCode::LShift => self.keys.shift = state,
+            KeyCode::KeyW => self.keys.w = state,
+            KeyCode::KeyA => self.keys.a = state,
+            KeyCode::KeyS => self.keys.s = state,
+            KeyCode::KeyD => self.keys.d = state,
+            KeyCode::Space => self.keys.space = state,
+            KeyCode::ShiftLeft => self.keys.shift = state,
             _ => {}
         }
     }
 
     pub fn handle_window_resize(&mut self) {
         self.render_loop.handle_window_resize()
+    }
+
+    pub fn handle_window_wait(&self) {
+        self.render_loop.handle_window_wait();
     }
 }

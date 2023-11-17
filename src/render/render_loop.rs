@@ -249,4 +249,8 @@ impl RenderLoop {
         // impacts the next update
         self.window_resized = true;
     }
+
+    pub fn handle_window_wait(&self) {
+        self.renderer.request_redraw();
+    }
 }

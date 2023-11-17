@@ -73,7 +73,7 @@ impl Renderer {
 
         // window settings
         window.set_title("Rusty Renderer");
-        window.set_inner_size(LogicalSize::new(600.0f32, 600.0));
+        let _new_size = window.request_inner_size(LogicalSize::new(600.0f32, 600.0));
         window.set_cursor_visible(false);
         window
             .set_cursor_grab(CursorGrabMode::Confined)
@@ -177,6 +177,10 @@ impl Renderer {
                 self.viewport.clone(),
             );
         }
+    }
+
+    pub fn request_redraw(&self) {
+        self.window.request_redraw();
     }
 
     pub fn get_image_count(&self) -> usize {

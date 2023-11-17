@@ -20,6 +20,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [x] .obj loading
 - [x] Global data dynamic buffer
 - [x] Object data storage buffer
+- [x] Depth culling
 - [ ] Lighting (Deferred rendering)
 	- [ ] Multiple subpasses?
 - [ ] GUI
