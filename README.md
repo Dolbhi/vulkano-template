@@ -11,6 +11,8 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 	- [ ] Finish ReadMe
 - [ ] Combine render_data::material with vulkano_objects::pipeline?
 - [ ] Combine render_data::mesh with vulkano_objects::buffers?
+- [ ] Refactor render_loop and renderer
+	- [ ] Move resize logic to render_loop?
 
 ### Features
 - [x] Multiple mesh rendering
@@ -29,7 +31,8 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [ ] Textures
 - [ ] Dynamic meshes
 - [ ] Anti-aliasing
+- [ ] Don't clean every frame
 
 ### Issues
-- [ ] Crashes when minimised
+- [x] Crashes when minimised
 - [ ] Crashes when closed after resize?

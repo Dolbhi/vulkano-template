@@ -187,6 +187,10 @@ impl Renderer {
         self.images.len()
     }
 
+    pub fn get_window(&self) -> &Arc<Window> {
+        &self.window
+    }
+
     pub fn clone_device(&self) -> Arc<Device> {
         self.device.clone()
     }

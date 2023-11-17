@@ -161,6 +161,17 @@ impl RenderLoop {
         // stuff
         self.total_seconds += seconds_passed;
 
+        // check zero sized window
+        let image_extent: [u32; 2] = self.renderer.get_window().inner_size().into();
+        if image_extent.contains(&0) {
+            return;
+        }
+
+        // clean up
+        if let Some(fence) = &mut self.frames[self.previous_frame_i as usize].fence {
+            fence.cleanup_finished();
+        }
+
         // do recreation if necessary
         if self.window_resized {
             self.window_resized = false;
