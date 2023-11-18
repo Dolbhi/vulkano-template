@@ -167,11 +167,6 @@ impl RenderLoop {
             return;
         }
 
-        // clean up
-        if let Some(fence) = &mut self.frames[self.previous_frame_i as usize].fence {
-            fence.cleanup_finished();
-        }
-
         // do recreation if necessary
         if self.window_resized {
             self.window_resized = false;
@@ -197,8 +192,9 @@ impl RenderLoop {
         }
 
         // wait for upcoming image to be ready (it should be by this point)
-        if let Some(image_fence) = &self.frames[image_i as usize].fence {
-            image_fence.wait(None).unwrap();
+        if let Some(image_fence) = &mut self.frames[image_i as usize].fence {
+            // image_fence.wait(None).unwrap();
+            image_fence.cleanup_finished();
         }
 
         self.update_gpu_data(transform_data, image_i);
