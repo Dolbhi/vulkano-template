@@ -51,13 +51,13 @@ pub type Fence = FenceSignalFuture<
 
 pub struct Renderer {
     _instance: Arc<Instance>,
-    window: Arc<Window>,
+    window: Arc<Window>, // pending refactor with swapchain
     device: Arc<Device>,
     queue: Arc<Queue>,
     swapchain: Arc<Swapchain>,
-    images: Vec<Arc<Image>>,
+    images: Vec<Arc<Image>>, // only used for getting image count
     render_pass: Arc<RenderPass>,
-    framebuffers: Vec<Arc<Framebuffer>>,
+    framebuffers: Vec<Arc<Framebuffer>>, // deferred examples remakes fb's every frame
     allocators: Allocators,
     viewport: Viewport,
     mesh_buffers: HashMap<String, Buffers<VertexFull>>,
@@ -122,9 +122,9 @@ impl Renderer {
         );
 
         let viewport = Viewport {
-            offset: [0.0, 0.0],
             extent: window.inner_size().into(),
-            depth_range: 0.0..=1.0,
+            ..Default::default() // offset: [0.0, 0.0],
+                                 // depth_range: 0.0..=1.0,
         };
 
         println!("[Renderer info]\nswapchain image count: {}", images.len());

@@ -14,7 +14,10 @@ use super::{
     renderer::Renderer,
 };
 use crate::VertexFull;
-use crate::{game_objects::Camera, shaders::basic};
+use crate::{
+    game_objects::Camera,
+    shaders::{basic, uv},
+};
 
 pub struct RenderLoop {
     renderer: Renderer,
@@ -41,8 +44,18 @@ impl RenderLoop {
             .expect("failed to create shader module")
             .entry_point("main")
             .unwrap();
-
         let material_id = String::from("basic");
+        renderer.init_material(material_id.clone(), vertex_shader, fragment_shader);
+
+        let vertex_shader = uv::vs::load(renderer.clone_device())
+            .expect("failed to create shader module")
+            .entry_point("main")
+            .unwrap();
+        let fragment_shader = uv::fs::load(renderer.clone_device())
+            .expect("failed to create shader module")
+            .entry_point("main")
+            .unwrap();
+        let material_id = String::from("uv");
         renderer.init_material(material_id.clone(), vertex_shader, fragment_shader);
 
         // meshes
@@ -52,7 +65,6 @@ impl RenderLoop {
         );
         let Mesh(vertices, indices) = Mesh::from_obj(path);
         let gun_id = String::from("gun");
-
         renderer.init_mesh(gun_id.clone(), vertices, indices);
 
         //      suzanne
@@ -61,7 +73,6 @@ impl RenderLoop {
         );
         let Mesh(vertices, indices) = Mesh::from_obj(path);
         let suz_id = String::from("suzanne");
-
         renderer.init_mesh(suz_id.clone(), vertices, indices);
 
         //      square
@@ -70,32 +81,45 @@ impl RenderLoop {
                 position: [-0.25, -0.25, 0.0],
                 normal: [0.0, 0.0, 1.0],
                 colour: [0.0, 1.0, 0.0],
+                uv: [0.0, 0.0],
             },
             VertexFull {
                 position: [0.25, -0.25, 0.0],
                 normal: [0.0, 0.0, 1.0],
                 colour: [0.0, 1.0, 0.0],
+                uv: [1.0, 0.0],
             },
             VertexFull {
                 position: [-0.25, 0.25, 0.0],
                 normal: [0.0, 0.0, 1.0],
                 colour: [0.0, 1.0, 0.0],
+                uv: [0.0, 1.0],
             },
             VertexFull {
                 position: [0.25, 0.25, 0.0],
                 normal: [0.0, 0.0, 1.0],
                 colour: [0.0, 1.0, 0.0],
+                uv: [1.0, 1.0],
             },
         ];
         let indices = vec![0, 1, 2, 1, 2, 3];
         let square_id = String::from("square");
-
         renderer.init_mesh(square_id.clone(), vertices, indices);
+
+        //      lost empire
+        let path = Path::new(
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/lost_empire.obj",
+        );
+        let Mesh(vertices, indices) = Mesh::from_obj(path);
+        let le_id = String::from("lost_empire");
+        renderer.init_mesh(le_id.clone(), vertices, indices);
 
         // objects
         let mut render_objects = Vec::<RenderObject>::with_capacity(9);
-        let controlled_obj = RenderObject::new(suz_id, material_id.clone());
-        render_objects.push(controlled_obj);
+        let suzanne_obj = RenderObject::new(suz_id, material_id.clone());
+        render_objects.push(suzanne_obj);
+
+        render_objects.push(RenderObject::new(le_id, material_id.clone()));
 
         for (x, y, z) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
             let mut square_obj = RenderObject::new(square_id.clone(), material_id.clone());
@@ -142,6 +166,7 @@ impl RenderLoop {
         }
     }
 
+    /// write gpu data to respective buffers
     fn update_gpu_data(&mut self, camera_data: &Camera, image_i: u32) {
         let frame = &mut self.frames[image_i as usize];
 

@@ -15,6 +15,6 @@ layout(set = 0, binding = 1) uniform GPUSceneData {
 
 void main()
 {
-	
-	f_color = vec4(color * sceneData.ambient_color.xyz, 1.0f);
+	f_color = vec4(texCoord * sceneData.ambient_color.xy, 0.0f, 1.0f);
+	f_color = vec4(texCoord, 0.0f, 1.0f);
 }

@@ -33,16 +33,19 @@ impl Mesh {
                 mesh.normals[first + 1],
                 mesh.normals[first + 2],
             ];
-            // let colour = [1., 0., 0.];
+            let colour = [1., 1., 1.];
             //     mesh.vertex_color[first],
             //     mesh.vertex_color[first + 1],
             //     mesh.vertex_color[first + 2],
             // ];
 
+            let uv = [mesh.texcoords[i * 2], 1.0 - mesh.texcoords[i * 2 + 1]];
+
             vertices.push(VertexFull {
                 position,
                 normal: normal.clone(),
-                colour: normal,
+                colour,
+                uv,
             })
         }
 
