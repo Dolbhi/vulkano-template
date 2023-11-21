@@ -49,7 +49,7 @@ pub type Fence = FenceSignalFuture<
     >,
 >;
 
-const INIT_WINDOW_SIZE: LogicalSize<f32> = LogicalSize::new(600.0f32, 600.0);
+const INIT_WINDOW_SIZE: LogicalSize<f32> = LogicalSize::new(1000.0f32, 600.0);
 
 pub struct Renderer {
     _instance: Arc<Instance>,

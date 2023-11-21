@@ -186,7 +186,11 @@ impl RenderLoop {
         frame.update_objects_data(&self.render_objects);
 
         // update camera
-        frame.update_camera_data(camera_data.view_matrix(), camera_data.projection_matrix(1.));
+        let extends = self.renderer.get_window().inner_size();
+        frame.update_camera_data(
+            camera_data.view_matrix(),
+            camera_data.projection_matrix(extends.width as f32 / extends.height as f32),
+        );
 
         // update scene data
         frame.update_scene_data([self.total_seconds.sin(), 0., self.total_seconds.cos(), 1.]);
