@@ -40,7 +40,10 @@ impl App {
 
         Self {
             render_loop: RenderLoop::new(event_loop),
-            camera: Camera::default(),
+            camera: Camera {
+                position: [0., 5., 0.].into(),
+                ..Default::default()
+            },
             keys: Keys::default(),
             focused: false,
         }

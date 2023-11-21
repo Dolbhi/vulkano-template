@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 
 use cgmath::{num_traits::clamp, Euler, Matrix3, Matrix4, Rad, Vector3};
 
-const CAM_SPEED: f32 = 1.3;
+const CAM_SPEED: f32 = 2.;
 const MOUSE_SENSITIVITY: f32 = 0.01;
 
 pub struct Camera {
