@@ -49,6 +49,8 @@ pub type Fence = FenceSignalFuture<
     >,
 >;
 
+const INIT_WINDOW_SIZE: LogicalSize<f32> = LogicalSize::new(600.0f32, 600.0);
+
 pub struct Renderer {
     _instance: Arc<Instance>,
     window: Arc<Window>, // pending refactor with swapchain
@@ -73,7 +75,7 @@ impl Renderer {
 
         // window settings
         window.set_title("Rusty Renderer");
-        let _new_size = window.request_inner_size(LogicalSize::new(600.0f32, 600.0));
+        let _new_size = window.request_inner_size(INIT_WINDOW_SIZE);
         window.set_cursor_visible(false);
         window
             .set_cursor_grab(CursorGrabMode::Confined)
@@ -259,6 +261,10 @@ impl Renderer {
         // );
         for (index, render_obj) in render_objects.iter().enumerate() {
             // material (pipeline)
+            // println!(
+            //     "[Rendering Obj] Mesh ID: {}, Mat ID: {}",
+            //     render_obj.mesh_id, render_obj.material_id
+            // );
             let pipeline = self.material_pipelines[&render_obj.material_id].get_pipeline();
             if last_mat != &render_obj.material_id {
                 builder
