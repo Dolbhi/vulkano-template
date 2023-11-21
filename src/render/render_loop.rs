@@ -63,7 +63,7 @@ impl RenderLoop {
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/gun.obj",
         );
-        let Mesh(vertices, indices) = Mesh::from_obj(path);
+        let Mesh(vertices, indices) = Mesh::from_obj(path).pop().unwrap();
         let gun_id = String::from("gun");
         renderer.init_mesh(gun_id.clone(), vertices, indices);
 
@@ -71,7 +71,7 @@ impl RenderLoop {
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/suzanne.obj",
         );
-        let Mesh(vertices, indices) = Mesh::from_obj(path);
+        let Mesh(vertices, indices) = Mesh::from_obj(path).pop().unwrap();
         let suz_id = String::from("suzanne");
         renderer.init_mesh(suz_id.clone(), vertices, indices);
 
@@ -110,21 +110,32 @@ impl RenderLoop {
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/lost_empire.obj",
         );
-        let Mesh(vertices, indices) = Mesh::from_obj(path);
         let le_id = String::from("lost_empire");
-        renderer.init_mesh(le_id.clone(), vertices, indices);
+        let le_ids: Vec<String> = Mesh::from_obj(path)
+            .into_iter()
+            .enumerate()
+            .map(|(i, Mesh(vertices, indices))| {
+                let id = format!("{}_{}", le_id, i);
+                renderer.init_mesh(id.clone(), vertices, indices);
+                id
+            })
+            .collect();
+        // println!("Lost empire mesh ids: {:?}", le_ids);
 
         // objects
-        let mut render_objects = Vec::<RenderObject>::with_capacity(9);
+        let mut render_objects = Vec::<RenderObject>::new();
         let suzanne_obj = RenderObject::new(suz_id, material_id.clone());
         render_objects.push(suzanne_obj);
-
-        render_objects.push(RenderObject::new(le_id, material_id.clone()));
 
         for (x, y, z) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
             let mut square_obj = RenderObject::new(square_id.clone(), material_id.clone());
             square_obj.update_transform([x as f32, y as f32, z as f32], cgmath::Rad(0.));
             render_objects.push(square_obj)
+        }
+
+        for id in le_ids {
+            let le_obj = RenderObject::new(id, material_id.clone());
+            render_objects.push(le_obj);
         }
 
         // for (x, y) in (-1..2)
