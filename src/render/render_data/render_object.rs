@@ -26,4 +26,16 @@ impl RenderObject {
 
         self.transform = translation * rotation;
     }
+
+    pub fn update_transform_axis(
+        &mut self,
+        position: [f32; 3],
+        rotation: Rad<f32>,
+        axis: [f32; 3],
+    ) {
+        let rotation = Matrix4::from_axis_angle(axis.into(), rotation);
+        let translation = Matrix4::from_translation(position.into());
+
+        self.transform = translation * rotation;
+    }
 }
