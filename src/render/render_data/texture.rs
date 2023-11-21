@@ -24,6 +24,8 @@ pub fn load_texture(allocators: &Allocators, queue: &Arc<Queue>, path: &Path) ->
     let info = reader.info();
     let extent = [info.width, info.height, 1];
 
+    println!("Texture gamme: {:?}", info.source_gamma);
+
     // create image
     let image = Image::new(
         allocators.memory.clone(),
