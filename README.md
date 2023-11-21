@@ -27,8 +27,9 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 	- [ ] Multiple subpasses?
 - [ ] GUI
 - [x] Camera control
-- [ ] View aspect adjust with window aspect
-- [ ] Textures
+- [x] View aspect adjust with window aspect
+- [x] Textures
+- [ ] Transparency
 - [ ] Dynamic meshes
 - [ ] Anti-aliasing
 - [ ] Don't clean every frame
