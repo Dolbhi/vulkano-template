@@ -1,9 +1,8 @@
 #version 460
 
-layout(location = 0) in vec3 color;
+layout(location = 0) in vec3 in_color;
 layout(location = 1) in vec2 texCoord;
 
-layout(location = 0) out vec4 f_color;
 
 layout(set = 0, binding = 1) uniform GPUSceneData {
     vec4 fog_color; 			// w is for exponent
@@ -11,10 +10,15 @@ layout(set = 0, binding = 1) uniform GPUSceneData {
 	vec4 ambient_color;
 	vec4 sunlight_direction; 	// w for sun power
 	vec4 sunlight_color;
-} sceneData;
+} scene_data;
+
+layout(set = 2, binding = 0) uniform sampler2D s;
+
+layout(location = 0) out vec4 f_color;
 
 void main()
 {
-	
-	f_color = vec4(color * sceneData.ambient_color.xyz, 1.0f);
+	vec4 dummy = scene_data.ambient_color;
+
+	f_color = texture(s, texCoord);
 }

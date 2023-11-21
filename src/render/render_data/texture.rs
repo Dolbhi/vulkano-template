@@ -2,18 +2,22 @@ use std::{fs::File, path::Path, sync::Arc};
 
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage},
-    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo},
+    command_buffer::{
+        AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo,
+        PrimaryCommandBufferAbstract,
+    },
     device::Queue,
     format::Format,
     image::{view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage},
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
+    sync::GpuFuture,
     DeviceSize,
 };
 
 use crate::vulkano_objects::allocators::Allocators;
 
 /// load a png texture into a ViewImage
-pub fn load_texture(allocators: &Allocators, queue: Arc<Queue>, path: &Path) -> Arc<ImageView> {
+pub fn load_texture(allocators: &Allocators, queue: &Arc<Queue>, path: &Path) -> Arc<ImageView> {
     // decode png
     let decoder = png::Decoder::new(File::open(path).unwrap());
     let mut reader = decoder.read_info().unwrap();
@@ -67,6 +71,17 @@ pub fn load_texture(allocators: &Allocators, queue: Arc<Queue>, path: &Path) -> 
             staging_buffer,
             image.clone(),
         ))
+        .unwrap();
+
+    // send it
+    builder
+        .build()
+        .unwrap()
+        .execute(queue.clone())
+        .unwrap()
+        .then_signal_fence_and_flush()
+        .unwrap()
+        .wait(None)
         .unwrap();
 
     ImageView::new_default(image).unwrap()

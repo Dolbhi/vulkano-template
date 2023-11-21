@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use crate::vulkano_objects::pipeline;
 use vulkano::{
+    command_buffer::AutoCommandBufferBuilder,
+    descriptor_set::PersistentDescriptorSet,
     device::Device,
-    pipeline::{graphics::viewport::Viewport, GraphicsPipeline},
+    pipeline::{graphics::viewport::Viewport, GraphicsPipeline, Pipeline},
     render_pass::RenderPass,
     shader::EntryPoint,
 };
@@ -11,16 +13,39 @@ use vulkano::{
 pub struct Material {
     vs: EntryPoint,
     fs: EntryPoint,
-    pipeline: Arc<GraphicsPipeline>,
+    pub pipeline: Arc<GraphicsPipeline>,
+    pub material_sets: Vec<Arc<PersistentDescriptorSet>>,
 }
 
 impl Material {
-    pub fn new(vs: EntryPoint, fs: EntryPoint, pipeline: Arc<GraphicsPipeline>) -> Self {
-        Material { vs, fs, pipeline }
+    pub fn new(
+        vs: EntryPoint,
+        fs: EntryPoint,
+        pipeline: Arc<GraphicsPipeline>,
+        material_sets: Vec<Arc<PersistentDescriptorSet>>,
+    ) -> Self {
+        Material {
+            vs,
+            fs,
+            pipeline,
+            material_sets,
+        }
     }
 
-    pub fn get_pipeline(&self) -> &Arc<GraphicsPipeline> {
-        &self.pipeline
+    pub fn bind_sets<T, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
+        &self,
+        command_builder: &mut AutoCommandBufferBuilder<T, A>,
+    ) {
+        for (i, set) in self.material_sets.iter().enumerate() {
+            command_builder
+                .bind_descriptor_sets(
+                    vulkano::pipeline::PipelineBindPoint::Graphics,
+                    self.pipeline.layout().clone(),
+                    i as u32 + 2,
+                    set.clone(),
+                )
+                .unwrap();
+        }
     }
 
     pub fn recreate_pipeline(

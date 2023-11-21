@@ -35,6 +35,13 @@ impl RenderLoop {
     pub fn new(event_loop: &EventLoop<()>) -> Self {
         let mut renderer = Renderer::initialize(event_loop);
 
+        // Texture
+        let path = Path::new(
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/lost_empire-RGBA.png",
+        );
+        let le_texture = renderer.init_texture(path);
+        let linear_sampler = renderer.init_sampler(vulkano::image::sampler::Filter::Linear);
+
         // materials
         let vertex_shader = basic::vs::load(renderer.clone_device())
             .expect("failed to create shader module")
@@ -44,8 +51,14 @@ impl RenderLoop {
             .expect("failed to create shader module")
             .entry_point("main")
             .unwrap();
-        let material_id = String::from("basic");
-        renderer.init_material(material_id.clone(), vertex_shader, fragment_shader);
+        let le_mat_id = String::from("basic");
+        renderer.init_material_with_texture(
+            le_mat_id.clone(),
+            vertex_shader,
+            fragment_shader,
+            le_texture,
+            linear_sampler,
+        );
 
         let vertex_shader = uv::vs::load(renderer.clone_device())
             .expect("failed to create shader module")
@@ -55,8 +68,8 @@ impl RenderLoop {
             .expect("failed to create shader module")
             .entry_point("main")
             .unwrap();
-        let material_id = String::from("uv");
-        renderer.init_material(material_id.clone(), vertex_shader, fragment_shader);
+        let uv_mat_id = String::from("uv");
+        renderer.init_material(uv_mat_id.clone(), vertex_shader, fragment_shader);
 
         // meshes
         //      gun
@@ -123,18 +136,21 @@ impl RenderLoop {
         // println!("Lost empire mesh ids: {:?}", le_ids);
 
         // objects
+        //  Suzanne
         let mut render_objects = Vec::<RenderObject>::new();
-        let suzanne_obj = RenderObject::new(suz_id, material_id.clone());
+        let suzanne_obj = RenderObject::new(suz_id, uv_mat_id.clone());
         render_objects.push(suzanne_obj);
 
+        //  Squares
         for (x, y, z) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
-            let mut square_obj = RenderObject::new(square_id.clone(), material_id.clone());
+            let mut square_obj = RenderObject::new(square_id.clone(), uv_mat_id.clone());
             square_obj.update_transform([x as f32, y as f32, z as f32], cgmath::Rad(0.));
             render_objects.push(square_obj)
         }
 
+        //  lost empires
         for id in le_ids {
-            let le_obj = RenderObject::new(id, material_id.clone());
+            let le_obj = RenderObject::new(id, le_mat_id.clone());
             render_objects.push(le_obj);
         }
 

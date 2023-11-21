@@ -1,4 +1,4 @@
-use std::{collections::hash_map::HashMap, sync::Arc};
+use std::{collections::hash_map::HashMap, path::Path, sync::Arc};
 
 use crate::{
     shaders::basic::{
@@ -15,9 +15,13 @@ use crate::{
 use vulkano::{
     buffer::Subbuffer,
     command_buffer::{self, RenderPassBeginInfo},
-    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet},
+    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
-    image::Image,
+    image::{
+        sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
+        view::ImageView,
+        Image,
+    },
     instance::Instance,
     pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint},
     render_pass::{Framebuffer, RenderPass},
@@ -39,7 +43,7 @@ use winit::{
     window::{CursorGrabMode, Window, WindowBuilder},
 };
 
-use super::render_data::{material::Material, render_object::RenderObject};
+use super::render_data::{material::Material, render_object::RenderObject, texture::load_texture};
 
 pub type Fence = FenceSignalFuture<
     PresentFuture<
@@ -265,8 +269,9 @@ impl Renderer {
             //     "[Rendering Obj] Mesh ID: {}, Mat ID: {}",
             //     render_obj.mesh_id, render_obj.material_id
             // );
-            let pipeline = self.material_pipelines[&render_obj.material_id].get_pipeline();
             if last_mat != &render_obj.material_id {
+                let material = &self.material_pipelines[&render_obj.material_id];
+                let pipeline = &material.pipeline;
                 builder
                     .bind_pipeline_graphics(pipeline.clone())
                     .unwrap()
@@ -284,6 +289,8 @@ impl Renderer {
                         objects_descriptor.clone(),
                     )
                     .unwrap();
+
+                material.bind_sets(&mut builder);
 
                 last_mat = &render_obj.material_id;
             }
@@ -335,6 +342,22 @@ impl Renderer {
         self.mesh_buffers.insert(id, buffer);
     }
 
+    pub fn init_texture(&self, path: &Path) -> Arc<ImageView> {
+        load_texture(&self.allocators, &self.queue, path)
+    }
+    pub fn init_sampler(&self, filter: Filter) -> Arc<Sampler> {
+        Sampler::new(
+            self.device.clone(),
+            SamplerCreateInfo {
+                mag_filter: filter,
+                min_filter: filter,
+                address_mode: [SamplerAddressMode::Repeat; 3],
+                ..Default::default()
+            },
+        )
+        .unwrap()
+    }
+
     pub fn init_material(
         &mut self,
         id: String,
@@ -348,7 +371,35 @@ impl Renderer {
             self.viewport.clone(),
             self.render_pass.clone(),
         );
-        let mat = Material::new(vertex_shader, fragment_shader, pipeline);
+
+        let mat = Material::new(vertex_shader, fragment_shader, pipeline, vec![]);
+        self.material_pipelines.insert(id, mat);
+    }
+    pub fn init_material_with_texture(
+        &mut self,
+        id: String,
+        vertex_shader: EntryPoint,
+        fragment_shader: EntryPoint,
+        texture: Arc<ImageView>,
+        sampler: Arc<Sampler>,
+    ) {
+        let pipeline = vulkano_objects::pipeline::window_size_dependent_pipeline(
+            self.device.clone(),
+            vertex_shader.clone(),
+            fragment_shader.clone(),
+            self.viewport.clone(),
+            self.render_pass.clone(),
+        );
+
+        let set = PersistentDescriptorSet::new(
+            &self.allocators.descriptor_set,
+            pipeline.layout().set_layouts().get(2).unwrap().clone(),
+            [WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
+            [],
+        )
+        .unwrap();
+
+        let mat = Material::new(vertex_shader, fragment_shader, pipeline, vec![set]);
         self.material_pipelines.insert(id, mat);
     }
 
@@ -366,7 +417,7 @@ impl Renderer {
             &self.allocators,
             &self.device,
             self.material_pipelines[material_id]
-                .get_pipeline()
+                .pipeline
                 .layout()
                 .set_layouts()
                 .get(0)
@@ -383,7 +434,7 @@ impl Renderer {
         create_storage_buffers(
             &self.allocators,
             self.material_pipelines[material_id]
-                .get_pipeline()
+                .pipeline
                 .layout()
                 .set_layouts()
                 .get(1)
