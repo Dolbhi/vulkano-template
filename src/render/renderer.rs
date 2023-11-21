@@ -133,7 +133,14 @@ impl Renderer {
                                  // depth_range: 0.0..=1.0,
         };
 
-        println!("[Renderer info]\nswapchain image count: {}", images.len());
+        println!(
+            "[Renderer info]\nswapchain image count: {}\nrgba format properties: {:?}",
+            images.len(),
+            physical_device
+                .format_properties(vulkano::format::Format::R8G8B8A8_SRGB)
+                .unwrap()
+                .optimal_tiling_features,
+        );
 
         Self {
             _instance: instance,
