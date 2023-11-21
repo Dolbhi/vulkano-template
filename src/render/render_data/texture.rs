@@ -1,5 +1,6 @@
 use std::{fs::File, path::Path, sync::Arc};
 
+use png::ColorType;
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage},
     command_buffer::{
@@ -16,6 +17,11 @@ use vulkano::{
 
 use crate::vulkano_objects::allocators::Allocators;
 
+// pub enum PNGFormat {
+//     Transparent,
+//     NonTransparent,
+// }
+
 /// load a png texture into a ViewImage
 pub fn load_texture(allocators: &Allocators, queue: &Arc<Queue>, path: &Path) -> Arc<ImageView> {
     // decode png
@@ -24,7 +30,7 @@ pub fn load_texture(allocators: &Allocators, queue: &Arc<Queue>, path: &Path) ->
     let info = reader.info();
     let extent = [info.width, info.height, 1];
 
-    println!("Texture gamme: {:?}", info.source_gamma);
+    // println!("Texture gamme: {:?}", info.source_gamma);
 
     // create image
     let image = Image::new(
@@ -57,9 +63,32 @@ pub fn load_texture(allocators: &Allocators, queue: &Arc<Queue>, path: &Path) ->
     .unwrap();
 
     // write to staging buffer
-    reader
-        .next_frame(&mut staging_buffer.write().unwrap())
-        .unwrap();
+    match info.color_type {
+        ColorType::Rgb => {
+            let pixel_count = (info.width * info.height) as usize;
+
+            let mut rgb_buf = vec![255u8; pixel_count * 3];
+            reader.next_frame(rgb_buf.as_mut_slice()).unwrap();
+
+            let mut rgba_buf = staging_buffer.write().unwrap();
+            for i in 0..pixel_count {
+                rgba_buf[i * 4] = rgb_buf[i * 3];
+                rgba_buf[i * 4 + 1] = rgb_buf[i * 3 + 1];
+                rgba_buf[i * 4 + 2] = rgb_buf[i * 3 + 2];
+            }
+        }
+        ColorType::Rgba => {
+            reader
+                .next_frame(&mut staging_buffer.write().unwrap())
+                .unwrap();
+        }
+        _ => {
+            panic!(
+                "Trying to load texture with unsupported color type: {:?}",
+                info.color_type
+            )
+        }
+    }
 
     // copy to image
     let mut builder = AutoCommandBufferBuilder::primary(
