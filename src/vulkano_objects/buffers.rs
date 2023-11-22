@@ -29,23 +29,6 @@ pub struct Buffers<V: Vertex + BufferContents> {
 }
 
 impl<V: Vertex + BufferContents> Buffers<V> {
-    /// Creates simple vertex, index and uniform buffers of specified model
-    // pub fn initialize_host_accessible<M: Model<V, U>>(
-    //     allocators: &Allocators,
-    //     descriptor_set_layout: Arc<DescriptorSetLayout>,
-    //     uniform_buffer_count: usize,
-    // ) -> Self {
-    //     Self {
-    //         vertex: create_cpu_accessible_vertex::<V, U, M>(allocators),
-    //         index: create_cpu_accessible_index::<V, U, M>(allocators),
-    //         uniforms: create_cpu_accessible_uniforms::<V, U, M>(
-    //             allocators,
-    //             descriptor_set_layout,
-    //             uniform_buffer_count,
-    //         ),
-    //     }
-    // }
-
     /// Creates device local vertex and index buffers of specified model
     pub fn initialize_device_local(
         allocators: &Allocators,
