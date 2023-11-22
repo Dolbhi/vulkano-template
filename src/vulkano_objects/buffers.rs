@@ -173,6 +173,12 @@ fn create_device_local_buffer<T: BufferContents>(
 //         .collect()
 // }
 
+/// Creates a dynamic buffer to store global data, and a descriptor set for those buffers to be used with offsets
+///
+/// ### Returned Tuple
+/// 1. The alignment of the dynamic buffer, for getting the correct descriptor offset
+/// 2. Vec of camera and scene subbuffers for each frame
+/// 3. The descriptor set with camera data on binding 0, and scene data on binding 1
 pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
     allocators: &Allocators,
     device: &Arc<Device>,
