@@ -15,24 +15,25 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 	- [ ] Move resize logic to render_loop?
 
 ### Features
+- [ ] Pipeline cache between materials
+- [ ] Transparency
+- [ ] Asset loader
+- [ ] Lighting (Deferred rendering)
+	- [ ] Multiple subpasses?
 - [x] Multiple mesh rendering
 - [x] Multiple pipeline rendering
-- [x] Realtime object rendering
-	- [ ] Render object streaming
+- [x] Realtime dynamic object rendering
 - [x] .obj loading
 - [x] Global data dynamic buffer
 - [x] Object data storage buffer
 - [x] Depth culling
-- [ ] Lighting (Deferred rendering)
-	- [ ] Multiple subpasses?
-- [ ] GUI
 - [x] Camera control
 - [x] View aspect adjust with window aspect
 - [x] Textures
-- [ ] Transparency
+- [ ] GUI
 - [ ] Dynamic meshes
 - [ ] Anti-aliasing
-- [ ] Don't clean every frame
+- [ ] Don't clean every frame?
 
 ### Issues
 - [x] Crashes when minimised

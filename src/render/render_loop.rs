@@ -54,11 +54,59 @@ impl RenderLoop {
         let le_mat_id = String::from("basic");
         renderer.init_material_with_texture(
             le_mat_id.clone(),
-            vertex_shader,
-            fragment_shader,
+            vertex_shader.clone(),
+            fragment_shader.clone(),
             le_texture,
-            linear_sampler,
+            linear_sampler.clone(),
         );
+
+        //  ina
+        let path = Path::new(
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/Body_Base_Color.png",
+        );
+        renderer.init_material_with_texture(
+            String::from("ina_body"),
+            vertex_shader.clone(),
+            fragment_shader.clone(),
+            renderer.init_texture(path),
+            linear_sampler.clone(),
+        );
+        let path = Path::new(
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/Cloth_Base_Color.png",
+        );
+        renderer.init_material_with_texture(
+            String::from("ina_cloth"),
+            vertex_shader.clone(),
+            fragment_shader.clone(),
+            renderer.init_texture(path),
+            linear_sampler.clone(),
+        );
+        let path = Path::new(
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/Hair_Base_Color.png",
+        );
+        renderer.init_material_with_texture(
+            String::from("ina_hair"),
+            vertex_shader.clone(),
+            fragment_shader.clone(),
+            renderer.init_texture(path),
+            linear_sampler.clone(),
+        );
+        let path = Path::new(
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/Head_Base_Color.png",
+        );
+        renderer.init_material_with_texture(
+            String::from("ina_head"),
+            vertex_shader.clone(),
+            fragment_shader.clone(),
+            renderer.init_texture(path),
+            linear_sampler.clone(),
+        );
+        let ina_ids = [
+            String::from("ina_hair"),
+            String::from("ina_cloth"),
+            String::from("ina_body"),
+            String::from("ina_head"),
+        ];
 
         let vertex_shader = uv::vs::load(renderer.clone_device())
             .expect("failed to create shader module")
@@ -135,6 +183,15 @@ impl RenderLoop {
             .collect();
         // println!("Lost empire mesh ids: {:?}", le_ids);
 
+        //      ina
+        let path = Path::new(
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/ReadyToRigINA.obj",
+        );
+        let ina_meshes = Mesh::from_obj(path).into_iter().skip(2);
+        for (id, Mesh(vertices, indices)) in zip(&ina_ids, ina_meshes) {
+            renderer.init_mesh(id.clone(), vertices, indices);
+        }
+
         // objects
         //  Suzanne
         let mut render_objects = Vec::<RenderObject>::new();
@@ -146,6 +203,13 @@ impl RenderLoop {
             let mut square_obj = RenderObject::new(square_id.clone(), uv_mat_id.clone());
             square_obj.update_transform([x as f32, y as f32, z as f32], cgmath::Rad(0.));
             render_objects.push(square_obj)
+        }
+
+        //  Ina
+        for id in ina_ids {
+            let mut obj = RenderObject::new(id.clone(), id);
+            obj.update_transform([0.0, 5.0, -1.0], cgmath::Rad(0.));
+            render_objects.push(obj);
         }
 
         //  lost empires
