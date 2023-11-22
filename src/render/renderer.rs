@@ -67,7 +67,7 @@ pub struct Renderer {
     allocators: Allocators,
     viewport: Viewport,
     mesh_buffers: HashMap<String, Buffers<VertexFull>>,
-    material_pipelines: HashMap<String, Material>,
+    materials: HashMap<String, Material>,
 }
 
 impl Renderer {
@@ -154,7 +154,7 @@ impl Renderer {
             allocators,
             viewport,
             mesh_buffers: HashMap::new(),
-            material_pipelines: HashMap::new(),
+            materials: HashMap::new(),
         }
     }
 
@@ -183,7 +183,7 @@ impl Renderer {
         self.recreate_swapchain();
         self.viewport.extent = self.window.inner_size().into();
 
-        for (_, v) in &mut self.material_pipelines {
+        for (_, v) in &mut self.materials {
             v.recreate_pipeline(
                 self.device.clone(),
                 self.render_pass.clone(),
@@ -277,7 +277,7 @@ impl Renderer {
             //     render_obj.mesh_id, render_obj.material_id
             // );
             if last_mat != &render_obj.material_id {
-                let material = &self.material_pipelines[&render_obj.material_id];
+                let material = &self.materials[&render_obj.material_id];
                 let pipeline = &material.pipeline;
                 builder
                     .bind_pipeline_graphics(pipeline.clone())
@@ -380,7 +380,7 @@ impl Renderer {
         );
 
         let mat = Material::new(vertex_shader, fragment_shader, pipeline, vec![]);
-        self.material_pipelines.insert(id, mat);
+        self.materials.insert(id, mat);
     }
     pub fn init_material_with_texture(
         &mut self,
@@ -407,7 +407,7 @@ impl Renderer {
         .unwrap();
 
         let mat = Material::new(vertex_shader, fragment_shader, pipeline, vec![set]);
-        self.material_pipelines.insert(id, mat);
+        self.materials.insert(id, mat);
     }
 
     pub fn create_scene_buffers(
@@ -423,7 +423,7 @@ impl Renderer {
         buffers::create_global_descriptors::<GPUCameraData, GPUSceneData>(
             &self.allocators,
             &self.device,
-            self.material_pipelines[material_id]
+            self.materials[material_id]
                 .pipeline
                 .layout()
                 .set_layouts()
@@ -440,7 +440,7 @@ impl Renderer {
     ) -> Vec<(Subbuffer<[GPUObjectData]>, Arc<PersistentDescriptorSet>)> {
         create_storage_buffers(
             &self.allocators,
-            self.material_pipelines[material_id]
+            self.materials[material_id]
                 .pipeline
                 .layout()
                 .set_layouts()
@@ -450,5 +450,13 @@ impl Renderer {
             self.get_image_count(),
             10000,
         )
+    }
+
+    pub fn debug_assets(&self) {
+        println!(
+            "Meshes: {:?}\nMaterials: {:?}",
+            self.mesh_buffers.keys(),
+            self.materials.keys()
+        );
     }
 }
