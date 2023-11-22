@@ -12,6 +12,7 @@ use super::allocators::Allocators;
 
 use winit::window::Window;
 
+/// create swapchain and swapchain images appropriate for given device and surface
 pub fn create_swapchain(
     physical_device: &Arc<PhysicalDevice>,
     device: Arc<Device>,
