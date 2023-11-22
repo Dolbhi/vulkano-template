@@ -13,7 +13,7 @@ use vulkano::{
     pipeline::{
         graphics::rasterization::{CullMode, RasterizationState},
         layout::PipelineDescriptorSetLayoutCreateInfo,
-        GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
+        GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
     },
     render_pass::{RenderPass, Subpass},
     shader::EntryPoint,
@@ -21,36 +21,45 @@ use vulkano::{
 
 use crate::VertexFull;
 
-// pub fn create_pipeline(
-//     device: Arc<Device>,
-//     vs: Arc<ShaderModule>,
-//     fs: Arc<ShaderModule>,
-//     render_pass: Arc<RenderPass>,
-//     viewport: Viewport,
-//     // assembly topology
-//     // rasterization polygon mode
-// ) -> Arc<GraphicsPipeline> {
-//     GraphicsPipeline::new(
-//         device,
-//         None,
-//         GraphicsPipelineCreateInfo {
-//             vertex_input_state: VertexFull::per_vertex().,
-//             depth_stencil_state: Some(DepthStencilState::simple_depth_test()),
-//             ..Default::default()
-//         },
-//     )
-//     .unwrap()
-//     .vertex_shader(vs.entry_point("main").unwrap(), ())
-//     .depth_stencil_state(DepthState::simple())
-//     .viewport_state(ViewportState:: {
-//         viewports: [viewport],
-//         scissors: [Default::default()],
-//     })
-//     .fragment_shader(fs.entry_point("main").unwrap(), ())
-//     .render_pass(Subpass::from(render_pass, 0).unwrap())
-//     .build(device)
-//     .unwrap()
-// }
+/// Pipeline wrapper to handle its own recreation
+pub struct PipelineWrapper {
+    vs: EntryPoint,
+    fs: EntryPoint,
+    pub pipeline: Arc<GraphicsPipeline>,
+}
+
+impl PipelineWrapper {
+    pub fn new(
+        device: Arc<Device>,
+        vs: EntryPoint,
+        fs: EntryPoint,
+        viewport: Viewport,
+        render_pass: Arc<RenderPass>,
+    ) -> Self {
+        let pipeline =
+            window_size_dependent_pipeline(device, vs.clone(), fs.clone(), viewport, render_pass);
+        Self { vs, fs, pipeline }
+    }
+
+    pub fn layout(&self) -> &Arc<PipelineLayout> {
+        self.pipeline.layout()
+    }
+
+    pub fn recreate_pipeline(
+        &mut self,
+        device: Arc<Device>,
+        render_pass: Arc<RenderPass>,
+        viewport: Viewport,
+    ) {
+        self.pipeline = window_size_dependent_pipeline(
+            device,
+            self.vs.clone(),
+            self.fs.clone(),
+            viewport,
+            render_pass,
+        );
+    }
+}
 
 /// Create pipeline made for rarely size changing windows, with the 2nd binding on the 1st set being dynamic
 ///
@@ -62,7 +71,7 @@ use crate::VertexFull;
 /// - viewport: given
 /// - rasterization: culls back faces
 /// - depth stencil: simple
-pub fn window_size_dependent_pipeline(
+fn window_size_dependent_pipeline(
     device: Arc<Device>,
     vs: EntryPoint,
     fs: EntryPoint,

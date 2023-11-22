@@ -9,6 +9,7 @@ use crate::{
         self,
         allocators::Allocators,
         buffers::{self, create_storage_buffers, Buffers},
+        pipeline::PipelineWrapper,
     },
     VertexFull,
 };
@@ -67,6 +68,7 @@ pub struct Renderer {
     allocators: Allocators,
     viewport: Viewport,
     mesh_buffers: HashMap<String, Buffers<VertexFull>>,
+    pipelines: HashMap<String, PipelineWrapper>,
     materials: HashMap<String, Material>,
 }
 
@@ -154,6 +156,7 @@ impl Renderer {
             allocators,
             viewport,
             mesh_buffers: HashMap::new(),
+            pipelines: HashMap::new(),
             materials: HashMap::new(),
         }
     }
@@ -183,7 +186,7 @@ impl Renderer {
         self.recreate_swapchain();
         self.viewport.extent = self.window.inner_size().into();
 
-        for (_, v) in &mut self.materials {
+        for (_, v) in &mut self.pipelines {
             v.recreate_pipeline(
                 self.device.clone(),
                 self.render_pass.clone(),
@@ -262,6 +265,7 @@ impl Renderer {
             )
             .unwrap();
 
+        let mut last_pipe = &String::new();
         let mut last_mat = &String::new();
         let mut last_mesh = &String::new();
         let mut last_buffer_len = 0;
@@ -271,31 +275,37 @@ impl Renderer {
         //     align
         // );
         for (index, render_obj) in render_objects.iter().enumerate() {
-            // material (pipeline)
+            // material
             // println!(
             //     "[Rendering Obj] Mesh ID: {}, Mat ID: {}",
             //     render_obj.mesh_id, render_obj.material_id
             // );
             if last_mat != &render_obj.material_id {
                 let material = &self.materials[&render_obj.material_id];
-                let pipeline = &material.pipeline;
-                builder
-                    .bind_pipeline_graphics(pipeline.clone())
-                    .unwrap()
-                    .bind_descriptor_sets(
-                        PipelineBindPoint::Graphics,
-                        pipeline.layout().clone(),
-                        0,
-                        global_descriptor.clone(),
-                    )
-                    .unwrap()
-                    .bind_descriptor_sets(
-                        PipelineBindPoint::Graphics,
-                        pipeline.layout().clone(),
-                        1,
-                        objects_descriptor.clone(),
-                    )
-                    .unwrap();
+
+                // pipeline
+                if last_pipe != &material.pipeline_id {
+                    let pipeline = &self.pipelines[&material.pipeline_id].pipeline;
+                    builder
+                        .bind_pipeline_graphics(pipeline.clone())
+                        .unwrap()
+                        .bind_descriptor_sets(
+                            PipelineBindPoint::Graphics,
+                            pipeline.layout().clone(),
+                            0,
+                            global_descriptor.clone(),
+                        )
+                        .unwrap()
+                        .bind_descriptor_sets(
+                            PipelineBindPoint::Graphics,
+                            pipeline.layout().clone(),
+                            1,
+                            objects_descriptor.clone(),
+                        )
+                        .unwrap();
+
+                    last_pipe = &material.pipeline_id;
+                }
 
                 material.bind_sets(&mut builder);
 
@@ -365,54 +375,68 @@ impl Renderer {
         .unwrap()
     }
 
-    pub fn init_material(
+    pub fn init_pipeline(
         &mut self,
         id: String,
         vertex_shader: EntryPoint,
         fragment_shader: EntryPoint,
     ) {
-        let pipeline = vulkano_objects::pipeline::window_size_dependent_pipeline(
-            self.device.clone(),
-            vertex_shader.clone(),
-            fragment_shader.clone(),
-            self.viewport.clone(),
-            self.render_pass.clone(),
+        self.pipelines.insert(
+            id,
+            PipelineWrapper::new(
+                self.device.clone(),
+                vertex_shader.clone(),
+                fragment_shader.clone(),
+                self.viewport.clone(),
+                self.render_pass.clone(),
+            ),
         );
+    }
 
-        let mat = Material::new(vertex_shader, fragment_shader, pipeline, vec![]);
-        self.materials.insert(id, mat);
+    fn init_material_with_sets(
+        &mut self,
+        id: String,
+        pipeline_id: String,
+        material_sets: Vec<Arc<PersistentDescriptorSet>>,
+    ) {
+        let layout = self.pipelines[&pipeline_id].layout().clone();
+        self.materials.insert(
+            id,
+            Material {
+                layout,
+                material_sets,
+                pipeline_id,
+            },
+        );
+    }
+    pub fn init_material(&mut self, id: String, pipeline_id: String) {
+        self.init_material_with_sets(id, pipeline_id, vec![]);
     }
     pub fn init_material_with_texture(
         &mut self,
         id: String,
-        vertex_shader: EntryPoint,
-        fragment_shader: EntryPoint,
+        pipeline_id: String,
         texture: Arc<ImageView>,
         sampler: Arc<Sampler>,
     ) {
-        let pipeline = vulkano_objects::pipeline::window_size_dependent_pipeline(
-            self.device.clone(),
-            vertex_shader.clone(),
-            fragment_shader.clone(),
-            self.viewport.clone(),
-            self.render_pass.clone(),
-        );
-
         let set = PersistentDescriptorSet::new(
             &self.allocators.descriptor_set,
-            pipeline.layout().set_layouts().get(2).unwrap().clone(),
+            self.pipelines[&pipeline_id]
+                .layout()
+                .set_layouts()
+                .get(2)
+                .unwrap()
+                .clone(),
             [WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
             [],
         )
         .unwrap();
-
-        let mat = Material::new(vertex_shader, fragment_shader, pipeline, vec![set]);
-        self.materials.insert(id, mat);
+        self.init_material_with_sets(id, pipeline_id, vec![set]);
     }
 
     pub fn create_scene_buffers(
         &self,
-        material_id: &String,
+        pipeline_id: &String,
     ) -> (
         u64,
         Vec<(Subbuffer<GPUCameraData>, Subbuffer<GPUSceneData>)>,
@@ -423,8 +447,7 @@ impl Renderer {
         buffers::create_global_descriptors::<GPUCameraData, GPUSceneData>(
             &self.allocators,
             &self.device,
-            self.materials[material_id]
-                .pipeline
+            self.pipelines[pipeline_id]
                 .layout()
                 .set_layouts()
                 .get(0)
@@ -436,12 +459,11 @@ impl Renderer {
 
     pub fn create_object_buffers(
         &self,
-        material_id: &String,
+        pipeline_id: &String,
     ) -> Vec<(Subbuffer<[GPUObjectData]>, Arc<PersistentDescriptorSet>)> {
         create_storage_buffers(
             &self.allocators,
-            self.materials[material_id]
-                .pipeline
+            self.pipelines[pipeline_id]
                 .layout()
                 .set_layouts()
                 .get(1)

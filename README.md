@@ -15,7 +15,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 	- [ ] Move resize logic to render_loop?
 
 ### Features
-- [ ] Pipeline cache between materials
+- [x] Pipeline cache between materials
 - [ ] Transparency
 - [ ] Asset loader
 - [ ] Lighting (Deferred rendering)
