@@ -20,6 +20,10 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [ ] Asset loader
 - [ ] Lighting (Deferred rendering)
 	- [ ] Multiple subpasses?
+- [ ] Anti-aliasing (MSAA)
+- [ ] GUI
+- [ ] Dynamic meshes
+- [ ] Don't clean every frame?
 - [x] Multiple mesh rendering
 - [x] Multiple pipeline rendering
 - [x] Realtime dynamic object rendering
@@ -30,10 +34,6 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [x] Camera control
 - [x] View aspect adjust with window aspect
 - [x] Textures
-- [ ] GUI
-- [ ] Dynamic meshes
-- [ ] Anti-aliasing
-- [ ] Don't clean every frame?
 
 ### Issues
 - [x] Crashes when minimised
