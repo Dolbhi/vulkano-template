@@ -11,8 +11,9 @@ use vulkano::{
         GraphicsPipelineCreateInfo,
     },
     pipeline::{
-        layout::PipelineDescriptorSetLayoutCreateInfo, GraphicsPipeline, PipelineLayout,
-        PipelineShaderStageCreateInfo,
+        graphics::rasterization::{CullMode, RasterizationState},
+        layout::PipelineDescriptorSetLayoutCreateInfo,
+        GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
     },
     render_pass::{RenderPass, Subpass},
     shader::EntryPoint,
@@ -39,20 +40,28 @@ use crate::VertexFull;
 //         },
 //     )
 //     .unwrap()
-
-//     // .vertex_shader(vs.entry_point("main").unwrap(), ())
-//     // .depth_stencil_state(DepthState::simple())
-//     // .viewport_state(ViewportState:: {
-//     //     viewports: [viewport],
-//     //     scissors: [Default::default()],
-//     // })
-//     // .fragment_shader(fs.entry_point("main").unwrap(), ())
-//     // .render_pass(Subpass::from(render_pass, 0).unwrap())
-//     // .build(device)
-//     // .unwrap()
+//     .vertex_shader(vs.entry_point("main").unwrap(), ())
+//     .depth_stencil_state(DepthState::simple())
+//     .viewport_state(ViewportState:: {
+//         viewports: [viewport],
+//         scissors: [Default::default()],
+//     })
+//     .fragment_shader(fs.entry_point("main").unwrap(), ())
+//     .render_pass(Subpass::from(render_pass, 0).unwrap())
+//     .build(device)
+//     .unwrap()
 // }
 
 /// Create pipeline made for rarely size changing windows, with the 2nd binding on the 1st set being dynamic
+///
+/// ### Descriptor Set Layout
+/// Descriptor set 0, binding 0 and 1 are set to dynamic
+///
+/// ### Pipeline Sates
+/// - vertex input: `VertexFull`
+/// - viewport: given
+/// - rasterization: culls back faces
+/// - depth stencil: simple
 pub fn window_size_dependent_pipeline(
     device: Arc<Device>,
     vs: EntryPoint,
@@ -147,7 +156,10 @@ pub fn window_size_dependent_pipeline(
                 .collect(),
                 ..Default::default()
             }),
-            rasterization_state: Some(Default::default()),
+            rasterization_state: Some(RasterizationState {
+                cull_mode: CullMode::Back,
+                ..Default::default()
+            }),
             depth_stencil_state: Some(DepthStencilState {
                 depth: Some(DepthState::simple()),
                 ..Default::default()
