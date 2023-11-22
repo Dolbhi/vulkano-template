@@ -9,7 +9,6 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 ### Misc.
 - [ ] Link to LinkedIn
 	- [ ] Finish ReadMe
-- [ ] Combine render_data::material with vulkano_objects::pipeline?
 - [ ] Combine render_data::mesh with vulkano_objects::buffers?
 - [ ] Refactor render_loop and renderer
 	- [ ] Move resize logic to render_loop?

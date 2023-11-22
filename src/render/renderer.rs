@@ -58,7 +58,7 @@ const INIT_WINDOW_SIZE: LogicalSize<f32> = LogicalSize::new(1000.0f32, 600.0);
 
 pub struct Renderer {
     _instance: Arc<Instance>,
-    window: Arc<Window>, // pending refactor with swapchain
+    pub window: Arc<Window>, // pending refactor with swapchain
     device: Arc<Device>,
     queue: Arc<Queue>,
     swapchain: Arc<Swapchain>,
@@ -191,16 +191,8 @@ impl Renderer {
         }
     }
 
-    pub fn request_redraw(&self) {
-        self.window.request_redraw();
-    }
-
     pub fn get_image_count(&self) -> usize {
         self.images.len()
-    }
-
-    pub fn get_window(&self) -> &Arc<Window> {
-        &self.window
     }
 
     pub fn clone_device(&self) -> Arc<Device> {
@@ -220,19 +212,6 @@ impl Renderer {
 
         now
     }
-
-    // fn pad_buffer_size(&self, size: DeviceSize) -> DeviceSize {
-    //     let min_dynamic_align = self
-    //         .device
-    //         .physical_device()
-    //         .properties()
-    //         .min_uniform_buffer_offset_alignment
-    //         .as_devicesize();
-
-    //     // Round size up to the next multiple of align.
-    //     // size_of::<B>()
-    //     (size + min_dynamic_align - 1) & !(min_dynamic_align - 1)
-    // }
 
     /// Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
     pub fn flush_next_future(

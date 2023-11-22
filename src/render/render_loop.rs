@@ -37,33 +37,33 @@ impl RenderLoop {
         let mut renderer = Renderer::initialize(event_loop);
 
         // pipelines
-        let vertex_shader = basic::vs::load(renderer.clone_device())
-            .expect("failed to create shader module")
-            .entry_point("main")
-            .unwrap();
-        let fragment_shader = basic::fs::load(renderer.clone_device())
-            .expect("failed to create shader module")
-            .entry_point("main")
-            .unwrap();
         let basic_shader_id = String::from("basic");
-        renderer.init_pipeline(basic_shader_id.clone(), vertex_shader, fragment_shader);
+        let uv_shader_id = String::from("uv");
+        {
+            let vertex_shader = basic::vs::load(renderer.clone_device())
+                .expect("failed to create shader module")
+                .entry_point("main")
+                .unwrap();
+            let fragment_shader = basic::fs::load(renderer.clone_device())
+                .expect("failed to create shader module")
+                .entry_point("main")
+                .unwrap();
+            renderer.init_pipeline(basic_shader_id.clone(), vertex_shader, fragment_shader);
 
-        let vertex_shader = uv::vs::load(renderer.clone_device())
-            .expect("failed to create shader module")
-            .entry_point("main")
-            .unwrap();
-        let fragment_shader = uv::fs::load(renderer.clone_device())
-            .expect("failed to create shader module")
-            .entry_point("main")
-            .unwrap();
-        let uv_id = String::from("uv");
-        renderer.init_pipeline(uv_id.clone(), vertex_shader, fragment_shader);
+            let vertex_shader = uv::vs::load(renderer.clone_device())
+                .expect("failed to create shader module")
+                .entry_point("main")
+                .unwrap();
+            let fragment_shader = uv::fs::load(renderer.clone_device())
+                .expect("failed to create shader module")
+                .entry_point("main")
+                .unwrap();
+            renderer.init_pipeline(uv_shader_id.clone(), vertex_shader, fragment_shader);
+        }
 
         // Texture
-        let path = Path::new(
-            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/lost_empire-RGBA.png",
-        );
-        let le_texture = renderer.init_texture(path);
+        let path = "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/lost_empire-RGBA.png";
+        let le_texture = renderer.init_texture(Path::new(path));
 
         let ina_textures = [
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/Hair_Base_Color.png",
@@ -92,7 +92,7 @@ impl RenderLoop {
         });
 
         //  uv
-        let uv_mat = renderer.init_material(uv_id.clone());
+        let uv_mat = renderer.init_material(uv_shader_id.clone());
 
         // meshes
         //      gun
@@ -103,10 +103,9 @@ impl RenderLoop {
         // let gun_mesh = renderer.init_mesh(vertices, indices);
 
         //      suzanne
-        let path = Path::new(
-            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/suzanne.obj",
-        );
-        let Mesh(vertices, indices) = Mesh::from_obj(path).pop().unwrap();
+        let path =
+            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/suzanne.obj";
+        let Mesh(vertices, indices) = Mesh::from_obj(Path::new(path)).pop().unwrap();
         let suzanne = renderer.init_mesh(vertices, indices);
 
         //      square
@@ -140,20 +139,16 @@ impl RenderLoop {
         let square = renderer.init_mesh(vertices, indices);
 
         //      lost empire
-        let path = Path::new(
-            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/lost_empire.obj",
-        );
-        let le_meshes: Vec<Arc<Buffers<VertexFull>>> = Mesh::from_obj(path)
+        let path = "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/lost_empire.obj";
+        let le_meshes: Vec<Arc<Buffers<VertexFull>>> = Mesh::from_obj(Path::new(path))
             .into_iter()
             .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
             .collect();
         // println!("Lost empire mesh ids: {:?}", le_ids);
 
         //      ina
-        let path = Path::new(
-            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/ReadyToRigINA.obj",
-        );
-        let ina_meshes: Vec<Arc<Buffers<VertexFull>>> = Mesh::from_obj(path)
+        let path = "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/ReadyToRigINA.obj";
+        let ina_meshes: Vec<Arc<Buffers<VertexFull>>> = Mesh::from_obj(Path::new(path))
             .into_iter()
             .skip(2)
             .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
@@ -185,16 +180,6 @@ impl RenderLoop {
             let le_obj = RenderObject::new(mesh, le_mat.clone());
             render_objects.push(le_obj);
         }
-
-        // for (x, y) in (-1..2)
-        //     .flat_map(|x| (-1..2).map(move |y| (x.clone(), y)))
-        //     .filter(|a| *a != (0, 0))
-        // {
-        //     let mut gun_obj = RenderObject::new(gun_id.clone(), material_id.clone());
-        //     gun_obj.update_transform([x as f32, y as f32, 1.], cgmath::Rad(0.));
-        //     render_objects.push(gun_obj)
-        // }
-        // println!("Total render objs: {}", render_objects.len());
 
         // global descriptors TODO: 1. Group dyanamics into its own struct 2. create independent layout not based on mat
         let (global_alignment, global_buffers, global_descriptor) =
@@ -234,7 +219,7 @@ impl RenderLoop {
         frame.update_objects_data(&self.render_objects);
 
         // update camera
-        let extends = self.renderer.get_window().inner_size();
+        let extends = self.renderer.window.inner_size();
         frame.update_camera_data(
             camera_data.view_matrix(),
             camera_data.projection_matrix(extends.width as f32 / extends.height as f32),
@@ -250,7 +235,7 @@ impl RenderLoop {
         self.total_seconds += seconds_passed;
 
         // check zero sized window
-        let image_extent: [u32; 2] = self.renderer.get_window().inner_size().into();
+        let image_extent: [u32; 2] = self.renderer.window.inner_size().into();
         if image_extent.contains(&0) {
             return;
         }
@@ -346,6 +331,6 @@ impl RenderLoop {
     }
 
     pub fn handle_window_wait(&self) {
-        self.renderer.request_redraw();
+        self.renderer.window.request_redraw();
     }
 }
