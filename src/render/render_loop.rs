@@ -13,6 +13,7 @@ use super::{
     render_data::{frame_data::FrameData, mesh::Mesh, render_object::RenderObject},
     renderer::Renderer,
 };
+use crate::vulkano_objects::buffers::Buffers;
 use crate::VertexFull;
 use crate::{
     game_objects::Camera,
@@ -74,49 +75,39 @@ impl RenderLoop {
         let linear_sampler = renderer.init_sampler(vulkano::image::sampler::Filter::Linear);
 
         // materials
-        let le_mat_id = String::from("basic");
-        renderer.init_material_with_texture(
-            le_mat_id.clone(),
+        //  lost empire
+        let le_mat = renderer.init_material_with_texture(
             basic_shader_id.clone(),
             le_texture,
             linear_sampler.clone(),
         );
 
         //  ina
-        let ina_ids = [
-            String::from("ina_hair"),
-            String::from("ina_cloth"),
-            String::from("ina_body"),
-            String::from("ina_head"),
-        ];
-        for (id, tex) in zip(ina_ids.clone(), ina_textures) {
+        let ina_materials = ina_textures.map(|tex| {
             renderer.init_material_with_texture(
-                id,
                 basic_shader_id.clone(),
                 tex,
                 linear_sampler.clone(),
-            );
-        }
+            )
+        });
 
         //  uv
-        renderer.init_material(uv_id.clone(), uv_id.clone());
+        let uv_mat = renderer.init_material(uv_id.clone());
 
         // meshes
         //      gun
-        let path = Path::new(
-            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/gun.obj",
-        );
-        let Mesh(vertices, indices) = Mesh::from_obj(path).pop().unwrap();
-        let gun_id = String::from("gun");
-        renderer.init_mesh(gun_id.clone(), vertices, indices);
+        // let path = Path::new(
+        //     "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/gun.obj",
+        // );
+        // let Mesh(vertices, indices) = Mesh::from_obj(path).pop().unwrap();
+        // let gun_mesh = renderer.init_mesh(vertices, indices);
 
         //      suzanne
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/suzanne.obj",
         );
         let Mesh(vertices, indices) = Mesh::from_obj(path).pop().unwrap();
-        let suz_id = String::from("suzanne");
-        renderer.init_mesh(suz_id.clone(), vertices, indices);
+        let suzanne = renderer.init_mesh(vertices, indices);
 
         //      square
         let vertices = vec![
@@ -145,23 +136,16 @@ impl RenderLoop {
                 uv: [1.0, 1.0],
             },
         ];
-        let indices = vec![0, 1, 2, 1, 2, 3];
-        let square_id = String::from("square");
-        renderer.init_mesh(square_id.clone(), vertices, indices);
+        let indices = vec![0, 1, 2, 2, 1, 3];
+        let square = renderer.init_mesh(vertices, indices);
 
         //      lost empire
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/lost_empire.obj",
         );
-        let le_id = String::from("lost_empire");
-        let le_ids: Vec<String> = Mesh::from_obj(path)
+        let le_meshes: Vec<Arc<Buffers<VertexFull>>> = Mesh::from_obj(path)
             .into_iter()
-            .enumerate()
-            .map(|(i, Mesh(vertices, indices))| {
-                let id = format!("{}_{}", le_id, i);
-                renderer.init_mesh(id.clone(), vertices, indices);
-                id
-            })
+            .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
             .collect();
         // println!("Lost empire mesh ids: {:?}", le_ids);
 
@@ -169,36 +153,36 @@ impl RenderLoop {
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/ReadyToRigINA.obj",
         );
-        let ina_meshes = Mesh::from_obj(path);
-        for (id, Mesh(vertices, indices)) in zip(&ina_ids, ina_meshes.into_iter().skip(2)) {
-            renderer.init_mesh(id.clone(), vertices, indices);
-        }
+        let ina_meshes: Vec<Arc<Buffers<VertexFull>>> = Mesh::from_obj(path)
+            .into_iter()
+            .skip(2)
+            .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
+            .collect();
 
         renderer.debug_assets();
 
         // objects
-        //  Suzanne
         let mut render_objects = Vec::<RenderObject>::new();
-        let suzanne_obj = RenderObject::new(suz_id, uv_id.clone());
-        render_objects.push(suzanne_obj);
+        //  Suzanne
+        render_objects.push(RenderObject::new(suzanne, uv_mat.clone()));
 
         //  Squares
         for (x, y, z) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
-            let mut square_obj = RenderObject::new(square_id.clone(), uv_id.clone());
+            let mut square_obj = RenderObject::new(square.clone(), uv_mat.clone());
             square_obj.update_transform([x as f32, y as f32, z as f32], cgmath::Rad(0.));
             render_objects.push(square_obj)
         }
 
         //  Ina
-        for id in ina_ids {
-            let mut obj = RenderObject::new(id.clone(), id);
+        for (mesh, mat) in zip(ina_meshes, ina_materials) {
+            let mut obj = RenderObject::new(mesh, mat);
             obj.update_transform([0.0, 5.0, -1.0], cgmath::Rad(0.));
             render_objects.push(obj);
         }
 
         //  lost empires
-        for id in le_ids {
-            let le_obj = RenderObject::new(id, le_mat_id.clone());
+        for mesh in le_meshes {
+            let le_obj = RenderObject::new(mesh, le_mat.clone());
             render_objects.push(le_obj);
         }
 

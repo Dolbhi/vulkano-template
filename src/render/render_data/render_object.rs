@@ -1,16 +1,22 @@
+use std::sync::Arc;
+
 use cgmath::{Matrix4, Rad, SquareMatrix};
 
+use crate::{vulkano_objects::buffers::Buffers, VertexFull};
+
+use super::material::Material;
+
 pub struct RenderObject {
-    pub mesh_id: String,
-    pub material_id: String,
+    pub mesh: Arc<Buffers<VertexFull>>,
+    pub material: Arc<Material>,
     transform: Matrix4<f32>,
 }
 
 impl RenderObject {
-    pub fn new(mesh_id: String, material_id: String) -> Self {
+    pub fn new(mesh: Arc<Buffers<VertexFull>>, material: Arc<Material>) -> Self {
         Self {
-            mesh_id,
-            material_id,
+            mesh,
+            material,
             // uniforms,
             transform: Matrix4::identity(),
         }

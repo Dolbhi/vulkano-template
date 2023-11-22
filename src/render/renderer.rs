@@ -67,9 +67,7 @@ pub struct Renderer {
     framebuffers: Vec<Arc<Framebuffer>>, // deferred examples remakes fb's every frame
     allocators: Allocators,
     viewport: Viewport,
-    mesh_buffers: HashMap<String, Buffers<VertexFull>>,
     pipelines: HashMap<String, PipelineWrapper>,
-    materials: HashMap<String, Material>,
 }
 
 impl Renderer {
@@ -155,9 +153,7 @@ impl Renderer {
             framebuffers,
             allocators,
             viewport,
-            mesh_buffers: HashMap::new(),
             pipelines: HashMap::new(),
-            materials: HashMap::new(),
         }
     }
 
@@ -265,67 +261,78 @@ impl Renderer {
             )
             .unwrap();
 
-        let mut last_pipe = &String::new();
-        let mut last_mat = &String::new();
-        let mut last_mesh = &String::new();
+        let mut last_pipe_id = &String::new();
+        let mut last_mat = None;
+        let mut last_mesh = None;
         let mut last_buffer_len = 0;
         // println!(
         //     "Data size: {}, Calculated alignment: {}",
         //     size_of::<GPUSceneData>(),
         //     align
         // );
+        // println!("Begin draw");
         for (index, render_obj) in render_objects.iter().enumerate() {
             // material
             // println!(
             //     "[Rendering Obj] Mesh ID: {}, Mat ID: {}",
             //     render_obj.mesh_id, render_obj.material_id
             // );
-            if last_mat != &render_obj.material_id {
-                let material = &self.materials[&render_obj.material_id];
-
-                // pipeline
-                if last_pipe != &material.pipeline_id {
-                    let pipeline = &self.pipelines[&material.pipeline_id].pipeline;
-                    builder
-                        .bind_pipeline_graphics(pipeline.clone())
-                        .unwrap()
-                        .bind_descriptor_sets(
-                            PipelineBindPoint::Graphics,
-                            pipeline.layout().clone(),
-                            0,
-                            global_descriptor.clone(),
-                        )
-                        .unwrap()
-                        .bind_descriptor_sets(
-                            PipelineBindPoint::Graphics,
-                            pipeline.layout().clone(),
-                            1,
-                            objects_descriptor.clone(),
-                        )
-                        .unwrap();
-
-                    last_pipe = &material.pipeline_id;
+            match last_mat {
+                Some(old_mat) if Arc::ptr_eq(old_mat, &render_obj.material) => {
+                    // println!("Same material, skipping...");
                 }
+                _ => {
+                    let material = &render_obj.material;
 
-                material.bind_sets(&mut builder);
+                    // pipeline
+                    if last_pipe_id != &material.pipeline_id {
+                        let pipeline = &self.pipelines[&material.pipeline_id].pipeline;
+                        builder
+                            .bind_pipeline_graphics(pipeline.clone())
+                            .unwrap()
+                            .bind_descriptor_sets(
+                                PipelineBindPoint::Graphics,
+                                pipeline.layout().clone(),
+                                0,
+                                global_descriptor.clone(),
+                            )
+                            .unwrap()
+                            .bind_descriptor_sets(
+                                PipelineBindPoint::Graphics,
+                                pipeline.layout().clone(),
+                                1,
+                                objects_descriptor.clone(),
+                            )
+                            .unwrap();
 
-                last_mat = &render_obj.material_id;
+                        last_pipe_id = &material.pipeline_id;
+                    }
+
+                    material.bind_sets(&mut builder);
+
+                    last_mat = Some(&render_obj.material);
+                }
             }
 
             // mesh (vertices and indicies)
-            if last_mesh != &render_obj.mesh_id {
-                let buffers = &self.mesh_buffers[&render_obj.mesh_id];
-                let index_buffer = buffers.get_index();
-                let index_buffer_length = index_buffer.len();
+            match last_mesh {
+                Some(old_mesh) if Arc::ptr_eq(old_mesh, &render_obj.mesh) => {
+                    // println!("Same mesh, skipping...");
+                }
+                _ => {
+                    let buffers = &render_obj.mesh;
+                    let index_buffer = buffers.get_index();
+                    let index_buffer_length = index_buffer.len();
 
-                builder
-                    .bind_vertex_buffers(0, buffers.get_vertex())
-                    .unwrap()
-                    .bind_index_buffer(index_buffer)
-                    .unwrap();
+                    builder
+                        .bind_vertex_buffers(0, buffers.get_vertex())
+                        .unwrap()
+                        .bind_index_buffer(index_buffer)
+                        .unwrap();
 
-                last_mesh = &render_obj.mesh_id;
-                last_buffer_len = index_buffer_length;
+                    last_mesh = Some(&render_obj.mesh);
+                    last_buffer_len = index_buffer_length;
+                }
             }
 
             // draw
@@ -347,16 +354,17 @@ impl Renderer {
             .then_signal_fence_and_flush()
     }
 
-    pub fn init_mesh(&mut self, id: String, vertices: Vec<VertexFull>, indices: Vec<u32>) {
-        // let (vertices, indices) = mesh.decompose();
-
-        let buffer = Buffers::initialize_device_local(
+    pub fn init_mesh(
+        &mut self,
+        vertices: Vec<VertexFull>,
+        indices: Vec<u32>,
+    ) -> Arc<Buffers<VertexFull>> {
+        Arc::new(Buffers::initialize_device_local(
             &self.allocators,
             self.queue.clone(),
             vertices,
             indices,
-        );
-        self.mesh_buffers.insert(id, buffer);
+        ))
     }
 
     pub fn init_texture(&self, path: &Path) -> Arc<ImageView> {
@@ -395,30 +403,26 @@ impl Renderer {
 
     fn init_material_with_sets(
         &mut self,
-        id: String,
         pipeline_id: String,
         material_sets: Vec<Arc<PersistentDescriptorSet>>,
-    ) {
+    ) -> Arc<Material> {
         let layout = self.pipelines[&pipeline_id].layout().clone();
-        self.materials.insert(
-            id,
-            Material {
-                layout,
-                material_sets,
-                pipeline_id,
-            },
-        );
+
+        Arc::new(Material {
+            layout,
+            material_sets,
+            pipeline_id,
+        })
     }
-    pub fn init_material(&mut self, id: String, pipeline_id: String) {
-        self.init_material_with_sets(id, pipeline_id, vec![]);
+    pub fn init_material(&mut self, pipeline_id: String) -> Arc<Material> {
+        self.init_material_with_sets(pipeline_id, vec![])
     }
     pub fn init_material_with_texture(
         &mut self,
-        id: String,
         pipeline_id: String,
         texture: Arc<ImageView>,
         sampler: Arc<Sampler>,
-    ) {
+    ) -> Arc<Material> {
         let set = PersistentDescriptorSet::new(
             &self.allocators.descriptor_set,
             self.pipelines[&pipeline_id]
@@ -431,7 +435,7 @@ impl Renderer {
             [],
         )
         .unwrap();
-        self.init_material_with_sets(id, pipeline_id, vec![set]);
+        self.init_material_with_sets(pipeline_id, vec![set])
     }
 
     pub fn create_scene_buffers(
@@ -475,10 +479,6 @@ impl Renderer {
     }
 
     pub fn debug_assets(&self) {
-        println!(
-            "Meshes: {:?}\nMaterials: {:?}",
-            self.mesh_buffers.keys(),
-            self.materials.keys()
-        );
+        println!("Pipelines: {:?}", self.pipelines.keys(),);
     }
 }
