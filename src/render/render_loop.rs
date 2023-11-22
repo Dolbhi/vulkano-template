@@ -187,10 +187,12 @@ impl RenderLoop {
         let path = Path::new(
             "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/ReadyToRigINA.obj",
         );
-        let ina_meshes = Mesh::from_obj(path).into_iter().skip(2);
-        for (id, Mesh(vertices, indices)) in zip(&ina_ids, ina_meshes) {
+        let ina_meshes = Mesh::from_obj(path);
+        for (id, Mesh(vertices, indices)) in zip(&ina_ids, ina_meshes.into_iter().skip(2)) {
             renderer.init_mesh(id.clone(), vertices, indices);
         }
+
+        renderer.debug_assets();
 
         // objects
         //  Suzanne
