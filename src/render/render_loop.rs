@@ -62,15 +62,15 @@ impl RenderLoop {
         }
 
         // Texture
-        let path = "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/lost_empire-RGBA.png";
-        let le_texture = renderer.init_texture(Path::new(path));
+        let le_texture = renderer.init_texture(Path::new("models/lost_empire-RGBA.png"));
 
         let ina_textures = [
-            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/Hair_Base_Color.png",
-            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/Cloth_Base_Color.png",
-            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/Body_Base_Color.png",
-            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/Head_Base_Color.png",
-        ].map(|p| renderer.init_texture(Path::new(p)));
+            "models/ina/Hair_Base_Color.png",
+            "models/ina/Cloth_Base_Color.png",
+            "models/ina/Body_Base_Color.png",
+            "models/ina/Head_Base_Color.png",
+        ]
+        .map(|p| renderer.init_texture(Path::new(p)));
 
         let linear_sampler = renderer.init_sampler(vulkano::image::sampler::Filter::Linear);
 
@@ -96,16 +96,13 @@ impl RenderLoop {
 
         // meshes
         //      gun
-        // let path = Path::new(
-        //     "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/gun.obj",
-        // );
-        // let Mesh(vertices, indices) = Mesh::from_obj(path).pop().unwrap();
+        // let Mesh(vertices, indices) = Mesh::from_obj("models/gun.obj").pop().unwrap();
         // let gun_mesh = renderer.init_mesh(vertices, indices);
 
         //      suzanne
-        let path =
-            "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/suzanne.obj";
-        let Mesh(vertices, indices) = Mesh::from_obj(Path::new(path)).pop().unwrap();
+        let Mesh(vertices, indices) = Mesh::from_obj(Path::new("models/suzanne.obj"))
+            .pop()
+            .unwrap();
         let suzanne = renderer.init_mesh(vertices, indices);
 
         //      square
@@ -139,20 +136,20 @@ impl RenderLoop {
         let square = renderer.init_mesh(vertices, indices);
 
         //      lost empire
-        let path = "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/lost_empire.obj";
-        let le_meshes: Vec<Arc<Buffers<VertexFull>>> = Mesh::from_obj(Path::new(path))
-            .into_iter()
-            .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
-            .collect();
+        let le_meshes: Vec<Arc<Buffers<VertexFull>>> =
+            Mesh::from_obj(Path::new("models/lost_empire.obj"))
+                .into_iter()
+                .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
+                .collect();
         // println!("Lost empire mesh ids: {:?}", le_ids);
 
         //      ina
-        let path = "C:/Users/dolbp/OneDrive/Documents/GitHub/RUSTY/vulkano-template/models/ina/ReadyToRigINA.obj";
-        let ina_meshes: Vec<Arc<Buffers<VertexFull>>> = Mesh::from_obj(Path::new(path))
-            .into_iter()
-            .skip(2)
-            .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
-            .collect();
+        let ina_meshes: Vec<Arc<Buffers<VertexFull>>> =
+            Mesh::from_obj(Path::new("models/ina/ReadyToRigINA.obj"))
+                .into_iter()
+                .skip(2)
+                .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
+                .collect();
 
         renderer.debug_assets();
 
