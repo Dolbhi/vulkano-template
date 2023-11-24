@@ -18,5 +18,8 @@ void main()
 {
 	vec4 dummy = scene_data.ambient_color;
 
-	f_color = pow(texture(s, texCoord), vec4(1/2.2));
+	vec4 tex_color = texture(s, texCoord);
+	if (tex_color.a < 0.1) discard;
+
+	f_color = pow(tex_color, vec4(1/2.2));
 }
