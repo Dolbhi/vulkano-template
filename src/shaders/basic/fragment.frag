@@ -21,5 +21,5 @@ void main()
 	vec4 tex_color = texture(s, texCoord);
 	if (tex_color.a < 0.05) discard;
 
-	f_color = pow(tex_color, vec4(1/2.2));
+	f_color = tex_color;// pow(tex_color, vec4(1/2.2));
 }
