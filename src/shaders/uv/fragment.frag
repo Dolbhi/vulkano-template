@@ -16,5 +16,8 @@ layout(location = 0) out vec4 f_color;
 void main()
 {
 	f_color = vec4(texCoord * sceneData.ambient_color.xy, 0.0f, 1.0f);
+
+    // float step_alpha = floor(tex_color.a * 10) / 10.f;
+
 	f_color = vec4(texCoord, 0.0f, 1.0f);
 }

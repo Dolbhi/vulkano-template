@@ -67,7 +67,7 @@ pub fn load_texture(allocators: &Allocators, queue: &Arc<Queue>, path: &Path) ->
         ColorType::Rgb => {
             let pixel_count = (info.width * info.height) as usize;
 
-            let mut rgb_buf = vec![255u8; pixel_count * 3];
+            let mut rgb_buf = vec![0; pixel_count * 3];
             reader.next_frame(rgb_buf.as_mut_slice()).unwrap();
 
             let mut rgba_buf = staging_buffer.write().unwrap();
@@ -75,6 +75,7 @@ pub fn load_texture(allocators: &Allocators, queue: &Arc<Queue>, path: &Path) ->
                 rgba_buf[i * 4] = rgb_buf[i * 3];
                 rgba_buf[i * 4 + 1] = rgb_buf[i * 3 + 1];
                 rgba_buf[i * 4 + 2] = rgb_buf[i * 3 + 2];
+                rgba_buf[i * 4 + 3] = u8::MAX;
             }
         }
         ColorType::Rgba => {

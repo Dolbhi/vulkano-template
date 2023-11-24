@@ -1,7 +1,7 @@
 pub mod vs {
     vulkano_shaders::shader! {
         ty: "vertex",
-        path: "src/shaders/uv/vertex.vert",
+        path: "src/shaders/basic/vertex.vert",
     }
 }
 

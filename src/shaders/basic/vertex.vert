@@ -26,13 +26,7 @@ void main() {
     vec4 localPos = vec4(position, 1.0);
     localPos = cameraData.view_proj * objectBuffer.objects[gl_BaseInstance].render_matrix * localPos;
     
-    gl_Position = vec4(
-        localPos.x,
-        localPos.y, 
-        localPos.z, 
-        localPos.w
-    );
+    gl_Position = localPos;
     outColor = colour;
-
     outTexCoord = uv;
 }

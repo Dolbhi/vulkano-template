@@ -1,7 +1,7 @@
 #version 460
 
 layout(location = 0) in vec3 in_color;
-layout(location = 1) in vec2 texCoord;
+layout(location = 1) in vec2 tex_coord;
 
 layout(set = 0, binding = 1) uniform GPUSceneData {
     vec4 fog_color; 			// w is for exponent
@@ -18,8 +18,9 @@ void main()
 {
 	vec4 dummy = scene_data.ambient_color;
 
-	vec4 tex_color = texture(s, texCoord);
-	if (tex_color.a < 0.05) discard;
+	vec4 tex_color = texture(s, tex_coord);
 
-	f_color = pow(tex_color, vec4(1/2.2));
+    // float step_alpha = floor(tex_color.a * 10) / 10.f;
+
+	f_color = vec4(tex_color.a);
 }

@@ -1,3 +1,3 @@
+pub mod alpha;
 pub mod basic;
-pub mod static_triangle;
 pub mod uv;

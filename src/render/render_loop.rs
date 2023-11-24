@@ -38,6 +38,7 @@ impl RenderLoop {
 
         // pipelines
         let basic_shader_id = String::from("basic");
+        // let alpha_shader_id = String::from("alpha");
         let uv_shader_id = String::from("uv");
         {
             let vertex_shader = basic::vs::load(renderer.clone_device())
@@ -49,6 +50,16 @@ impl RenderLoop {
                 .entry_point("main")
                 .unwrap();
             renderer.init_pipeline(basic_shader_id.clone(), vertex_shader, fragment_shader);
+
+            // let vertex_shader = alpha::vs::load(renderer.clone_device())
+            //     .expect("failed to create shader module")
+            //     .entry_point("main")
+            //     .unwrap();
+            // let fragment_shader = alpha::fs::load(renderer.clone_device())
+            //     .expect("failed to create shader module")
+            //     .entry_point("main")
+            //     .unwrap();
+            // renderer.init_pipeline(alpha_shader_id.clone(), vertex_shader, fragment_shader);
 
             let vertex_shader = uv::vs::load(renderer.clone_device())
                 .expect("failed to create shader module")
@@ -141,7 +152,7 @@ impl RenderLoop {
                 .into_iter()
                 .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
                 .collect();
-        // println!("Lost empire mesh ids: {:?}", le_ids);
+        println!("Lost empire mesh count: {}", le_meshes.len());
 
         //      ina
         let ina_meshes: Vec<Arc<Buffers<VertexFull>>> =
@@ -150,6 +161,7 @@ impl RenderLoop {
                 .skip(2)
                 .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
                 .collect();
+        println!("Ina mesh count: {}", ina_meshes.len());
 
         renderer.debug_assets();
 

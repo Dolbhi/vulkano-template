@@ -28,6 +28,12 @@ pub fn create_swapchain(
         .unwrap()[0]
         .0;
 
+    println!("Surface formats: {:?}", {
+        physical_device
+            .surface_formats(&surface, Default::default())
+            .unwrap()
+    });
+
     Swapchain::new(
         device,
         surface.clone(),
