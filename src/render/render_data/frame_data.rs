@@ -4,7 +4,7 @@ use crate::shaders::basic::{
     fs::GPUSceneData,
     vs::{GPUCameraData, GPUObjectData},
 };
-use cgmath::Matrix4;
+use cgmath::{Matrix, Matrix4, Transform};
 use vulkano::{buffer::Subbuffer, descriptor_set::PersistentDescriptorSet};
 
 use crate::render::renderer::Fence;
@@ -45,13 +45,27 @@ impl FrameData {
         cam_uniform_contents.view_proj = (proj * view).into();
     }
 
-    pub fn update_scene_data(&mut self, ambient_color: [f32; 4]) {
+    pub fn update_scene_data(
+        &mut self,
+        ambient_color: Option<[f32; 4]>,
+        sunlight_direction: Option<[f32; 4]>,
+        sunlight_color: Option<[f32; 4]>,
+    ) {
         let mut scene_uniform_contents = self
             .scene_buffer
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to scene uniform buffer\n{}", e));
 
-        scene_uniform_contents.ambient_color = ambient_color;
+        if let Some(ambient) = ambient_color {
+            scene_uniform_contents.ambient_color = ambient;
+        }
+        if let Some(direction) = sunlight_direction {
+            scene_uniform_contents.sunlight_direction = direction;
+            // scene_uniform_contents.sunlight_direction[1] *= -1.;
+        }
+        if let Some(color) = sunlight_color {
+            scene_uniform_contents.sunlight_color = color;
+        }
     }
 
     pub fn update_objects_data(&mut self, render_objects: &Vec<RenderObject>) {
@@ -62,6 +76,12 @@ impl FrameData {
 
         for (i, render_object) in render_objects.iter().enumerate() {
             storage_buffer_contents[i].render_matrix = render_object.get_transform_matrix().into();
+            storage_buffer_contents[i].normal_matrix = render_object
+                .get_transform_matrix()
+                .inverse_transform()
+                .unwrap()
+                .transpose()
+                .into();
         }
     }
 

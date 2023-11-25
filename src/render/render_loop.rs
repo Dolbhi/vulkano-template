@@ -3,6 +3,7 @@ use std::iter::zip;
 use std::path::Path;
 use std::sync::Arc;
 
+use cgmath::{vec3, InnerSpace, Vector3};
 use vulkano::descriptor_set::{DescriptorSet, PersistentDescriptorSet};
 use vulkano::DeviceSize;
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
@@ -18,6 +19,7 @@ use super::{
     },
     renderer::Renderer,
 };
+use crate::shaders::phong;
 use crate::{
     game_objects::Camera,
     shaders::{basic, uv},
@@ -53,7 +55,14 @@ impl RenderLoop {
             .into_iter()
             .map(
                 |((cam_buffer, scene_buffer), (storage_buffer, object_descriptor))| {
-                    FrameData::new(cam_buffer, scene_buffer, storage_buffer, object_descriptor)
+                    let mut frame =
+                        FrameData::new(cam_buffer, scene_buffer, storage_buffer, object_descriptor);
+                    frame.update_scene_data(
+                        Some([0.2, 0.2, 0.2, 1.]),
+                        None,
+                        Some([0.9, 0.9, 0.6, 1.]),
+                    );
+                    frame
                 },
             )
             .collect();
@@ -179,7 +188,7 @@ impl RenderLoop {
     fn init_render_objects(renderer: &mut Renderer) -> Vec<RenderObject> {
         // pipelines
         let basic_shader_id = String::from("basic");
-        // let alpha_shader_id = String::from("alpha");
+        let phong_shader_id = String::from("phong");
         let uv_shader_id = String::from("uv");
         {
             let vertex_shader = basic::vs::load(renderer.device.clone())
@@ -192,15 +201,15 @@ impl RenderLoop {
                 .unwrap();
             renderer.init_pipeline(basic_shader_id.clone(), vertex_shader, fragment_shader);
 
-            // let vertex_shader = alpha::vs::load(renderer.clone_device())
-            //     .expect("failed to create shader module")
-            //     .entry_point("main")
-            //     .unwrap();
-            // let fragment_shader = alpha::fs::load(renderer.clone_device())
-            //     .expect("failed to create shader module")
-            //     .entry_point("main")
-            //     .unwrap();
-            // renderer.init_pipeline(alpha_shader_id.clone(), vertex_shader, fragment_shader);
+            let vertex_shader = phong::vs::load(renderer.device.clone())
+                .expect("failed to create shader module")
+                .entry_point("main")
+                .unwrap();
+            let fragment_shader = phong::fs::load(renderer.device.clone())
+                .expect("failed to create shader module")
+                .entry_point("main")
+                .unwrap();
+            renderer.init_pipeline(phong_shader_id.clone(), vertex_shader, fragment_shader);
 
             let vertex_shader = uv::vs::load(renderer.device.clone())
                 .expect("failed to create shader module")
@@ -236,7 +245,7 @@ impl RenderLoop {
         // materials
         //  lost empire
         let le_mat = renderer.init_material_with_texture(
-            basic_shader_id.clone(),
+            phong_shader_id.clone(),
             le_texture,
             linear_sampler.clone(),
         );
@@ -244,7 +253,7 @@ impl RenderLoop {
         //  ina
         let ina_materials = ina_textures.map(|tex| {
             renderer.init_material_with_texture(
-                basic_shader_id.clone(),
+                phong_shader_id.clone(),
                 tex,
                 linear_sampler.clone(),
             )
@@ -377,6 +386,8 @@ impl RenderLoop {
         );
 
         // update scene data
-        frame.update_scene_data([self.total_seconds.sin(), 0., self.total_seconds.cos(), 1.]);
+        let angle = self.total_seconds / 2.;
+        let Vector3::<f32> { x, y, z } = vec3(angle.sin(), -1., angle.cos()).normalize();
+        frame.update_scene_data(None, Some([x, y, z, 1.]), None);
     }
 }

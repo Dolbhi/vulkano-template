@@ -20,14 +20,17 @@ layout(set = 1, binding = 0) readonly buffer ObjectBuffer {
     GPUObjectData objects[];
 } objectBuffer;
 
-layout(location = 0) out vec3 outColor;
-layout(location = 1) out vec2 outTexCoord;
+layout(location = 0) out vec2 outTexCoord;
+layout(location = 1) out vec3 outWorldPos;
+layout(location = 2) out vec3 outNormal;
 
 void main() {
-    vec4 localPos = vec4(position, 1.0);
-    localPos = cameraData.view_proj * objectBuffer.objects[gl_BaseInstance].render_matrix * localPos;
+    GPUObjectData objectData = objectBuffer.objects[gl_BaseInstance];
+
+    vec4 worldPos = objectData.render_matrix * vec4(position, 1.0);
     
-    gl_Position = localPos;
-    outColor = colour;
+    gl_Position = cameraData.view_proj * worldPos;
+    outWorldPos = worldPos.xyz;
     outTexCoord = uv;
+    outNormal = normalize(mat3(objectData.normal_matrix) * normal);
 }
