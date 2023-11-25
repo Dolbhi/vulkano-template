@@ -13,7 +13,7 @@ use super::{
     render_data::{frame_data::FrameData, mesh::Mesh, render_object::RenderObject},
     renderer::Renderer,
 };
-use crate::render::render_data::texture::create_sampler;
+use crate::render::render_data::texture::{create_sampler, load_texture};
 use crate::vulkano_objects::buffers::Buffers;
 use crate::VertexFull;
 use crate::{
@@ -74,7 +74,11 @@ impl RenderLoop {
         }
 
         // Texture
-        let le_texture = renderer.init_texture(Path::new("models/lost_empire-RGBA.png"));
+        let le_texture = load_texture(
+            &renderer.allocators,
+            &renderer.queue,
+            Path::new("models/lost_empire-RGBA.png"),
+        );
 
         let ina_textures = [
             "models/ina/Hair_Base_Color.png",
@@ -82,7 +86,7 @@ impl RenderLoop {
             "models/ina/Body_Base_Color.png",
             "models/ina/Head_Base_Color.png",
         ]
-        .map(|p| renderer.init_texture(Path::new(p)));
+        .map(|p| load_texture(&renderer.allocators, &renderer.queue, Path::new(p)));
 
         let linear_sampler = create_sampler(
             renderer.device.clone(),

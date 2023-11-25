@@ -1,4 +1,4 @@
-use std::{collections::hash_map::HashMap, path::Path, sync::Arc};
+use std::{collections::hash_map::HashMap, sync::Arc};
 
 use crate::{
     shaders::basic::{
@@ -40,7 +40,7 @@ use winit::{
     window::{CursorGrabMode, Window, WindowBuilder},
 };
 
-use super::render_data::{material::Material, render_object::RenderObject, texture::load_texture};
+use super::render_data::{material::Material, render_object::RenderObject};
 
 pub type Fence = FenceSignalFuture<
     PresentFuture<
@@ -56,12 +56,12 @@ pub struct Renderer {
     _instance: Arc<Instance>,
     pub window: Arc<Window>, // pending refactor with swapchain
     pub device: Arc<Device>,
-    queue: Arc<Queue>,
+    pub queue: Arc<Queue>,
     swapchain: Arc<Swapchain>,
     images: Vec<Arc<Image>>, // only used for getting image count
     render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>, // deferred examples remakes fb's every frame
-    allocators: Allocators,
+    pub allocators: Allocators,
     viewport: Viewport,
     pipelines: HashMap<String, PipelineWrapper>,
 }
@@ -340,10 +340,6 @@ impl Renderer {
             vertices,
             indices,
         ))
-    }
-
-    pub fn init_texture(&self, path: &Path) -> Arc<ImageView> {
-        load_texture(&self.allocators, &self.queue, path)
     }
 
     pub fn init_pipeline(
