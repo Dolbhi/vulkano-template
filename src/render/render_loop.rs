@@ -254,15 +254,16 @@ impl RenderLoop {
         let uv_mat = renderer.init_material(uv_shader_id.clone());
 
         // meshes
-        //      gun
-        // let Mesh(vertices, indices) = Mesh::from_obj("models/gun.obj").pop().unwrap();
-        // let gun_mesh = renderer.init_mesh(vertices, indices);
-
         //      suzanne
         let Mesh(vertices, indices) = Mesh::from_obj(Path::new("models/suzanne.obj"))
             .pop()
             .unwrap();
-        let suzanne = renderer.init_mesh(vertices, indices);
+        let suzanne = Arc::new(Buffers::initialize_device_local(
+            &renderer.allocators,
+            renderer.queue.clone(),
+            vertices,
+            indices,
+        ));
 
         //      square
         let vertices = vec![
@@ -292,13 +293,25 @@ impl RenderLoop {
             },
         ];
         let indices = vec![0, 1, 2, 2, 1, 3];
-        let square = renderer.init_mesh(vertices, indices);
+        let square = Arc::new(Buffers::initialize_device_local(
+            &renderer.allocators,
+            renderer.queue.clone(),
+            vertices,
+            indices,
+        ));
 
         //      lost empire
         let le_meshes: Vec<Arc<Buffers<VertexFull>>> =
             Mesh::from_obj(Path::new("models/lost_empire.obj"))
                 .into_iter()
-                .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
+                .map(|Mesh(vertices, indices)| {
+                    Arc::new(Buffers::initialize_device_local(
+                        &renderer.allocators,
+                        renderer.queue.clone(),
+                        vertices,
+                        indices,
+                    ))
+                })
                 .collect();
         println!("Lost empire mesh count: {}", le_meshes.len());
 
@@ -307,7 +320,14 @@ impl RenderLoop {
             Mesh::from_obj(Path::new("models/ina/ReadyToRigINA.obj"))
                 .into_iter()
                 .skip(2)
-                .map(|Mesh(vertices, indices)| renderer.init_mesh(vertices, indices))
+                .map(|Mesh(vertices, indices)| {
+                    Arc::new(Buffers::initialize_device_local(
+                        &renderer.allocators,
+                        renderer.queue.clone(),
+                        vertices,
+                        indices,
+                    ))
+                })
                 .collect();
         println!("Ina mesh count: {}", ina_meshes.len());
 

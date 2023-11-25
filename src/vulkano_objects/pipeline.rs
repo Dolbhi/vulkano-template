@@ -79,44 +79,6 @@ fn window_size_dependent_pipeline(
     // images: &[Arc<Image>],
     render_pass: Arc<RenderPass>,
 ) -> Arc<GraphicsPipeline> {
-    // let device = memory_allocator.device().clone();
-    // let extent = images[0].extent();
-
-    // let depth_buffer = ImageView::new_default(
-    //     Image::new(
-    //         memory_allocator,
-    //         ImageCreateInfo {
-    //             image_type: ImageType::Dim2d,
-    //             format: Format::D16_UNORM,
-    //             extent: images[0].extent(),
-    //             usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
-    //             ..Default::default()
-    //         },
-    //         AllocationCreateInfo::default(),
-    //     )
-    //     .unwrap(),
-    // )
-    // .unwrap();
-
-    // let framebuffers = images
-    //     .iter()
-    //     .map(|image| {
-    //         let view = ImageView::new_default(image.clone()).unwrap();
-    //         Framebuffer::new(
-    //             render_pass.clone(),
-    //             FramebufferCreateInfo {
-    //                 attachments: vec![view, depth_buffer.clone()],
-    //                 ..Default::default()
-    //             },
-    //         )
-    //         .unwrap()
-    //     })
-    //     .collect::<Vec<_>>();
-
-    // In the triangle example we use a dynamic viewport, as its a simple example. However in the
-    // teapot example, we recreate the pipelines with a hardcoded viewport instead. This allows the
-    // driver to optimize things, at the cost of slower window resizes.
-    // https://computergraphics.stackexchange.com/questions/5742/vulkan-best-way-of-updating-pipeline-viewport
     let vertex_input_state = VertexFull::per_vertex()
         .definition(&vs.info().input_interface) //[Position::per_vertex(), Normal::per_vertex()]
         .unwrap();

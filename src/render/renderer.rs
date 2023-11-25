@@ -8,10 +8,9 @@ use crate::{
     vulkano_objects::{
         self,
         allocators::Allocators,
-        buffers::{self, create_storage_buffers, Buffers},
+        buffers::{self, create_storage_buffers},
         pipeline::PipelineWrapper,
     },
-    VertexFull,
 };
 use vulkano::{
     buffer::Subbuffer,
@@ -318,19 +317,6 @@ impl Renderer {
                 SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_i),
             )
             .then_signal_fence_and_flush()
-    }
-
-    pub fn init_mesh(
-        &mut self,
-        vertices: Vec<VertexFull>,
-        indices: Vec<u32>,
-    ) -> Arc<Buffers<VertexFull>> {
-        Arc::new(Buffers::initialize_device_local(
-            &self.allocators,
-            self.queue.clone(),
-            vertices,
-            indices,
-        ))
     }
 
     pub fn init_pipeline(
