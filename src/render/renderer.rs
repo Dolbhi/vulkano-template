@@ -87,7 +87,6 @@ impl Renderer {
             khr_shader_draw_parameters: true,
             ..DeviceExtensions::empty()
         };
-
         let (physical_device, queue_family_index) =
             vulkano_objects::physical_device::select_physical_device(
                 &instance,
@@ -117,7 +116,7 @@ impl Renderer {
 
         let render_pass =
             vulkano_objects::render_pass::create_render_pass(device.clone(), swapchain.clone());
-        let framebuffers = vulkano_objects::swapchain::create_framebuffers_from_swapchain_images(
+        let framebuffers = vulkano_objects::render_pass::create_framebuffers_from_swapchain_images(
             &images,
             render_pass.clone(),
             &allocators,
@@ -166,7 +165,7 @@ impl Renderer {
 
         self.swapchain = new_swapchain;
         self.images = new_images;
-        self.framebuffers = vulkano_objects::swapchain::create_framebuffers_from_swapchain_images(
+        self.framebuffers = vulkano_objects::render_pass::create_framebuffers_from_swapchain_images(
             &self.images,
             self.render_pass.clone(),
             &self.allocators,
@@ -185,14 +184,6 @@ impl Renderer {
                 self.viewport.clone(),
             );
         }
-    }
-
-    pub fn get_image_count(&self) -> usize {
-        self.images.len()
-    }
-
-    pub fn clone_device(&self) -> Arc<Device> {
-        self.device.clone()
     }
 
     /// Gets future where next image in swapchain is ready
@@ -405,8 +396,6 @@ impl Renderer {
         Vec<(Subbuffer<GPUCameraData>, Subbuffer<GPUSceneData>)>,
         Arc<PersistentDescriptorSet>,
     ) {
-        let image_count = self.get_image_count();
-
         buffers::create_global_descriptors::<GPUCameraData, GPUSceneData>(
             &self.allocators,
             &self.device,
@@ -416,7 +405,7 @@ impl Renderer {
                 .get(0)
                 .unwrap()
                 .clone(),
-            image_count,
+            self.swapchain.image_count() as usize,
         )
     }
 
@@ -432,7 +421,7 @@ impl Renderer {
                 .get(1)
                 .unwrap()
                 .clone(),
-            self.get_image_count(),
+            self.swapchain.image_count() as usize,
             10000,
         )
     }
