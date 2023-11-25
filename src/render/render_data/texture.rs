@@ -7,9 +7,13 @@ use vulkano::{
         AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo,
         PrimaryCommandBufferAbstract,
     },
-    device::Queue,
+    device::{Device, Queue},
     format::Format,
-    image::{view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage},
+    image::{
+        sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
+        view::ImageView,
+        Image, ImageCreateInfo, ImageType, ImageUsage,
+    },
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     sync::GpuFuture,
     DeviceSize,
@@ -117,4 +121,18 @@ pub fn load_texture(allocators: &Allocators, queue: &Arc<Queue>, path: &Path) ->
         .unwrap();
 
     ImageView::new_default(image).unwrap()
+}
+
+/// Create a texture sampler with the same mag_filter and min_filter
+pub fn create_sampler(device: Arc<Device>, filter: Filter) -> Arc<Sampler> {
+    Sampler::new(
+        device,
+        SamplerCreateInfo {
+            mag_filter: filter,
+            min_filter: filter,
+            address_mode: [SamplerAddressMode::Repeat; 3],
+            ..Default::default()
+        },
+    )
+    .unwrap()
 }

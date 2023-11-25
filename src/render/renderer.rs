@@ -18,11 +18,7 @@ use vulkano::{
     command_buffer::{self, RenderPassBeginInfo},
     descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
-    image::{
-        sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
-        view::ImageView,
-        Image,
-    },
+    image::{sampler::Sampler, view::ImageView, Image},
     instance::Instance,
     pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint},
     render_pass::{Framebuffer, RenderPass},
@@ -59,7 +55,7 @@ const INIT_WINDOW_SIZE: LogicalSize<f32> = LogicalSize::new(1000.0f32, 600.0);
 pub struct Renderer {
     _instance: Arc<Instance>,
     pub window: Arc<Window>, // pending refactor with swapchain
-    device: Arc<Device>,
+    pub device: Arc<Device>,
     queue: Arc<Queue>,
     swapchain: Arc<Swapchain>,
     images: Vec<Arc<Image>>, // only used for getting image count
@@ -348,18 +344,6 @@ impl Renderer {
 
     pub fn init_texture(&self, path: &Path) -> Arc<ImageView> {
         load_texture(&self.allocators, &self.queue, path)
-    }
-    pub fn init_sampler(&self, filter: Filter) -> Arc<Sampler> {
-        Sampler::new(
-            self.device.clone(),
-            SamplerCreateInfo {
-                mag_filter: filter,
-                min_filter: filter,
-                address_mode: [SamplerAddressMode::Repeat; 3],
-                ..Default::default()
-            },
-        )
-        .unwrap()
     }
 
     pub fn init_pipeline(

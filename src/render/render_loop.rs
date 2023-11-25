@@ -13,6 +13,7 @@ use super::{
     render_data::{frame_data::FrameData, mesh::Mesh, render_object::RenderObject},
     renderer::Renderer,
 };
+use crate::render::render_data::texture::create_sampler;
 use crate::vulkano_objects::buffers::Buffers;
 use crate::VertexFull;
 use crate::{
@@ -83,7 +84,10 @@ impl RenderLoop {
         ]
         .map(|p| renderer.init_texture(Path::new(p)));
 
-        let linear_sampler = renderer.init_sampler(vulkano::image::sampler::Filter::Linear);
+        let linear_sampler = create_sampler(
+            renderer.device.clone(),
+            vulkano::image::sampler::Filter::Linear,
+        );
 
         // materials
         //  lost empire
