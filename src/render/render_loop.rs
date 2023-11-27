@@ -322,7 +322,6 @@ impl RenderLoop {
                     ))
                 })
                 .collect();
-        println!("Lost empire mesh count: {}", le_meshes.len());
 
         //      ina
         let ina_meshes: Vec<Arc<Buffers<VertexFull>>> =
@@ -338,6 +337,9 @@ impl RenderLoop {
                     ))
                 })
                 .collect();
+
+        println!("[Rendering Data]");
+        println!("Lost empire mesh count: {}", le_meshes.len());
         println!("Ina mesh count: {}", ina_meshes.len());
 
         renderer.debug_assets();

@@ -68,7 +68,7 @@ impl FrameData {
         }
     }
 
-    pub fn update_objects_data(&mut self, render_objects: &Vec<RenderObject>) {
+    pub fn update_objects_data(&self, render_objects: &Vec<RenderObject>) {
         let mut storage_buffer_contents = self
             .objects_buffer
             .write()

@@ -252,6 +252,7 @@ pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
     (align, buffers, descriptor_set)
 }
 
+/// Create descriptor sets of a storage buffer containing an array of the given data type
 pub fn create_storage_buffers<T: BufferContents>(
     allocators: &Allocators,
     descriptor_set_layout: Arc<DescriptorSetLayout>,

@@ -128,8 +128,9 @@ impl Renderer {
         };
 
         println!(
-            "[Renderer info]\nswapchain image count: {}\nrgba format properties: {:?}",
+            "[Renderer info]\nswapchain image count: {}\nQueue family: {}\nrgba format properties: {:?}",
             images.len(),
+            queue_family_index,
             physical_device
                 .format_properties(vulkano::format::Format::R8G8B8A8_SRGB)
                 .unwrap()
@@ -259,14 +260,7 @@ impl Renderer {
                                 PipelineBindPoint::Graphics,
                                 pipeline.layout().clone(),
                                 0,
-                                global_descriptor.clone(),
-                            )
-                            .unwrap()
-                            .bind_descriptor_sets(
-                                PipelineBindPoint::Graphics,
-                                pipeline.layout().clone(),
-                                1,
-                                objects_descriptor.clone(),
+                                vec![global_descriptor.clone(), objects_descriptor.clone().into()],
                             )
                             .unwrap();
 
@@ -336,6 +330,9 @@ impl Renderer {
             ),
         );
     }
+    pub fn get_pipeline(&self, id: &String) -> &PipelineWrapper {
+        &self.pipelines[id]
+    }
 
     fn init_material_with_sets(
         &mut self,
@@ -374,6 +371,7 @@ impl Renderer {
         self.init_material_with_sets(pipeline_id, vec![set])
     }
 
+    /// See `buffers::create_global_descriptors`
     pub fn create_scene_buffers(
         &self,
         pipeline_id: &String,
