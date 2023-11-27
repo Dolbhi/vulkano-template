@@ -4,8 +4,6 @@ use std::path::Path;
 use std::sync::Arc;
 
 use cgmath::{vec3, InnerSpace, Vector3};
-use vulkano::descriptor_set::{DescriptorSet, PersistentDescriptorSet};
-use vulkano::DeviceSize;
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use winit::event_loop::EventLoop;
@@ -33,8 +31,6 @@ pub struct RenderLoop {
     window_resized: bool,
     frames: Vec<FrameData>,
     previous_frame_i: u32,
-    global_descriptor: Arc<PersistentDescriptorSet>,
-    global_alignment: DeviceSize,
     total_seconds: f32,
     render_objects: Vec<RenderObject>,
 }
@@ -46,17 +42,21 @@ impl RenderLoop {
         let render_objects = Self::init_render_objects(&mut renderer);
 
         // global descriptors TODO: 1. Group dyanamics into its own struct 2. create independent layout not based on mat
-        let (global_alignment, global_buffers, global_descriptor) =
-            renderer.create_scene_buffers(&String::from("basic"));
+        let global_data = renderer.create_scene_buffers(&String::from("basic"));
         let object_uniforms = renderer.create_object_buffers(&String::from("basic"));
 
         // create frame data
-        let frames = zip(global_buffers, object_uniforms)
+        let frames = zip(global_data, object_uniforms)
             .into_iter()
             .map(
-                |((cam_buffer, scene_buffer), (storage_buffer, object_descriptor))| {
-                    let mut frame =
-                        FrameData::new(cam_buffer, scene_buffer, storage_buffer, object_descriptor);
+                |((cam_buffer, scene_buffer, global_set), (storage_buffer, object_descriptor))| {
+                    let mut frame = FrameData::new(
+                        cam_buffer,
+                        scene_buffer,
+                        global_set,
+                        storage_buffer,
+                        object_descriptor.into(),
+                    );
                     frame.update_scene_data(
                         Some([0.2, 0.2, 0.2, 1.]),
                         None,
@@ -73,8 +73,6 @@ impl RenderLoop {
             window_resized: false,
             frames,
             previous_frame_i: 0,
-            global_descriptor,
-            global_alignment,
             total_seconds: 0.0,
             render_objects,
         }
@@ -148,18 +146,18 @@ impl RenderLoop {
         //     (0..size_of::<GPUCameraData>()).end,
         //     self.camera_dynamic.align() as u32 * image_i,
         // );
+        let FrameData {
+            global_descriptor,
+            objects_descriptor,
+            ..
+        } = &self.frames[image_i as usize];
         let result = self.renderer.flush_next_future(
             previous_future,
             acquire_future,
             image_i,
             &self.render_objects,
-            self.global_descriptor.clone().offsets([
-                self.global_alignment as u32 * image_i,
-                self.global_alignment as u32 * image_i,
-            ]),
-            self.frames[image_i as usize]
-                .get_objects_descriptor()
-                .clone(),
+            global_descriptor.clone(),
+            objects_descriptor.clone(),
         );
         // replace fence of upcoming image with new one
         self.frames[image_i as usize].fence = match result {

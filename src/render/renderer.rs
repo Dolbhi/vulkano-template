@@ -208,7 +208,7 @@ impl Renderer {
         image_i: u32,
         render_objects: &Vec<RenderObject>,
         global_descriptor: DescriptorSetWithOffsets,
-        objects_descriptor: Arc<PersistentDescriptorSet>,
+        objects_descriptor: DescriptorSetWithOffsets,
     ) -> Result<Fence, Validated<VulkanError>> {
         let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
@@ -260,7 +260,7 @@ impl Renderer {
                                 PipelineBindPoint::Graphics,
                                 pipeline.layout().clone(),
                                 0,
-                                vec![global_descriptor.clone(), objects_descriptor.clone().into()],
+                                vec![global_descriptor.clone(), objects_descriptor.clone()],
                             )
                             .unwrap();
 
@@ -375,11 +375,11 @@ impl Renderer {
     pub fn create_scene_buffers(
         &self,
         pipeline_id: &String,
-    ) -> (
-        u64,
-        Vec<(Subbuffer<GPUCameraData>, Subbuffer<GPUSceneData>)>,
-        Arc<PersistentDescriptorSet>,
-    ) {
+    ) -> Vec<(
+        Subbuffer<GPUCameraData>,
+        Subbuffer<GPUSceneData>,
+        DescriptorSetWithOffsets,
+    )> {
         buffers::create_global_descriptors::<GPUCameraData, GPUSceneData>(
             &self.allocators,
             &self.device,

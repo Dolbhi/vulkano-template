@@ -5,7 +5,7 @@ use crate::shaders::basic::{
     vs::{GPUCameraData, GPUObjectData},
 };
 use cgmath::{Matrix, Matrix4, Transform};
-use vulkano::{buffer::Subbuffer, descriptor_set::PersistentDescriptorSet};
+use vulkano::{buffer::Subbuffer, descriptor_set::DescriptorSetWithOffsets};
 
 use crate::render::renderer::Fence;
 
@@ -14,24 +14,27 @@ use super::render_object::RenderObject;
 pub struct FrameData {
     pub fence: Option<Arc<Fence>>,
     camera_buffer: Subbuffer<GPUCameraData>,
-    scene_buffer: Subbuffer<GPUSceneData>,
+    global_buffer: Subbuffer<GPUSceneData>,
     objects_buffer: Subbuffer<[GPUObjectData]>,
-    object_descriptor: Arc<PersistentDescriptorSet>,
+    pub global_descriptor: DescriptorSetWithOffsets,
+    pub objects_descriptor: DescriptorSetWithOffsets,
 }
 
 impl FrameData {
     pub fn new(
         camera_buffer: Subbuffer<GPUCameraData>,
-        scene_buffer: Subbuffer<GPUSceneData>,
+        global_buffer: Subbuffer<GPUSceneData>,
+        global_descriptor: DescriptorSetWithOffsets,
         objects_buffer: Subbuffer<[GPUObjectData]>,
-        object_descriptor: Arc<PersistentDescriptorSet>,
+        objects_descriptor: DescriptorSetWithOffsets,
     ) -> Self {
         FrameData {
             fence: None,
             camera_buffer,
-            scene_buffer,
+            global_buffer,
+            global_descriptor,
             objects_buffer,
-            object_descriptor,
+            objects_descriptor,
         }
     }
 
@@ -52,7 +55,7 @@ impl FrameData {
         sunlight_color: Option<[f32; 4]>,
     ) {
         let mut scene_uniform_contents = self
-            .scene_buffer
+            .global_buffer
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to scene uniform buffer\n{}", e));
 
@@ -83,13 +86,5 @@ impl FrameData {
                 .transpose()
                 .into();
         }
-    }
-
-    // pub fn get_global_descriptor(&self) -> &Arc<PersistentDescriptorSet> {
-    //     &self.global_descriptor
-    // }
-
-    pub fn get_objects_descriptor(&self) -> &Arc<PersistentDescriptorSet> {
-        &self.object_descriptor
     }
 }

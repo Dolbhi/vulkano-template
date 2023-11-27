@@ -7,8 +7,8 @@ use vulkano::{
         PrimaryCommandBufferAbstract,
     },
     descriptor_set::{
-        layout::DescriptorSetLayout, DescriptorBufferInfo, PersistentDescriptorSet,
-        WriteDescriptorSet,
+        layout::DescriptorSetLayout, DescriptorBufferInfo, DescriptorSet, DescriptorSetWithOffsets,
+        PersistentDescriptorSet, WriteDescriptorSet,
     },
     device::{Device, Queue},
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
@@ -167,11 +167,7 @@ pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
     device: &Arc<Device>,
     descriptor_set_layout: Arc<DescriptorSetLayout>,
     buffer_count: usize,
-) -> (
-    DeviceSize,
-    Vec<(Subbuffer<C>, Subbuffer<S>)>,
-    Arc<PersistentDescriptorSet>,
-) {
+) -> Vec<(Subbuffer<C>, Subbuffer<S>, DescriptorSetWithOffsets)> {
     let c_size = size_of::<C>() as DeviceSize;
     let s_size = size_of::<S>() as DeviceSize;
     let total_size = c_size + s_size;
@@ -230,7 +226,7 @@ pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
     )
     .unwrap();
 
-    let buffers = (0..buffer_count as DeviceSize)
+    (0..buffer_count as DeviceSize)
         .map(|i| {
             let start = i * align;
             let c_end = start + c_size;
@@ -245,11 +241,12 @@ pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
                 .slice(c_end..s_end)
                 .reinterpret::<S>();
 
-            (cam_buffer, scene_buffer)
-        })
-        .collect();
+            let offset = (align * i) as u32;
+            let set = descriptor_set.clone().offsets([offset; 2]);
 
-    (align, buffers, descriptor_set)
+            (cam_buffer, scene_buffer, set)
+        })
+        .collect()
 }
 
 /// Create descriptor sets of a storage buffer containing an array of the given data type
