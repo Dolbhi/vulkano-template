@@ -71,13 +71,16 @@ impl FrameData {
         }
     }
 
-    pub fn update_objects_data(&self, render_objects: &Vec<RenderObject>) {
+    pub fn update_objects_data<'a>(
+        &self,
+        render_objects: impl Iterator<Item = &'a Arc<RenderObject>>,
+    ) {
         let mut storage_buffer_contents = self
             .objects_buffer
             .write()
-            .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
+            .unwrap_or_else(|e| panic!("Failed to write to object storage buffer\n{}", e));
 
-        for (i, render_object) in render_objects.iter().enumerate() {
+        for (i, render_object) in render_objects.enumerate() {
             storage_buffer_contents[i].render_matrix = render_object.get_transform_matrix().into();
             storage_buffer_contents[i].normal_matrix = render_object
                 .get_transform_matrix()

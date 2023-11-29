@@ -22,13 +22,13 @@ use vulkano::{
 use crate::VertexFull;
 
 /// Pipeline wrapper to handle its own recreation
-pub struct PipelineWrapper {
+pub struct PipelineHandler {
     vs: EntryPoint,
     fs: EntryPoint,
     pub pipeline: Arc<GraphicsPipeline>,
 }
 
-impl PipelineWrapper {
+impl PipelineHandler {
     pub fn new(
         device: Arc<Device>,
         vs: EntryPoint,
@@ -71,7 +71,7 @@ impl PipelineWrapper {
 /// - viewport: given
 /// - rasterization: culls back faces
 /// - depth stencil: simple
-fn window_size_dependent_pipeline(
+pub fn window_size_dependent_pipeline(
     device: Arc<Device>,
     vs: EntryPoint,
     fs: EntryPoint,

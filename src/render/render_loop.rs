@@ -1,4 +1,5 @@
-use std::iter::zip;
+use std::vec;
+use std::{collections::HashMap, iter::zip};
 // use std::mem::size_of;
 use std::path::Path;
 use std::sync::Arc;
@@ -12,11 +13,12 @@ use super::{
     render_data::{
         frame_data::FrameData,
         mesh::Mesh,
-        render_object::RenderObject,
+        render_object::{PipelineGroup, RenderObject},
         texture::{create_sampler, load_texture},
     },
     renderer::Renderer,
 };
+
 use crate::shaders::phong;
 use crate::{
     game_objects::Camera,
@@ -32,18 +34,22 @@ pub struct RenderLoop {
     frames: Vec<FrameData>,
     previous_frame_i: u32,
     total_seconds: f32,
-    render_objects: Vec<RenderObject>,
+    render_pipelines: Vec<PipelineGroup>,
+    sorted_objects: HashMap<String, Vec<Arc<RenderObject>>>,
+    render_objects: Vec<Arc<RenderObject>>,
 }
 
 impl RenderLoop {
     pub fn new(event_loop: &EventLoop<()>) -> Self {
         let mut renderer = Renderer::initialize(event_loop);
 
-        let render_objects = Self::init_render_objects(&mut renderer);
+        let (render_pipelines, sorted_objects, render_objects) =
+            Self::init_render_objects(&mut renderer);
 
         // global descriptors TODO: 1. Group dyanamics into its own struct 2. create independent layout not based on mat
-        let global_data = renderer.create_scene_buffers(&String::from("basic"));
-        let object_uniforms = renderer.create_object_buffers(&String::from("basic"));
+        let layout = render_pipelines[0].pipeline.layout();
+        let global_data = renderer.create_scene_buffers(layout);
+        let object_uniforms = renderer.create_object_buffers(layout);
 
         // create frame data
         let frames = zip(global_data, object_uniforms)
@@ -74,6 +80,8 @@ impl RenderLoop {
             frames,
             previous_frame_i: 0,
             total_seconds: 0.0,
+            render_pipelines,
+            sorted_objects,
             render_objects,
         }
     }
@@ -93,7 +101,8 @@ impl RenderLoop {
         if self.window_resized {
             self.window_resized = false;
             self.recreate_swapchain = false;
-            self.renderer.handle_window_resize();
+            self.renderer
+                .handle_window_resize(&mut self.render_pipelines);
         } else if self.recreate_swapchain {
             self.recreate_swapchain = false;
             self.renderer.recreate_swapchain();
@@ -155,9 +164,10 @@ impl RenderLoop {
             previous_future,
             acquire_future,
             image_i,
-            &self.render_objects,
-            global_descriptor.clone(),
-            objects_descriptor.clone(),
+            &self.render_pipelines,
+            &mut self.sorted_objects,
+            &global_descriptor,
+            &objects_descriptor,
         );
         // replace fence of upcoming image with new one
         self.frames[image_i as usize].fence = match result {
@@ -183,22 +193,26 @@ impl RenderLoop {
         self.renderer.window.request_redraw();
     }
 
-    fn init_render_objects(renderer: &mut Renderer) -> Vec<RenderObject> {
+    fn init_render_objects(
+        renderer: &mut Renderer,
+    ) -> (
+        Vec<PipelineGroup>,
+        HashMap<String, Vec<Arc<RenderObject>>>,
+        Vec<Arc<RenderObject>>,
+    ) {
         // pipelines
-        let basic_shader_id = String::from("basic");
-        let phong_shader_id = String::from("phong");
-        let uv_shader_id = String::from("uv");
-        {
-            let vertex_shader = basic::vs::load(renderer.device.clone())
-                .expect("failed to create shader module")
-                .entry_point("main")
-                .unwrap();
-            let fragment_shader = basic::fs::load(renderer.device.clone())
-                .expect("failed to create shader module")
-                .entry_point("main")
-                .unwrap();
-            renderer.init_pipeline(basic_shader_id.clone(), vertex_shader, fragment_shader);
-
+        // let mut basic_pipeline = {
+        //     let vertex_shader = basic::vs::load(renderer.device.clone())
+        //         .expect("failed to create shader module")
+        //         .entry_point("main")
+        //         .unwrap();
+        //     let fragment_shader = basic::fs::load(renderer.device.clone())
+        //         .expect("failed to create shader module")
+        //         .entry_point("main")
+        //         .unwrap();
+        //     PipelineGroup::new(renderer.create_pipeline(vertex_shader, fragment_shader))
+        // };
+        let mut phong_pipeline = {
             let vertex_shader = phong::vs::load(renderer.device.clone())
                 .expect("failed to create shader module")
                 .entry_point("main")
@@ -207,8 +221,9 @@ impl RenderLoop {
                 .expect("failed to create shader module")
                 .entry_point("main")
                 .unwrap();
-            renderer.init_pipeline(phong_shader_id.clone(), vertex_shader, fragment_shader);
-
+            PipelineGroup::new(renderer.create_pipeline(vertex_shader, fragment_shader))
+        };
+        let mut uv_pipeline = {
             let vertex_shader = uv::vs::load(renderer.device.clone())
                 .expect("failed to create shader module")
                 .entry_point("main")
@@ -217,8 +232,8 @@ impl RenderLoop {
                 .expect("failed to create shader module")
                 .entry_point("main")
                 .unwrap();
-            renderer.init_pipeline(uv_shader_id.clone(), vertex_shader, fragment_shader);
-        }
+            PipelineGroup::new(renderer.create_pipeline(vertex_shader, fragment_shader))
+        };
 
         // Texture
         let le_texture = load_texture(
@@ -241,24 +256,39 @@ impl RenderLoop {
         );
 
         // materials
+        let mut objects_hash = HashMap::new();
         //  lost empire
-        let le_mat = renderer.init_material_with_texture(
-            phong_shader_id.clone(),
-            le_texture,
-            linear_sampler.clone(),
+        let le_mat_id = "lost_empire".to_string();
+        phong_pipeline.add_material(
+            le_mat_id.clone(),
+            Some(phong_pipeline.create_material_set(
+                &renderer.allocators,
+                2,
+                le_texture,
+                linear_sampler.clone(),
+            )),
         );
+        objects_hash.insert(le_mat_id.clone(), vec![]);
 
         //  ina
-        let ina_materials = ina_textures.map(|tex| {
-            renderer.init_material_with_texture(
-                phong_shader_id.clone(),
-                tex,
-                linear_sampler.clone(),
-            )
-        });
+        let ina_ids = ["hair", "cloth", "body", "head"].map(|s| s.to_string());
+        for (id, tex) in zip(ina_ids.clone(), ina_textures) {
+            phong_pipeline.add_material(
+                id.clone(),
+                Some(phong_pipeline.create_material_set(
+                    &renderer.allocators,
+                    2,
+                    tex,
+                    linear_sampler.clone(),
+                )),
+            );
+            objects_hash.insert(id, vec![]);
+        }
 
         //  uv
-        let uv_mat = renderer.init_material(uv_shader_id.clone());
+        let uv_mat_id = "uv".to_string();
+        uv_pipeline.add_material(uv_mat_id.clone(), None);
+        objects_hash.insert(uv_mat_id.clone(), vec![]);
 
         // meshes
         //      suzanne
@@ -340,34 +370,38 @@ impl RenderLoop {
         println!("Lost empire mesh count: {}", le_meshes.len());
         println!("Ina mesh count: {}", ina_meshes.len());
 
-        renderer.debug_assets();
-
         // objects
-        let mut render_objects = Vec::<RenderObject>::new();
+        let mut render_objects = Vec::new();
         //  Suzanne
-        render_objects.push(RenderObject::new(suzanne, uv_mat.clone()));
+        render_objects.push(Arc::new(RenderObject::new(suzanne, uv_mat_id.clone())));
 
         //  Squares
         for (x, y, z) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
-            let mut square_obj = RenderObject::new(square.clone(), uv_mat.clone());
+            let mut square_obj = RenderObject::new(square.clone(), uv_mat_id.clone());
             square_obj.update_transform([x as f32, y as f32, z as f32], cgmath::Rad(0.));
-            render_objects.push(square_obj)
+
+            render_objects.push(Arc::new(square_obj));
         }
 
         //  Ina
-        for (mesh, mat) in zip(ina_meshes, ina_materials) {
-            let mut obj = RenderObject::new(mesh, mat);
+        for (mesh, mat_id) in zip(ina_meshes, ina_ids.clone()) {
+            let mut obj = RenderObject::new(mesh, mat_id);
             obj.update_transform([0.0, 5.0, -1.0], cgmath::Rad(0.));
-            render_objects.push(obj);
+
+            render_objects.push(Arc::new(obj));
         }
 
         //  lost empires
         for mesh in le_meshes {
-            let le_obj = RenderObject::new(mesh, le_mat.clone());
-            render_objects.push(le_obj);
+            render_objects.push(Arc::new(RenderObject::new(mesh, le_mat_id.clone())));
         }
 
-        render_objects
+        (
+            // vec![basic_pipeline, phong_pipeline, uv_pipeline],
+            vec![phong_pipeline, uv_pipeline],
+            objects_hash,
+            render_objects,
+        )
     }
 
     /// write gpu data to respective buffers
@@ -375,8 +409,28 @@ impl RenderLoop {
         let frame = &mut self.frames[image_i as usize];
 
         // update object data
-        self.render_objects[0].update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));
-        frame.update_objects_data(&self.render_objects);
+        match Arc::get_mut(&mut self.render_objects[0]) {
+            Some(obj) => {
+                obj.update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));
+            }
+            None => {
+                panic!("Unable to update render object");
+            }
+        }
+        // sort renderobjects
+        for obj in self.render_objects.iter() {
+            self.sorted_objects
+                .get_mut(&obj.material_id)
+                .unwrap()
+                .push(obj.clone());
+        }
+        let obj_iter = self.render_pipelines.iter().flat_map(|pipeline| {
+            pipeline
+                .materials
+                .iter()
+                .flat_map(|mat| self.sorted_objects[&mat.id].iter())
+        });
+        frame.update_objects_data(obj_iter);
 
         // update camera
         let extends = self.renderer.window.inner_size();

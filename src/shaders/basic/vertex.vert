@@ -11,8 +11,6 @@ layout(set = 0, binding = 0) uniform GPUCameraData {
     mat4 view_proj;
 } cameraData;
 struct GPUObjectData {
-    // vec3 color;
-	vec4 data;
 	mat4 render_matrix;
     mat4 normal_matrix;
 };

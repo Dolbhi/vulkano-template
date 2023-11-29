@@ -1,4 +1,4 @@
-use std::{collections::hash_map::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     shaders::basic::{
@@ -9,17 +9,17 @@ use crate::{
         self,
         allocators::Allocators,
         buffers::{self, create_storage_buffers},
-        pipeline::PipelineWrapper,
+        pipeline::PipelineHandler,
     },
 };
 use vulkano::{
     buffer::Subbuffer,
     command_buffer::{self, RenderPassBeginInfo},
-    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
+    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
-    image::{sampler::Sampler, view::ImageView, Image},
+    image::Image,
     instance::Instance,
-    pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint},
+    pipeline::{graphics::viewport::Viewport, PipelineLayout},
     render_pass::{Framebuffer, RenderPass},
     shader::EntryPoint,
     swapchain::{
@@ -39,7 +39,7 @@ use winit::{
     window::{CursorGrabMode, Window, WindowBuilder},
 };
 
-use super::render_data::{material::Material, render_object::RenderObject};
+use super::render_data::render_object::{PipelineGroup, RenderObject};
 
 pub type Fence = FenceSignalFuture<
     PresentFuture<
@@ -62,7 +62,6 @@ pub struct Renderer {
     framebuffers: Vec<Arc<Framebuffer>>, // deferred examples remakes fb's every frame
     pub allocators: Allocators,
     viewport: Viewport,
-    pipelines: HashMap<String, PipelineWrapper>,
 }
 
 impl Renderer {
@@ -148,7 +147,6 @@ impl Renderer {
             framebuffers,
             allocators,
             viewport,
-            pipelines: HashMap::new(),
         }
     }
 
@@ -173,12 +171,12 @@ impl Renderer {
     }
 
     /// recreates swapchain and framebuffers, followed by the pipeline with new viewport dimensions
-    pub fn handle_window_resize(&mut self) {
+    pub fn handle_window_resize(&mut self, pipelines: &mut Vec<PipelineGroup>) {
         self.recreate_swapchain();
         self.viewport.extent = self.window.inner_size().into();
 
-        for (_, v) in &mut self.pipelines {
-            v.recreate_pipeline(
+        for pipeline in pipelines {
+            pipeline.pipeline.recreate_pipeline(
                 self.device.clone(),
                 self.render_pass.clone(),
                 self.viewport.clone(),
@@ -206,9 +204,10 @@ impl Renderer {
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
-        render_objects: &Vec<RenderObject>,
-        global_descriptor: DescriptorSetWithOffsets,
-        objects_descriptor: DescriptorSetWithOffsets,
+        pipelines: &Vec<PipelineGroup>,
+        render_objects: &mut HashMap<String, Vec<Arc<RenderObject>>>,
+        global_descriptor: &DescriptorSetWithOffsets,
+        objects_descriptor: &DescriptorSetWithOffsets,
     ) -> Result<Fence, Validated<VulkanError>> {
         let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
@@ -227,78 +226,15 @@ impl Renderer {
             )
             .unwrap();
 
-        let mut last_pipe_id = &String::new();
-        let mut last_mat = None;
-        let mut last_mesh = None;
-        let mut last_buffer_len = 0;
-        // println!(
-        //     "Data size: {}, Calculated alignment: {}",
-        //     size_of::<GPUSceneData>(),
-        //     align
-        // );
-        // println!("Begin draw");
-        for (index, render_obj) in render_objects.iter().enumerate() {
-            // material
-            // println!(
-            //     "[Rendering Obj] Mesh ID: {}, Mat ID: {}",
-            //     render_obj.mesh_id, render_obj.material_id
-            // );
-            match last_mat {
-                Some(old_mat) if Arc::ptr_eq(old_mat, &render_obj.material) => {
-                    // println!("Same material, skipping...");
-                }
-                _ => {
-                    let material = &render_obj.material;
-
-                    // pipeline
-                    if last_pipe_id != &material.pipeline_id {
-                        let pipeline = &self.pipelines[&material.pipeline_id].pipeline;
-                        builder
-                            .bind_pipeline_graphics(pipeline.clone())
-                            .unwrap()
-                            .bind_descriptor_sets(
-                                PipelineBindPoint::Graphics,
-                                pipeline.layout().clone(),
-                                0,
-                                vec![global_descriptor.clone(), objects_descriptor.clone()],
-                            )
-                            .unwrap();
-
-                        last_pipe_id = &material.pipeline_id;
-                    }
-
-                    material.bind_sets(&mut builder);
-
-                    last_mat = Some(&render_obj.material);
-                }
-            }
-
-            // mesh (vertices and indicies)
-            match last_mesh {
-                Some(old_mesh) if Arc::ptr_eq(old_mesh, &render_obj.mesh) => {
-                    // println!("Same mesh, skipping...");
-                }
-                _ => {
-                    let buffers = &render_obj.mesh;
-                    let index_buffer = buffers.get_index();
-                    let index_buffer_length = index_buffer.len();
-
-                    builder
-                        .bind_vertex_buffers(0, buffers.get_vertex())
-                        .unwrap()
-                        .bind_index_buffer(index_buffer)
-                        .unwrap();
-
-                    last_mesh = Some(&render_obj.mesh);
-                    last_buffer_len = index_buffer_length;
-                }
-            }
-
-            // draw
-            builder
-                .draw_indexed(last_buffer_len as u32, 1, 0, 0, index as u32)
-                .unwrap();
+        for pipeline_group in pipelines {
+            pipeline_group.draw_objects(
+                global_descriptor,
+                objects_descriptor,
+                &mut builder,
+                render_objects,
+            );
         }
+
         builder.end_render_pass(Default::default()).unwrap();
 
         // Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
@@ -313,68 +249,60 @@ impl Renderer {
             .then_signal_fence_and_flush()
     }
 
-    pub fn init_pipeline(
+    pub fn create_pipeline(
         &mut self,
-        id: String,
         vertex_shader: EntryPoint,
         fragment_shader: EntryPoint,
-    ) {
-        self.pipelines.insert(
-            id,
-            PipelineWrapper::new(
-                self.device.clone(),
-                vertex_shader.clone(),
-                fragment_shader.clone(),
-                self.viewport.clone(),
-                self.render_pass.clone(),
-            ),
-        );
-    }
-    pub fn get_pipeline(&self, id: &String) -> &PipelineWrapper {
-        &self.pipelines[id]
-    }
-
-    fn init_material_with_sets(
-        &mut self,
-        pipeline_id: String,
-        material_sets: Vec<Arc<PersistentDescriptorSet>>,
-    ) -> Arc<Material> {
-        let layout = self.pipelines[&pipeline_id].layout().clone();
-
-        Arc::new(Material {
-            layout,
-            material_sets,
-            pipeline_id,
-        })
-    }
-    pub fn init_material(&mut self, pipeline_id: String) -> Arc<Material> {
-        self.init_material_with_sets(pipeline_id, vec![])
-    }
-    pub fn init_material_with_texture(
-        &mut self,
-        pipeline_id: String,
-        texture: Arc<ImageView>,
-        sampler: Arc<Sampler>,
-    ) -> Arc<Material> {
-        let set = PersistentDescriptorSet::new(
-            &self.allocators.descriptor_set,
-            self.pipelines[&pipeline_id]
-                .layout()
-                .set_layouts()
-                .get(2)
-                .unwrap()
-                .clone(),
-            [WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
-            [],
+    ) -> PipelineHandler {
+        PipelineHandler::new(
+            self.device.clone(),
+            vertex_shader.clone(),
+            fragment_shader.clone(),
+            self.viewport.clone(),
+            self.render_pass.clone(),
         )
-        .unwrap();
-        self.init_material_with_sets(pipeline_id, vec![set])
     }
+
+    // fn init_material_with_sets(
+    //     &mut self,
+    //     pipeline_id: String,
+    //     material_sets: Vec<Arc<PersistentDescriptorSet>>,
+    // ) -> Arc<Material> {
+    //     let layout = self.pipelines[&pipeline_id].layout().clone();
+    //     Arc::new(Material {
+    //         layout,
+    //         material_sets,
+    //         pipeline_id,
+    //     })
+    // }
+    // pub fn init_material(&mut self, pipeline_id: String) -> Arc<Material> {
+    //     self.init_material_with_sets(pipeline_id, vec![])
+    // }
+    // pub fn init_material_with_texture(
+    //     &mut self,
+    //     pipeline_id: String,
+    //     texture: Arc<ImageView>,
+    //     sampler: Arc<Sampler>,
+    // ) -> Arc<Material> {
+    //     let set = PersistentDescriptorSet::new(
+    //         &self.allocators.descriptor_set,
+    //         self.pipelines[&pipeline_id]
+    //             .layout()
+    //             .set_layouts()
+    //             .get(2)
+    //             .unwrap()
+    //             .clone(),
+    //         [WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
+    //         [],
+    //     )
+    //     .unwrap();
+    //     self.init_material_with_sets(pipeline_id, vec![set])
+    // }
 
     /// See `buffers::create_global_descriptors`
     pub fn create_scene_buffers(
         &self,
-        pipeline_id: &String,
+        layout: &Arc<PipelineLayout>,
     ) -> Vec<(
         Subbuffer<GPUCameraData>,
         Subbuffer<GPUSceneData>,
@@ -383,34 +311,20 @@ impl Renderer {
         buffers::create_global_descriptors::<GPUCameraData, GPUSceneData>(
             &self.allocators,
             &self.device,
-            self.pipelines[pipeline_id]
-                .layout()
-                .set_layouts()
-                .get(0)
-                .unwrap()
-                .clone(),
+            layout.set_layouts().get(0).unwrap().clone(),
             self.swapchain.image_count() as usize,
         )
     }
 
     pub fn create_object_buffers(
         &self,
-        pipeline_id: &String,
+        layout: &Arc<PipelineLayout>,
     ) -> Vec<(Subbuffer<[GPUObjectData]>, Arc<PersistentDescriptorSet>)> {
         create_storage_buffers(
             &self.allocators,
-            self.pipelines[pipeline_id]
-                .layout()
-                .set_layouts()
-                .get(1)
-                .unwrap()
-                .clone(),
+            layout.set_layouts().get(1).unwrap().clone(),
             self.swapchain.image_count() as usize,
             10000,
         )
-    }
-
-    pub fn debug_assets(&self) {
-        println!("Pipelines: {:?}", self.pipelines.keys(),);
     }
 }
