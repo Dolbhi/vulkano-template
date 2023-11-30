@@ -9,6 +9,7 @@ use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use winit::event_loop::EventLoop;
 
+use super::renderer::Fence;
 use super::{
     render_data::{
         frame_data::FrameData,
@@ -32,6 +33,7 @@ pub struct RenderLoop {
     recreate_swapchain: bool,
     window_resized: bool,
     frames: Vec<FrameData>,
+    fences: Vec<Option<Arc<Fence>>>,
     previous_frame_i: u32,
     total_seconds: f32,
     render_pipelines: Vec<PipelineGroup>,
@@ -52,7 +54,7 @@ impl RenderLoop {
         let object_uniforms = renderer.create_object_buffers(layout);
 
         // create frame data
-        let frames = zip(global_data, object_uniforms)
+        let frames: Vec<FrameData> = zip(global_data, object_uniforms)
             .into_iter()
             .map(
                 |((cam_buffer, scene_buffer, global_set), (storage_buffer, object_descriptor))| {
@@ -73,11 +75,14 @@ impl RenderLoop {
             )
             .collect();
 
+        let fences = vec![None; frames.len()]; //(0..frames.len()).map(|_| None).collect();
+
         Self {
             renderer,
             recreate_swapchain: false,
             window_resized: false,
             frames,
+            fences,
             previous_frame_i: 0,
             total_seconds: 0.0,
             render_pipelines,
@@ -123,7 +128,7 @@ impl RenderLoop {
         }
 
         // wait for upcoming image to be ready (it should be by this point)
-        if let Some(image_fence) = &mut self.frames[image_i as usize].fence {
+        if let Some(image_fence) = &mut self.fences[image_i as usize] {
             // image_fence.wait(None).unwrap();
             image_fence.cleanup_finished();
         }
@@ -132,7 +137,7 @@ impl RenderLoop {
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
         let something_needs_all_gpu_resources = false;
-        let previous_future = match self.frames[self.previous_frame_i as usize].fence.clone() {
+        let previous_future = match self.fences[self.previous_frame_i as usize].clone() {
             None => self.renderer.synchronize().boxed(),
             Some(fence) => {
                 if something_needs_all_gpu_resources {
@@ -170,7 +175,7 @@ impl RenderLoop {
             &objects_descriptor,
         );
         // replace fence of upcoming image with new one
-        self.frames[image_i as usize].fence = match result {
+        self.fences[image_i as usize] = match result {
             Ok(fence) => Some(Arc::new(fence)),
             Err(Validated::Error(VulkanError::OutOfDate)) => {
                 self.recreate_swapchain = true;

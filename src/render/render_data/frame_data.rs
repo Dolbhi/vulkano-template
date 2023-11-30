@@ -12,7 +12,7 @@ use crate::render::renderer::Fence;
 use super::render_object::RenderObject;
 
 pub struct FrameData {
-    pub fence: Option<Arc<Fence>>,
+    // pub fence: Option<Arc<Fence>>,
     camera_buffer: Subbuffer<GPUCameraData>,
     global_buffer: Subbuffer<GPUSceneData>,
     objects_buffer: Subbuffer<[GPUObjectData]>,
@@ -29,7 +29,7 @@ impl FrameData {
         objects_descriptor: DescriptorSetWithOffsets,
     ) -> Self {
         FrameData {
-            fence: None,
+            // fence: None,
             camera_buffer,
             global_buffer,
             global_descriptor,
