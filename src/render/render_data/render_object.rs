@@ -57,7 +57,7 @@ impl RenderObject<Matrix4<f32>> {
 
 pub struct PipelineGroup {
     pub pipeline: PipelineHandler,
-    pub materials: Vec<MaterialGroup>,
+    materials: Vec<Material>,
 }
 
 impl PipelineGroup {
@@ -128,24 +128,8 @@ impl PipelineGroup {
         }
     }
 
-    // pub fn upload_objects<T: Iterator<Item = Arc<RenderObject>>>(
-    //     &mut self,
-    //     render_objects: &mut T,
-    // ) {
-    //     self.clear_objects();
-    //     for render_object in render_objects {
-    //         self.objects[&render_object.material_id].push(render_object.clone());
-    //     }
-    // }
-    // fn clear_objects(&mut self) {
-    //     // clear meshes
-    //     for mat in &self.materials {
-    //         self.objects[&mat.id].clear();
-    //     }
-    // }
-
     pub fn add_material(&mut self, id: String, set: Option<Arc<PersistentDescriptorSet>>) {
-        let material = MaterialGroup {
+        let material = Material {
             id,
             descriptor_set: set,
         };
@@ -173,14 +157,17 @@ impl PipelineGroup {
         )
         .unwrap()
     }
+    pub fn material_iter(&self) -> impl Iterator<Item = &String> {
+        self.materials.iter().map(|mat| &mat.id)
+    }
 }
 
-pub struct MaterialGroup {
+struct Material {
     pub id: String,
     pub descriptor_set: Option<Arc<PersistentDescriptorSet>>,
 }
-impl MaterialGroup {
-    pub fn bind_sets<T, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
+impl Material {
+    fn bind_sets<T, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &self,
         layout: &Arc<PipelineLayout>,
         command_builder: &mut AutoCommandBufferBuilder<T, A>,

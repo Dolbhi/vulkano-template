@@ -159,9 +159,8 @@ impl RenderData {
         // update renderobjects
         let obj_iter = self.pipelines.iter().flat_map(|pipeline| {
             pipeline
-                .materials
-                .iter()
-                .flat_map(|mat| self.pending_objects[&mat.id].iter())
+                .material_iter()
+                .flat_map(|mat_id| self.pending_objects[mat_id].iter())
         });
         let frame = &mut self.frames[image_i as usize];
         frame.update_objects_data(obj_iter);

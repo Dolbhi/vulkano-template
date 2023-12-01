@@ -45,33 +45,6 @@ impl RenderLoop {
 
         let (render_data, render_objects) = Self::init_render_objects(&mut renderer);
 
-        // // global descriptors TODO: 1. Group dyanamics into its own struct 2. create independent layout not based on mat
-        // let layout = render_pipelines[0].pipeline.layout();
-        // let global_data = renderer.create_scene_buffers(layout);
-        // let object_uniforms = renderer.create_object_buffers(layout);
-
-        // // create frame data
-        // let frames: Vec<FrameData> = zip(global_data, object_uniforms)
-        //     .into_iter()
-        //     .map(
-        //         |((cam_buffer, scene_buffer, global_set), (storage_buffer, object_descriptor))| {
-        //             let mut frame = FrameData::new(
-        //                 cam_buffer,
-        //                 scene_buffer,
-        //                 global_set,
-        //                 storage_buffer,
-        //                 object_descriptor.into(),
-        //             );
-        //             frame.update_scene_data(
-        //                 Some([0.2, 0.2, 0.2, 1.]),
-        //                 None,
-        //                 Some([0.9, 0.9, 0.6, 1.]),
-        //             );
-        //             frame
-        //         },
-        //     )
-        //     .collect();
-
         let fences = vec![None; renderer.swapchain.image_count() as usize]; //(0..frames.len()).map(|_| None).collect();
 
         Self {
