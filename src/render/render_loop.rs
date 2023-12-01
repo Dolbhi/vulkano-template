@@ -20,10 +20,12 @@ use super::{
     renderer::Renderer,
 };
 
-use crate::shaders::phong;
 use crate::{
     game_objects::Camera,
-    shaders::{basic, uv},
+    shaders::{
+        basic::{self, vs::GPUObjectData},
+        phong, uv,
+    },
     vulkano_objects::buffers::Buffers,
     VertexFull,
 };
@@ -35,8 +37,8 @@ pub struct RenderLoop {
     fences: Vec<Option<Arc<Fence>>>,
     previous_frame_i: u32,
     total_seconds: f32,
-    render_data: RenderData,
-    render_objects: Vec<Arc<RenderObject<cgmath::Matrix4<f32>>>>,
+    render_data: RenderData<GPUObjectData, Matrix4<f32>>,
+    render_objects: Vec<Arc<RenderObject<Matrix4<f32>>>>,
 }
 
 impl RenderLoop {
@@ -151,7 +153,10 @@ impl RenderLoop {
 
     fn init_render_objects(
         renderer: &mut Renderer,
-    ) -> (RenderData, Vec<Arc<RenderObject<Matrix4<f32>>>>) {
+    ) -> (
+        RenderData<GPUObjectData, Matrix4<f32>>,
+        Vec<Arc<RenderObject<Matrix4<f32>>>>,
+    ) {
         // pipelines
         let mut data = {
             let vertex_shader = basic::vs::load(renderer.device.clone())

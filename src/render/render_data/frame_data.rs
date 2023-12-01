@@ -1,29 +1,28 @@
 use std::sync::Arc;
 
-use crate::shaders::basic::{
-    fs::GPUSceneData,
-    vs::{GPUCameraData, GPUObjectData},
-};
+use crate::shaders::basic::{fs::GPUSceneData, vs::GPUCameraData};
 use cgmath::Matrix4;
-use vulkano::{buffer::Subbuffer, descriptor_set::DescriptorSetWithOffsets};
+use vulkano::{
+    buffer::{BufferContents, Subbuffer},
+    descriptor_set::DescriptorSetWithOffsets,
+};
 
 use super::render_object::RenderObject;
 
-pub struct FrameData {
-    // pub fence: Option<Arc<Fence>>,
+pub struct FrameData<O: BufferContents> {
     camera_buffer: Subbuffer<GPUCameraData>,
     global_buffer: Subbuffer<GPUSceneData>,
-    objects_buffer: Subbuffer<[GPUObjectData]>,
+    objects_buffer: Subbuffer<[O]>,
     pub global_descriptor: DescriptorSetWithOffsets,
     pub objects_descriptor: DescriptorSetWithOffsets,
 }
 
-impl FrameData {
+impl<O: BufferContents> FrameData<O> {
     pub fn new(
         camera_buffer: Subbuffer<GPUCameraData>,
         global_buffer: Subbuffer<GPUSceneData>,
         global_descriptor: DescriptorSetWithOffsets,
-        objects_buffer: Subbuffer<[GPUObjectData]>,
+        objects_buffer: Subbuffer<[O]>,
         objects_descriptor: DescriptorSetWithOffsets,
     ) -> Self {
         FrameData {
@@ -73,7 +72,7 @@ impl FrameData {
         &self,
         render_objects: impl Iterator<Item = &'a Arc<RenderObject<T>>>,
     ) where
-        T: Into<GPUObjectData> + Clone + 'a,
+        T: Into<O> + Clone + 'a,
     {
         let mut storage_buffer_contents = self
             .objects_buffer
@@ -82,13 +81,6 @@ impl FrameData {
 
         for (i, render_object) in render_objects.enumerate() {
             storage_buffer_contents[i] = render_object.get_data().into();
-            // storage_buffer_contents[i].render_matrix = render_object.get_transform_matrix().into();
-            // storage_buffer_contents[i].normal_matrix = render_object
-            //     .get_transform_matrix()
-            //     .inverse_transform()
-            //     .unwrap()
-            //     .transpose()
-            //     .into();
         }
     }
 }

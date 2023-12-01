@@ -1,8 +1,8 @@
 use std::{collections::HashMap, iter::zip, sync::Arc, vec};
 
 use vulkano::{
-    command_buffer::AutoCommandBufferBuilder, descriptor_set::PersistentDescriptorSet,
-    shader::EntryPoint,
+    buffer::BufferContents, command_buffer::AutoCommandBufferBuilder,
+    descriptor_set::PersistentDescriptorSet, shader::EntryPoint,
 };
 
 use crate::{
@@ -14,10 +14,7 @@ use crate::{
     },
 };
 
-use self::{
-    frame_data::FrameData,
-    render_object::{PipelineGroup, RenderObject},
-};
+use self::{frame_data::FrameData, material::PipelineGroup, render_object::RenderObject};
 
 use super::renderer::Renderer;
 
@@ -28,13 +25,21 @@ pub mod render_object;
 pub mod texture;
 
 /// Collection of all data needed for rendering
-pub struct RenderData {
+pub struct RenderData<O, T>
+where
+    O: BufferContents + From<T>,
+    T: Clone,
+{
     pipelines: Vec<PipelineGroup>,
-    frames: Vec<FrameData>,
-    pending_objects: HashMap<String, Vec<Arc<RenderObject<cgmath::Matrix4<f32>>>>>,
+    frames: Vec<FrameData<O>>,
+    pending_objects: HashMap<String, Vec<Arc<RenderObject<T>>>>,
 }
 
-impl RenderData {
+impl<'a, O, T> RenderData<O, T>
+where
+    O: BufferContents + From<T>,
+    T: Clone + 'a,
+{
     /// creates a pipelines collection using 1 pipeline that future added pipelines must match
     pub fn new(context: &Renderer, vs: EntryPoint, fs: EntryPoint) -> Self {
         // initialize
@@ -116,10 +121,10 @@ impl RenderData {
     }
 
     /// bind draw calls to the given command buffer builder, be sure to call `upload_draw_data()` before hand
-    pub fn render<T, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
+    pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &mut self,
         image_i: usize,
-        command_builder: &mut AutoCommandBufferBuilder<T, A>,
+        command_builder: &mut AutoCommandBufferBuilder<P, A>,
     ) {
         let frame = &self.frames[image_i];
         for pipeline_group in self.pipelines.iter() {
@@ -132,9 +137,9 @@ impl RenderData {
         }
     }
     /// write gpu data to respective buffers (currently auto rotates sunlight)
-    pub fn upload_draw_data<'a>(
+    pub fn upload_draw_data(
         &mut self,
-        objects: impl Iterator<Item = &'a Arc<RenderObject<cgmath::Matrix4<f32>>>>,
+        objects: impl Iterator<Item = &'a Arc<RenderObject<T>>>,
         camera_data: &Camera,
         aspect: f32,
         image_i: u32,

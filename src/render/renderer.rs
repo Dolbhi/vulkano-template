@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::vulkano_objects::{self, allocators::Allocators};
 use vulkano::{
+    buffer::BufferContents,
     command_buffer::{self, RenderPassBeginInfo},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
     image::Image,
@@ -184,13 +185,17 @@ impl Renderer {
     }
 
     /// Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
-    pub fn flush_next_future(
+    pub fn flush_next_future<O, T>(
         &self,
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
-        render_data: &mut RenderData,
-    ) -> Result<Fence, Validated<VulkanError>> {
+        render_data: &mut RenderData<O, T>,
+    ) -> Result<Fence, Validated<VulkanError>>
+    where
+        O: BufferContents + From<T>,
+        T: Clone,
+    {
         let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
             self.queue.queue_family_index(),
