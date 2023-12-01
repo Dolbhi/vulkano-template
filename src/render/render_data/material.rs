@@ -27,12 +27,13 @@ impl PipelineGroup {
     /// NOTE: clears object vecs
     pub fn draw_objects<T: Clone, C, A: CommandBufferAllocator>(
         &self,
+        object_index: &mut u32,
         global_descriptor: &DescriptorSetWithOffsets,
         objects_descriptor: &DescriptorSetWithOffsets,
         command_builder: &mut AutoCommandBufferBuilder<C, A>,
         objects: &mut HashMap<String, Vec<Arc<RenderObject<T>>>>,
     ) {
-        let mut index = 0;
+        // let mut index = 0;
         // bind pipeline
         command_builder
             .bind_pipeline_graphics(self.pipeline.pipeline.clone())
@@ -74,9 +75,9 @@ impl PipelineGroup {
 
                 // draw
                 command_builder
-                    .draw_indexed(last_buffer_len as u32, 1, 0, 0, index as u32)
+                    .draw_indexed(last_buffer_len as u32, 1, 0, 0, *object_index)
                     .unwrap();
-                index += 1;
+                *object_index += 1;
             }
 
             // clear render objects

@@ -127,8 +127,10 @@ where
         command_builder: &mut AutoCommandBufferBuilder<P, A>,
     ) {
         let frame = &self.frames[image_i];
+        let mut object_index = 0;
         for pipeline_group in self.pipelines.iter() {
             pipeline_group.draw_objects(
+                &mut object_index,
                 &frame.global_descriptor,
                 &frame.objects_descriptor,
                 command_builder,
