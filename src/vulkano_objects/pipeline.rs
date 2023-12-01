@@ -120,7 +120,7 @@ pub fn window_size_dependent_pipeline(
             viewport_state: Some(ViewportState {
                 viewports: [Viewport {
                     offset: [0.0, 0.0],
-                    extent: [viewport.extent[0] as f32, viewport.extent[1] as f32],
+                    extent: viewport.extent,
                     depth_range: 0.0..=1.0,
                 }]
                 .into_iter()

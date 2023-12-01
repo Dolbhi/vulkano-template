@@ -1,27 +1,13 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
-use crate::{
-    shaders::basic::{
-        fs::GPUSceneData,
-        vs::{GPUCameraData, GPUObjectData},
-    },
-    vulkano_objects::{
-        self,
-        allocators::Allocators,
-        buffers::{self, create_storage_buffers},
-        pipeline::PipelineHandler,
-    },
-};
+use crate::vulkano_objects::{self, allocators::Allocators};
 use vulkano::{
-    buffer::Subbuffer,
     command_buffer::{self, RenderPassBeginInfo},
-    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
     image::Image,
     instance::Instance,
-    pipeline::{graphics::viewport::Viewport, PipelineLayout},
+    pipeline::graphics::viewport::Viewport,
     render_pass::{Framebuffer, RenderPass},
-    shader::EntryPoint,
     swapchain::{
         self, PresentFuture, Surface, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
         SwapchainPresentInfo,
@@ -39,7 +25,7 @@ use winit::{
     window::{CursorGrabMode, Window, WindowBuilder},
 };
 
-use super::render_data::render_object::{PipelineGroup, RenderObject};
+use super::render_data::RenderData;
 
 pub type Fence = FenceSignalFuture<
     PresentFuture<
@@ -56,12 +42,12 @@ pub struct Renderer {
     pub window: Arc<Window>, // pending refactor with swapchain
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
-    swapchain: Arc<Swapchain>,
+    pub swapchain: Arc<Swapchain>,
     images: Vec<Arc<Image>>, // only used for getting image count
-    render_pass: Arc<RenderPass>,
+    pub render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>, // deferred examples remakes fb's every frame
     pub allocators: Allocators,
-    viewport: Viewport,
+    pub viewport: Viewport,
 }
 
 impl Renderer {
@@ -171,18 +157,17 @@ impl Renderer {
     }
 
     /// recreates swapchain and framebuffers, followed by the pipeline with new viewport dimensions
-    pub fn handle_window_resize(&mut self, pipelines: &mut Vec<PipelineGroup>) {
-        self.recreate_swapchain();
-        self.viewport.extent = self.window.inner_size().into();
-
-        for pipeline in pipelines {
-            pipeline.pipeline.recreate_pipeline(
-                self.device.clone(),
-                self.render_pass.clone(),
-                self.viewport.clone(),
-            );
-        }
-    }
+    // pub fn handle_window_resize(&mut self, pipelines: &mut Vec<PipelineGroup>) {
+    //     self.recreate_swapchain();
+    //     self.viewport.extent = self.window.inner_size().into();
+    //     for pipeline in pipelines {
+    //         pipeline.pipeline.recreate_pipeline(
+    //             self.device.clone(),
+    //             self.render_pass.clone(),
+    //             self.viewport.clone(),
+    //         );
+    //     }
+    // }
 
     /// Gets future where next image in swapchain is ready
     pub fn acquire_swapchain_image(
@@ -204,10 +189,7 @@ impl Renderer {
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
-        pipelines: &Vec<PipelineGroup>,
-        render_objects: &mut HashMap<String, Vec<Arc<RenderObject>>>,
-        global_descriptor: &DescriptorSetWithOffsets,
-        objects_descriptor: &DescriptorSetWithOffsets,
+        render_data: &mut RenderData,
     ) -> Result<Fence, Validated<VulkanError>> {
         let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
@@ -226,14 +208,15 @@ impl Renderer {
             )
             .unwrap();
 
-        for pipeline_group in pipelines {
-            pipeline_group.draw_objects(
-                global_descriptor,
-                objects_descriptor,
-                &mut builder,
-                render_objects,
-            );
-        }
+        render_data.render(image_i as usize, &mut builder);
+        // for pipeline_group in pipelines {
+        //     pipeline_group.draw_objects(
+        //         global_descriptor,
+        //         objects_descriptor,
+        //         &mut builder,
+        //         render_objects,
+        //     );
+        // }
 
         builder.end_render_pass(Default::default()).unwrap();
 
@@ -249,19 +232,19 @@ impl Renderer {
             .then_signal_fence_and_flush()
     }
 
-    pub fn create_pipeline(
-        &mut self,
-        vertex_shader: EntryPoint,
-        fragment_shader: EntryPoint,
-    ) -> PipelineHandler {
-        PipelineHandler::new(
-            self.device.clone(),
-            vertex_shader.clone(),
-            fragment_shader.clone(),
-            self.viewport.clone(),
-            self.render_pass.clone(),
-        )
-    }
+    // pub fn create_pipeline(
+    //     &mut self,
+    //     vertex_shader: EntryPoint,
+    //     fragment_shader: EntryPoint,
+    // ) -> PipelineHandler {
+    //     PipelineHandler::new(
+    //         self.device.clone(),
+    //         vertex_shader.clone(),
+    //         fragment_shader.clone(),
+    //         self.viewport.clone(),
+    //         self.render_pass.clone(),
+    //     )
+    // }
 
     // fn init_material_with_sets(
     //     &mut self,
@@ -299,32 +282,32 @@ impl Renderer {
     //     self.init_material_with_sets(pipeline_id, vec![set])
     // }
 
-    /// See `buffers::create_global_descriptors`
-    pub fn create_scene_buffers(
-        &self,
-        layout: &Arc<PipelineLayout>,
-    ) -> Vec<(
-        Subbuffer<GPUCameraData>,
-        Subbuffer<GPUSceneData>,
-        DescriptorSetWithOffsets,
-    )> {
-        buffers::create_global_descriptors::<GPUCameraData, GPUSceneData>(
-            &self.allocators,
-            &self.device,
-            layout.set_layouts().get(0).unwrap().clone(),
-            self.swapchain.image_count() as usize,
-        )
-    }
+    // See `buffers::create_global_descriptors`
+    // pub fn create_scene_buffers(
+    //     &self,
+    //     layout: &Arc<PipelineLayout>,
+    // ) -> Vec<(
+    //     Subbuffer<GPUCameraData>,
+    //     Subbuffer<GPUSceneData>,
+    //     DescriptorSetWithOffsets,
+    // )> {
+    //     buffers::create_global_descriptors::<GPUCameraData, GPUSceneData>(
+    //         &self.allocators,
+    //         &self.device,
+    //         layout.set_layouts().get(0).unwrap().clone(),
+    //         self.swapchain.image_count() as usize,
+    //     )
+    // }
 
-    pub fn create_object_buffers(
-        &self,
-        layout: &Arc<PipelineLayout>,
-    ) -> Vec<(Subbuffer<[GPUObjectData]>, Arc<PersistentDescriptorSet>)> {
-        create_storage_buffers(
-            &self.allocators,
-            layout.set_layouts().get(1).unwrap().clone(),
-            self.swapchain.image_count() as usize,
-            10000,
-        )
-    }
+    // pub fn create_object_buffers(
+    //     &self,
+    //     layout: &Arc<PipelineLayout>,
+    // ) -> Vec<(Subbuffer<[GPUObjectData]>, Arc<PersistentDescriptorSet>)> {
+    //     create_storage_buffers(
+    //         &self.allocators,
+    //         layout.set_layouts().get(1).unwrap().clone(),
+    //         self.swapchain.image_count() as usize,
+    //         10000,
+    //     )
+    // }
 }

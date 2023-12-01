@@ -13,31 +13,33 @@ use crate::{
     VertexFull,
 };
 
-pub struct RenderObject {
+pub struct RenderObject<T: Clone> {
     pub mesh: Arc<Buffers<VertexFull>>,
     pub material_id: String,
-    transform: Matrix4<f32>,
+    pub data: T,
 }
 
-impl RenderObject {
+impl<T: Clone> RenderObject<T> {
+    pub fn get_data(&self) -> T {
+        self.data.clone()
+    }
+}
+
+impl RenderObject<Matrix4<f32>> {
     pub fn new(mesh: Arc<Buffers<VertexFull>>, material_id: String) -> Self {
         Self {
             mesh,
             material_id,
             // uniforms,
-            transform: Matrix4::identity(),
+            data: Matrix4::identity(),
         }
-    }
-
-    pub fn get_transform_matrix(&self) -> Matrix4<f32> {
-        self.transform
     }
 
     pub fn update_transform(&mut self, position: [f32; 3], rotation: Rad<f32>) {
         let rotation = Matrix4::from_axis_angle([0., 1., 0.].into(), rotation);
         let translation = Matrix4::from_translation(position.into());
 
-        self.transform = translation * rotation;
+        self.data = translation * rotation;
     }
 
     // pub fn update_transform_axis(
@@ -52,13 +54,6 @@ impl RenderObject {
     //     self.transform = translation * rotation;
     // }
 }
-
-// pub struct RenderData {
-//     pub pipelines: Vec<PipelineGroup>,
-//     pub objects: HashMap<String, Vec<Arc<RenderObject>>>,
-// }
-
-// impl RenderData {}
 
 pub struct PipelineGroup {
     pub pipeline: PipelineHandler,
@@ -79,7 +74,7 @@ impl PipelineGroup {
         global_descriptor: &DescriptorSetWithOffsets,
         objects_descriptor: &DescriptorSetWithOffsets,
         command_builder: &mut AutoCommandBufferBuilder<T, A>,
-        objects: &mut HashMap<String, Vec<Arc<RenderObject>>>,
+        objects: &mut HashMap<String, Vec<Arc<RenderObject<Matrix4<f32>>>>>,
     ) {
         let mut index = 0;
         // bind pipeline
@@ -100,8 +95,7 @@ impl PipelineGroup {
 
             let mut last_mesh = None;
             let mut last_buffer_len = 0;
-            for render_obj in objects[&material.id].iter() {
-                let mesh = &render_obj.mesh;
+            for mesh in objects[&material.id].iter().map(|ro| &ro.mesh) {
                 match last_mesh {
                     Some(old_mesh) if Arc::ptr_eq(old_mesh, &mesh) => {
                         // println!("Same mesh, skipping...");

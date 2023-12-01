@@ -4,10 +4,8 @@ use crate::shaders::basic::{
     fs::GPUSceneData,
     vs::{GPUCameraData, GPUObjectData},
 };
-use cgmath::{Matrix, Matrix4, Transform};
+use cgmath::Matrix4;
 use vulkano::{buffer::Subbuffer, descriptor_set::DescriptorSetWithOffsets};
-
-use crate::render::renderer::Fence;
 
 use super::render_object::RenderObject;
 
@@ -71,23 +69,26 @@ impl FrameData {
         }
     }
 
-    pub fn update_objects_data<'a>(
+    pub fn update_objects_data<'a, T>(
         &self,
-        render_objects: impl Iterator<Item = &'a Arc<RenderObject>>,
-    ) {
+        render_objects: impl Iterator<Item = &'a Arc<RenderObject<T>>>,
+    ) where
+        T: Into<GPUObjectData> + Clone + 'a,
+    {
         let mut storage_buffer_contents = self
             .objects_buffer
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to object storage buffer\n{}", e));
 
         for (i, render_object) in render_objects.enumerate() {
-            storage_buffer_contents[i].render_matrix = render_object.get_transform_matrix().into();
-            storage_buffer_contents[i].normal_matrix = render_object
-                .get_transform_matrix()
-                .inverse_transform()
-                .unwrap()
-                .transpose()
-                .into();
+            storage_buffer_contents[i] = render_object.get_data().into();
+            // storage_buffer_contents[i].render_matrix = render_object.get_transform_matrix().into();
+            // storage_buffer_contents[i].normal_matrix = render_object
+            //     .get_transform_matrix()
+            //     .inverse_transform()
+            //     .unwrap()
+            //     .transpose()
+            //     .into();
         }
     }
 }

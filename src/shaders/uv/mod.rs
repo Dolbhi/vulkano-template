@@ -1,9 +1,4 @@
-pub mod vs {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "src/shaders/basic/vertex.vert",
-    }
-}
+pub use super::basic::vs;
 
 pub mod fs {
     vulkano_shaders::shader! {
