@@ -14,7 +14,11 @@ use crate::{
     },
 };
 
-use self::{frame_data::FrameData, material::PipelineGroup, render_object::RenderObject};
+use self::{
+    frame_data::FrameData,
+    material::{MaterialID, PipelineGroup},
+    render_object::RenderObject,
+};
 
 use super::renderer::Renderer;
 
@@ -25,17 +29,17 @@ pub mod render_object;
 pub mod texture;
 
 /// Collection of all data needed for rendering
-pub struct RenderData<O, T>
+pub struct DrawSystem<O, T>
 where
     O: BufferContents + From<T>,
     T: Clone,
 {
     pipelines: Vec<PipelineGroup>,
     frames: Vec<FrameData<O>>,
-    pending_objects: HashMap<String, Vec<Arc<RenderObject<T>>>>,
+    pending_objects: HashMap<MaterialID, Vec<Arc<RenderObject<T>>>>,
 }
 
-impl<'a, O, T> RenderData<O, T>
+impl<'a, O, T> DrawSystem<O, T>
 where
     O: BufferContents + From<T>,
     T: Clone + 'a,
@@ -43,7 +47,7 @@ where
     /// creates a pipelines collection using 1 pipeline that future added pipelines must match
     pub fn new(context: &Renderer, vs: EntryPoint, fs: EntryPoint) -> Self {
         // initialize
-        let mut data = RenderData {
+        let mut data = DrawSystem {
             pipelines: vec![],
             frames: vec![],
             pending_objects: HashMap::new(),
@@ -113,11 +117,13 @@ where
     pub fn add_material(
         &mut self,
         pipeline_index: usize,
-        mat_id: String,
+        mat_id: impl Into<MaterialID>,
         set: Option<Arc<PersistentDescriptorSet>>,
-    ) {
-        self.pipelines[pipeline_index].add_material(mat_id.clone(), set);
-        self.pending_objects.insert(mat_id, vec![]);
+    ) -> MaterialID {
+        let id: MaterialID = mat_id.into();
+        self.pipelines[pipeline_index].add_material(id.clone(), set);
+        self.pending_objects.insert(id.clone(), vec![]);
+        id
     }
 
     /// bind draw calls to the given command buffer builder, be sure to call `upload_draw_data()` before hand

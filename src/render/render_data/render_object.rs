@@ -4,9 +4,11 @@ use cgmath::{Matrix4, Rad, SquareMatrix};
 
 use crate::{vulkano_objects::buffers::Buffers, VertexFull};
 
+use super::material::MaterialID;
+
 pub struct RenderObject<T: Clone> {
     pub mesh: Arc<Buffers<VertexFull>>,
-    pub material_id: String,
+    pub material_id: MaterialID,
     pub data: T,
 }
 
@@ -17,7 +19,7 @@ impl<T: Clone> RenderObject<T> {
 }
 
 impl RenderObject<Matrix4<f32>> {
-    pub fn new(mesh: Arc<Buffers<VertexFull>>, material_id: String) -> Self {
+    pub fn new(mesh: Arc<Buffers<VertexFull>>, material_id: MaterialID) -> Self {
         Self {
             mesh,
             material_id,

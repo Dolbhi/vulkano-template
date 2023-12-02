@@ -9,7 +9,7 @@ use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use winit::event_loop::EventLoop;
 
-use super::render_data::RenderData;
+use super::render_data::DrawSystem;
 use super::renderer::Fence;
 use super::{
     render_data::{
@@ -37,7 +37,7 @@ pub struct RenderLoop {
     fences: Vec<Option<Arc<Fence>>>,
     previous_frame_i: u32,
     total_seconds: f32,
-    render_data: RenderData<GPUObjectData, Matrix4<f32>>,
+    render_data: DrawSystem<GPUObjectData, Matrix4<f32>>,
     render_objects: Vec<Arc<RenderObject<Matrix4<f32>>>>,
 }
 
@@ -154,7 +154,7 @@ impl RenderLoop {
     fn init_render_objects(
         renderer: &mut Renderer,
     ) -> (
-        RenderData<GPUObjectData, Matrix4<f32>>,
+        DrawSystem<GPUObjectData, Matrix4<f32>>,
         Vec<Arc<RenderObject<Matrix4<f32>>>>,
     ) {
         // pipelines
@@ -167,7 +167,7 @@ impl RenderLoop {
                 .expect("failed to create shader module")
                 .entry_point("main")
                 .unwrap();
-            RenderData::new(&renderer, vertex_shader, fragment_shader)
+            DrawSystem::new(&renderer, vertex_shader, fragment_shader)
         };
         let phong_id = {
             let vertex_shader = phong::vs::load(renderer.device.clone())
@@ -214,10 +214,9 @@ impl RenderLoop {
 
         // materials
         //  lost empire
-        let le_mat_id = "lost_empire".to_string();
-        data.add_material(
+        let le_mat_id = data.add_material(
             0,
-            le_mat_id.clone(),
+            "lost_empire",
             Some(data.get_pipeline(0).create_material_set(
                 &renderer.allocators,
                 2,
@@ -227,23 +226,24 @@ impl RenderLoop {
         );
 
         //  ina
-        let ina_ids = ["hair", "cloth", "body", "head"].map(|s| s.to_string());
-        for (id, tex) in zip(ina_ids.clone(), ina_textures) {
-            data.add_material(
-                phong_id,
-                id.clone(),
-                Some(data.get_pipeline(phong_id).create_material_set(
-                    &renderer.allocators,
-                    2,
-                    tex,
-                    linear_sampler.clone(),
-                )),
-            );
-        }
+        let ina_ids: Vec<crate::render::render_data::material::MaterialID> =
+            zip(["hair", "cloth", "body", "head"], ina_textures)
+                .map(|(id, tex)| {
+                    data.add_material(
+                        phong_id,
+                        id,
+                        Some(data.get_pipeline(phong_id).create_material_set(
+                            &renderer.allocators,
+                            2,
+                            tex,
+                            linear_sampler.clone(),
+                        )),
+                    )
+                })
+                .collect();
 
         //  uv
-        let uv_mat_id = "uv".to_string();
-        data.add_material(uv_id, uv_mat_id.clone(), None);
+        let uv_mat_id = data.add_material(uv_id, "uv", None);
 
         // meshes
         //      suzanne

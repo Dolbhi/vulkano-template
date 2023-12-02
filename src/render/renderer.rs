@@ -26,7 +26,7 @@ use winit::{
     window::{CursorGrabMode, Window, WindowBuilder},
 };
 
-use super::render_data::RenderData;
+use super::render_data::DrawSystem;
 
 pub type Fence = FenceSignalFuture<
     PresentFuture<
@@ -190,7 +190,7 @@ impl Renderer {
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
-        render_data: &mut RenderData<O, T>,
+        render_data: &mut DrawSystem<O, T>,
     ) -> Result<Fence, Validated<VulkanError>>
     where
         O: BufferContents + From<T>,

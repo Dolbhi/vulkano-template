@@ -31,7 +31,7 @@ impl PipelineGroup {
         global_descriptor: &DescriptorSetWithOffsets,
         objects_descriptor: &DescriptorSetWithOffsets,
         command_builder: &mut AutoCommandBufferBuilder<C, A>,
-        objects: &mut HashMap<String, Vec<Arc<RenderObject<T>>>>,
+        objects: &mut HashMap<MaterialID, Vec<Arc<RenderObject<T>>>>,
     ) {
         // let mut index = 0;
         // bind pipeline
@@ -85,7 +85,7 @@ impl PipelineGroup {
         }
     }
 
-    pub fn add_material(&mut self, id: String, set: Option<Arc<PersistentDescriptorSet>>) {
+    pub fn add_material(&mut self, id: MaterialID, set: Option<Arc<PersistentDescriptorSet>>) {
         let material = Material {
             id,
             descriptor_set: set,
@@ -114,13 +114,26 @@ impl PipelineGroup {
         )
         .unwrap()
     }
-    pub fn material_iter(&self) -> impl Iterator<Item = &String> {
+    pub fn material_iter(&self) -> impl Iterator<Item = &MaterialID> {
         self.materials.iter().map(|mat| &mat.id)
     }
 }
 
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub struct MaterialID(pub String);
+impl From<String> for MaterialID {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+impl From<&str> for MaterialID {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
 struct Material {
-    pub id: String,
+    pub id: MaterialID,
     pub descriptor_set: Option<Arc<PersistentDescriptorSet>>,
 }
 impl Material {
