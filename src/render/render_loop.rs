@@ -146,7 +146,6 @@ impl RenderLoop {
         // impacts the next update
         self.window_resized = true;
     }
-
     pub fn handle_window_wait(&self) {
         self.renderer.window.request_redraw();
     }
@@ -376,32 +375,5 @@ impl RenderLoop {
             image_i,
             self.total_seconds,
         );
-
-        // sort renderobjects
-        // for obj in self.render_objects.iter() {
-        //     self.sorted_objects
-        //         .get_mut(&obj.material_id)
-        //         .unwrap()
-        //         .push(obj.clone());
-        // }
-        // let obj_iter = self.render_pipelines.iter().flat_map(|pipeline| {
-        //     pipeline
-        //         .materials
-        //         .iter()
-        //         .flat_map(|mat| self.sorted_objects[&mat.id].iter())
-        // });
-        // frame.update_objects_data(obj_iter);
-
-        // // update camera
-        // let extends = self.renderer.window.inner_size();
-        // frame.update_camera_data(
-        //     camera_data.view_matrix(),
-        //     camera_data.projection_matrix(extends.width as f32 / extends.height as f32),
-        // );
-
-        // // update scene data
-        // let angle = self.total_seconds / 2.;
-        // let Vector3::<f32> { x, y, z } = vec3(angle.sin(), -1., angle.cos()).normalize();
-        // frame.update_scene_data(None, Some([x, y, z, 1.]), None);
     }
 }

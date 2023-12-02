@@ -11,6 +11,7 @@ fn main() {
     let mut app = App::start(&event_loop);
 
     let mut previous_frame_time = Instant::now();
+    let mut window_focused = false;
     event_loop
         .run(move |event, elwt| match event {
             Event::WindowEvent {
@@ -29,21 +30,25 @@ fn main() {
                 event: WindowEvent::Focused(focused),
                 ..
             } => {
-                app.handle_focused(focused);
+                window_focused = focused;
             }
             Event::WindowEvent {
                 event: WindowEvent::KeyboardInput { event, .. },
                 ..
             } => {
-                if let PhysicalKey::Code(code) = event.physical_key {
-                    app.handle_keyboard_input(code, event.state);
+                if window_focused {
+                    if let PhysicalKey::Code(code) = event.physical_key {
+                        app.handle_keyboard_input(code, event.state);
+                    }
                 }
             }
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
-                app.handle_mouse_input(delta.0 as f32, delta.1 as f32);
+                if window_focused {
+                    app.handle_mouse_input(delta.0 as f32, delta.1 as f32);
+                }
             }
             Event::WindowEvent {
                 event: WindowEvent::RedrawRequested,

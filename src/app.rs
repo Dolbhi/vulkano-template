@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use legion::World;
 use winit::event_loop::EventLoop;
 use winit::{event::ElementState, keyboard::KeyCode};
 
@@ -31,13 +32,15 @@ pub struct App {
     render_loop: RenderLoop,
     camera: Camera,
     keys: Keys,
-    focused: bool,
+    world: World,
 }
 
 impl App {
     pub fn start(event_loop: &EventLoop<()>) -> Self {
         println!("Welcome to THE RUSTY RENDERER!");
         println!("Press WASD, SPACE and LSHIFT to move and Q to swap materials");
+
+        let mut world = World::default();
 
         Self {
             render_loop: RenderLoop::new(event_loop),
@@ -46,7 +49,7 @@ impl App {
                 ..Default::default()
             },
             keys: Keys::default(),
-            focused: false,
+            world,
         }
     }
 
@@ -82,25 +85,15 @@ impl App {
         }
     }
 
-    pub fn handle_focused(&mut self, focused: bool) {
-        self.focused = focused;
-    }
-
     pub fn handle_mouse_input(&mut self, dx: f32, dy: f32) {
-        if self.focused {
-            self.camera.rotate(dx, dy);
-        }
+        self.camera.rotate(dx, dy);
+
         // println!(
         //     "[Camera Rotation] x: {}, y: {}, z: {}",
         //     self.camera.rotation.x.0, self.camera.rotation.y.0, self.camera.rotation.z.0
         // );
     }
-
     pub fn handle_keyboard_input(&mut self, key_code: KeyCode, state: ElementState) {
-        if !self.focused {
-            return;
-        }
-
         let state = match state {
             ElementState::Pressed => Pressed,
             ElementState::Released => Released,
@@ -126,7 +119,6 @@ impl App {
     pub fn handle_window_resize(&mut self) {
         self.render_loop.handle_window_resize()
     }
-
     pub fn handle_window_wait(&self) {
         self.render_loop.handle_window_wait();
     }
