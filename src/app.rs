@@ -22,6 +22,7 @@ struct Keys {
     w: KeyState,
     s: KeyState,
     d: KeyState,
+    q: KeyState,
     space: KeyState,
     shift: KeyState,
 }
@@ -36,7 +37,7 @@ pub struct App {
 impl App {
     pub fn start(event_loop: &EventLoop<()>) -> Self {
         println!("Welcome to THE RUSTY RENDERER!");
-        println!("Press WASD to move and SPACE to change color");
+        println!("Press WASD, SPACE and LSHIFT to move and Q to swap materials");
 
         Self {
             render_loop: RenderLoop::new(event_loop),
@@ -106,12 +107,12 @@ impl App {
         };
 
         match key_code {
-            // VirtualKeyCode::Space => {
-            //     if state == Pressed && self.keys.space == Released {
-            //         // self.square.change_to_random_color();
-            //     }
-            //     self.keys.space = state;
-            // }
+            KeyCode::KeyQ => {
+                if state == Pressed && self.keys.q == Released {
+                    // self.square.change_to_random_color();
+                }
+                self.keys.q = state;
+            }
             KeyCode::KeyW => self.keys.w = state,
             KeyCode::KeyA => self.keys.a = state,
             KeyCode::KeyS => self.keys.s = state,
