@@ -9,7 +9,7 @@ use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use winit::event_loop::EventLoop;
 
-use super::render_data::DrawSystem;
+use super::render_data::{render_object, DrawSystem};
 use super::renderer::Fence;
 use super::{
     render_data::{
@@ -38,31 +38,38 @@ pub struct RenderLoop {
     previous_frame_i: u32,
     total_seconds: f32,
     render_data: DrawSystem<GPUObjectData, Matrix4<f32>>,
-    render_objects: Vec<Arc<RenderObject<Matrix4<f32>>>>,
+    // render_objects: Vec<Arc<RenderObject<Matrix4<f32>>>>,
 }
 
 impl RenderLoop {
-    pub fn new(event_loop: &EventLoop<()>) -> Self {
+    pub fn new(event_loop: &EventLoop<()>) -> (Self, Vec<Arc<RenderObject<Matrix4<f32>>>>) {
         let mut renderer = Renderer::initialize(event_loop);
 
         let (render_data, render_objects) = Self::init_render_objects(&mut renderer);
 
         let fences = vec![None; renderer.swapchain.image_count() as usize]; //(0..frames.len()).map(|_| None).collect();
 
-        Self {
-            renderer,
-            recreate_swapchain: false,
-            window_resized: false,
-            fences,
-            previous_frame_i: 0,
-            total_seconds: 0.0,
-            render_data,
+        (
+            Self {
+                renderer,
+                recreate_swapchain: false,
+                window_resized: false,
+                fences,
+                previous_frame_i: 0,
+                total_seconds: 0.0,
+                render_data,
+            },
             render_objects,
-        }
+        )
     }
 
     /// update renderer and draw upcoming image
-    pub fn update(&mut self, transform_data: &Camera, seconds_passed: f32) {
+    pub fn update<'a>(
+        &mut self,
+        camera_data: &Camera,
+        render_objects: impl Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
+        seconds_passed: f32,
+    ) {
         // stuff
         self.total_seconds += seconds_passed;
 
@@ -102,7 +109,14 @@ impl RenderLoop {
             image_fence.cleanup_finished();
         }
 
-        self.update_gpu_data(transform_data, image_i);
+        let extends = self.renderer.window.inner_size();
+        self.render_data.upload_draw_data(
+            render_objects,
+            camera_data,
+            extends.width as f32 / extends.height as f32,
+            image_i,
+            self.total_seconds,
+        );
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
         let something_needs_all_gpu_resources = false;
@@ -353,27 +367,27 @@ impl RenderLoop {
         (data, render_objects)
     }
 
-    /// write gpu data to respective buffers
-    fn update_gpu_data(&mut self, camera_data: &Camera, image_i: u32) {
-        // let frame = &mut self.frames[image_i as usize];
+    // write gpu data to respective buffers
+    // fn update_gpu_data(&mut self, camera_data: &Camera, image_i: u32) {
+    //     // let frame = &mut self.frames[image_i as usize];
 
-        // update object data
-        match Arc::get_mut(&mut self.render_objects[0]) {
-            Some(obj) => {
-                obj.update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));
-            }
-            None => {
-                panic!("Unable to update render object");
-            }
-        }
+    //     // update object data
+    //     // match Arc::get_mut(&mut self.render_objects[0]) {
+    //     //     Some(obj) => {
+    //     //         obj.update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));
+    //     //     }
+    //     //     None => {
+    //     //         panic!("Unable to update render object");
+    //     //     }
+    //     // }
 
-        let extends = self.renderer.window.inner_size();
-        self.render_data.upload_draw_data(
-            self.render_objects.iter(),
-            camera_data,
-            extends.width as f32 / extends.height as f32,
-            image_i,
-            self.total_seconds,
-        );
-    }
+    //     let extends = self.renderer.window.inner_size();
+    //     self.render_data.upload_draw_data(
+    //         self.render_objects.iter(),
+    //         camera_data,
+    //         extends.width as f32 / extends.height as f32,
+    //         image_i,
+    //         self.total_seconds,
+    //     );
+    // }
 }

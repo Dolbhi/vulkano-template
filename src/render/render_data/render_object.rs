@@ -28,6 +28,10 @@ impl RenderObject<Matrix4<f32>> {
         }
     }
 
+    pub fn set_matrix(&mut self, matrix: Matrix4<f32>) {
+        self.data = matrix;
+    }
+
     pub fn update_transform(&mut self, position: [f32; 3], rotation: Rad<f32>) {
         let rotation = Matrix4::from_axis_angle([0., 1., 0.].into(), rotation);
         let translation = Matrix4::from_translation(position.into());

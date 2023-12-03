@@ -1,5 +1,6 @@
 mod camera;
+pub mod transform;
 
 pub use camera::Camera;
 
-pub struct Transform(cgmath::Matrix4<f32>);
+use crate::render::RenderObject;

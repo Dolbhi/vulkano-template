@@ -1,10 +1,20 @@
+use std::iter::zip;
+use std::sync::Arc;
 use std::time::Duration;
 
-use legion::World;
+use cgmath::Matrix4;
+use legion::*;
 use winit::event_loop::EventLoop;
 use winit::{event::ElementState, keyboard::KeyCode};
 
-use crate::{game_objects::Camera, render::RenderLoop};
+use crate::render::RenderObject;
+use crate::{
+    game_objects::{
+        transform::{Transform, TransformID, TransformSystem},
+        Camera,
+    },
+    render::RenderLoop,
+};
 
 // TO flush_next_future METHOD ADD PARAMS FOR PASSING CAMERA DESCRIPTOR SET
 
@@ -33,6 +43,7 @@ pub struct App {
     camera: Camera,
     keys: Keys,
     world: World,
+    transforms: TransformSystem,
 }
 
 impl App {
@@ -41,15 +52,20 @@ impl App {
         println!("Press WASD, SPACE and LSHIFT to move and Q to swap materials");
 
         let mut world = World::default();
+        let mut transforms = TransformSystem::new();
+        let (render_loop, render_objects) = RenderLoop::new(event_loop);
+
+        let entities = world.extend(zip(render_objects, &mut transforms));
 
         Self {
-            render_loop: RenderLoop::new(event_loop),
+            render_loop,
             camera: Camera {
                 position: [0., 5., 0.].into(),
                 ..Default::default()
             },
             keys: Keys::default(),
             world,
+            transforms,
         }
     }
 
@@ -59,7 +75,28 @@ impl App {
 
         self.update_movement(seconds_passed);
 
-        self.render_loop.update(&self.camera, seconds_passed);
+        // update render objects
+        let mut query = <(&TransformID, &mut Arc<RenderObject<Matrix4<f32>>>)>::query();
+        for (transform, render_object) in query.iter_mut(&mut self.world) {
+            // update object data
+            match Arc::get_mut(render_object) {
+                Some(obj) => {
+                    obj.set_matrix(self.transforms.get_model(transform))
+                    // obj.update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));
+                }
+                None => {
+                    panic!("Unable to update render object");
+                }
+            }
+        }
+        // query render objects
+        let mut query = <&Arc<RenderObject<Matrix4<f32>>>>::query();
+
+        self.render_loop.update(
+            &self.camera,
+            query.iter_mut(&mut self.world),
+            seconds_passed,
+        );
     }
 
     fn update_movement(&mut self, seconds_passed: f32) {
