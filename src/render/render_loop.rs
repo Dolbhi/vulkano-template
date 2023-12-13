@@ -228,9 +228,9 @@ impl RenderLoop {
         // materials
         //  lost empire
         let le_mat_id = data.add_material(
-            0,
+            phong_id,
             "lost_empire",
-            Some(data.get_pipeline(0).create_material_set(
+            Some(data.get_pipeline(phong_id).create_material_set(
                 &renderer.allocators,
                 2,
                 le_texture,
