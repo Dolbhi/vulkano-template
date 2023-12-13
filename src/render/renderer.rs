@@ -157,19 +157,6 @@ impl Renderer {
         );
     }
 
-    /// recreates swapchain and framebuffers, followed by the pipeline with new viewport dimensions
-    // pub fn handle_window_resize(&mut self, pipelines: &mut Vec<PipelineGroup>) {
-    //     self.recreate_swapchain();
-    //     self.viewport.extent = self.window.inner_size().into();
-    //     for pipeline in pipelines {
-    //         pipeline.pipeline.recreate_pipeline(
-    //             self.device.clone(),
-    //             self.render_pass.clone(),
-    //             self.viewport.clone(),
-    //         );
-    //     }
-    // }
-
     /// Gets future where next image in swapchain is ready
     pub fn acquire_swapchain_image(
         &self,
@@ -214,14 +201,6 @@ impl Renderer {
             .unwrap();
 
         render_data.render(image_i as usize, &mut builder);
-        // for pipeline_group in pipelines {
-        //     pipeline_group.draw_objects(
-        //         global_descriptor,
-        //         objects_descriptor,
-        //         &mut builder,
-        //         render_objects,
-        //     );
-        // }
 
         builder.end_render_pass(Default::default()).unwrap();
 
@@ -236,83 +215,4 @@ impl Renderer {
             )
             .then_signal_fence_and_flush()
     }
-
-    // pub fn create_pipeline(
-    //     &mut self,
-    //     vertex_shader: EntryPoint,
-    //     fragment_shader: EntryPoint,
-    // ) -> PipelineHandler {
-    //     PipelineHandler::new(
-    //         self.device.clone(),
-    //         vertex_shader.clone(),
-    //         fragment_shader.clone(),
-    //         self.viewport.clone(),
-    //         self.render_pass.clone(),
-    //     )
-    // }
-
-    // fn init_material_with_sets(
-    //     &mut self,
-    //     pipeline_id: String,
-    //     material_sets: Vec<Arc<PersistentDescriptorSet>>,
-    // ) -> Arc<Material> {
-    //     let layout = self.pipelines[&pipeline_id].layout().clone();
-    //     Arc::new(Material {
-    //         layout,
-    //         material_sets,
-    //         pipeline_id,
-    //     })
-    // }
-    // pub fn init_material(&mut self, pipeline_id: String) -> Arc<Material> {
-    //     self.init_material_with_sets(pipeline_id, vec![])
-    // }
-    // pub fn init_material_with_texture(
-    //     &mut self,
-    //     pipeline_id: String,
-    //     texture: Arc<ImageView>,
-    //     sampler: Arc<Sampler>,
-    // ) -> Arc<Material> {
-    //     let set = PersistentDescriptorSet::new(
-    //         &self.allocators.descriptor_set,
-    //         self.pipelines[&pipeline_id]
-    //             .layout()
-    //             .set_layouts()
-    //             .get(2)
-    //             .unwrap()
-    //             .clone(),
-    //         [WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
-    //         [],
-    //     )
-    //     .unwrap();
-    //     self.init_material_with_sets(pipeline_id, vec![set])
-    // }
-
-    // See `buffers::create_global_descriptors`
-    // pub fn create_scene_buffers(
-    //     &self,
-    //     layout: &Arc<PipelineLayout>,
-    // ) -> Vec<(
-    //     Subbuffer<GPUCameraData>,
-    //     Subbuffer<GPUSceneData>,
-    //     DescriptorSetWithOffsets,
-    // )> {
-    //     buffers::create_global_descriptors::<GPUCameraData, GPUSceneData>(
-    //         &self.allocators,
-    //         &self.device,
-    //         layout.set_layouts().get(0).unwrap().clone(),
-    //         self.swapchain.image_count() as usize,
-    //     )
-    // }
-
-    // pub fn create_object_buffers(
-    //     &self,
-    //     layout: &Arc<PipelineLayout>,
-    // ) -> Vec<(Subbuffer<[GPUObjectData]>, Arc<PersistentDescriptorSet>)> {
-    //     create_storage_buffers(
-    //         &self.allocators,
-    //         layout.set_layouts().get(1).unwrap().clone(),
-    //         self.swapchain.image_count() as usize,
-    //         10000,
-    //     )
-    // }
 }

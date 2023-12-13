@@ -153,15 +153,6 @@ where
         image_i: u32,
         total_seconds: f32,
     ) {
-        // update object data
-        // match Arc::get_mut(&mut self.render_objects[0]) {
-        //     Some(obj) => {
-        //         obj.update_transform([0., 0., 0.], cgmath::Rad(total_seconds));
-        //     }
-        //     None => {
-        //         panic!("Unable to update render object");
-        //     }
-        // }
         // sort renderobjects
         for object in objects {
             self.pending_objects

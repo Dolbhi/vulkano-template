@@ -366,28 +366,4 @@ impl RenderLoop {
 
         (data, render_objects)
     }
-
-    // write gpu data to respective buffers
-    // fn update_gpu_data(&mut self, camera_data: &Camera, image_i: u32) {
-    //     // let frame = &mut self.frames[image_i as usize];
-
-    //     // update object data
-    //     // match Arc::get_mut(&mut self.render_objects[0]) {
-    //     //     Some(obj) => {
-    //     //         obj.update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));
-    //     //     }
-    //     //     None => {
-    //     //         panic!("Unable to update render object");
-    //     //     }
-    //     // }
-
-    //     let extends = self.renderer.window.inner_size();
-    //     self.render_data.upload_draw_data(
-    //         self.render_objects.iter(),
-    //         camera_data,
-    //         extends.width as f32 / extends.height as f32,
-    //         image_i,
-    //         self.total_seconds,
-    //     );
-    // }
 }
