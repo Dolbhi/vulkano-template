@@ -10,7 +10,7 @@ use winit::{event::ElementState, keyboard::KeyCode};
 use crate::render::RenderObject;
 use crate::{
     game_objects::{
-        transform::{Transform, TransformID, TransformSystem},
+        transform::{TransformID, TransformSystem},
         Camera,
     },
     render::RenderLoop,
@@ -55,7 +55,7 @@ impl App {
         let mut transforms = TransformSystem::new();
         let (render_loop, render_objects) = RenderLoop::new(event_loop);
 
-        let entities = world.extend(zip(render_objects, &mut transforms));
+        let _entities = world.extend(zip(render_objects, &mut transforms));
 
         Self {
             render_loop,
@@ -70,7 +70,7 @@ impl App {
     }
 
     pub fn update(&mut self, duration_since_last_update: &Duration) {
-        let seconds_passed = (duration_since_last_update.as_micros() as f32) / 1000000.0;
+        let seconds_passed = duration_since_last_update.as_secs_f32();
         // println!("Current time: {}", seconds_passed);
 
         self.update_movement(seconds_passed);

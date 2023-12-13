@@ -9,13 +9,13 @@ use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use winit::event_loop::EventLoop;
 
-use super::render_data::{render_object, DrawSystem};
 use super::renderer::Fence;
 use super::{
     render_data::{
         mesh::Mesh,
         render_object::RenderObject,
         texture::{create_sampler, load_texture},
+        DrawSystem,
     },
     renderer::Renderer,
 };
