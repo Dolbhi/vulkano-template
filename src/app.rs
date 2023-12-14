@@ -9,7 +9,7 @@ use winit::event_loop::EventLoop;
 use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::game_objects::transform::Transform;
-use crate::render::mesh::Mesh;
+use crate::render::mesh::from_obj;
 use crate::render::{DrawSystem, RenderObject, Renderer};
 use crate::shaders::basic::vs::GPUObjectData;
 use crate::VertexFull;
@@ -137,9 +137,7 @@ impl App {
 
         // meshes
         //      suzanne
-        let Mesh(vertices, indices) = Mesh::from_obj(Path::new("models/suzanne.obj"))
-            .pop()
-            .unwrap();
+        let (vertices, indices) = from_obj(Path::new("models/suzanne.obj")).pop().unwrap();
         let suzanne_mesh = resource_loader.load_mesh(vertices, indices);
 
         //      square
@@ -173,16 +171,16 @@ impl App {
         let square = resource_loader.load_mesh(vertices, indices);
 
         //      lost empire
-        let le_meshes: Vec<_> = Mesh::from_obj(Path::new("models/lost_empire.obj"))
+        let le_meshes: Vec<_> = from_obj(Path::new("models/lost_empire.obj"))
             .into_iter()
-            .map(|Mesh(vertices, indices)| resource_loader.load_mesh(vertices, indices))
+            .map(|(vertices, indices)| resource_loader.load_mesh(vertices, indices))
             .collect();
 
         //      ina
-        let ina_meshes: Vec<_> = Mesh::from_obj(Path::new("models/ina/ReadyToRigINA.obj"))
+        let ina_meshes: Vec<_> = from_obj(Path::new("models/ina/ReadyToRigINA.obj"))
             .into_iter()
             .skip(2)
-            .map(|Mesh(vertices, indices)| resource_loader.load_mesh(vertices, indices))
+            .map(|(vertices, indices)| resource_loader.load_mesh(vertices, indices))
             .collect();
 
         println!("[Rendering Data]");
@@ -256,7 +254,7 @@ impl App {
             // update object data
             match Arc::get_mut(render_object) {
                 Some(obj) => {
-                    let transfrom_matrix = self.transforms.get_model(transform_id);
+                    let transfrom_matrix = self.transforms.get_global_model(transform_id);
                     // println!("Obj {:?}: {:?}", transform_id, obj);
                     obj.set_matrix(transfrom_matrix)
                     // obj.update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));

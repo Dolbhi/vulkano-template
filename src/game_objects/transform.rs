@@ -94,14 +94,7 @@ impl TransformSystem {
         }
     }
 
-    pub fn add_transform(&mut self, transform: Transform) -> TransformID {
-        let id = TransformID(self.next_id);
-        self.transforms.insert(id, transform);
-        self.next_id += 1;
-        id
-    }
-
-    pub fn get_model(&mut self, id: &TransformID) -> Matrix4<f32> {
+    pub fn get_global_model(&mut self, id: &TransformID) -> Matrix4<f32> {
         let mut current = self
             .get_transform(id)
             .unwrap_or_else(|| panic!("transform system missing given ID"));
@@ -119,6 +112,13 @@ impl TransformSystem {
             model = self.get_transform_mut(&id).unwrap().get_local_model() * model
         }
         model
+    }
+
+    pub fn add_transform(&mut self, transform: Transform) -> TransformID {
+        let id = TransformID(self.next_id);
+        self.transforms.insert(id, transform);
+        self.next_id += 1;
+        id
     }
     pub fn get_transform(&self, id: &TransformID) -> Option<&Transform> {
         self.transforms.get(id)
