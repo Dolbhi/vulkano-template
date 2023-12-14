@@ -22,6 +22,7 @@ use super::allocators::Allocators;
 type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
 
 /// Struct with a vertex and index, using VertexFull for vertices
+#[derive(Debug)]
 pub struct Buffers<V: Vertex + BufferContents> {
     pub vertex: Subbuffer<[V]>,
     pub index: Subbuffer<[u32]>,

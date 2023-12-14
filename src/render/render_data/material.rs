@@ -119,7 +119,7 @@ impl PipelineGroup {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct MaterialID(pub String);
 impl From<String> for MaterialID {
     fn from(value: String) -> Self {

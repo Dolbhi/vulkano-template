@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter::zip, sync::Arc, vec};
+use std::{collections::HashMap, f32::consts::PI, iter::zip, sync::Arc, vec};
 
 use vulkano::{
     buffer::BufferContents, command_buffer::AutoCommandBufferBuilder,
@@ -151,7 +151,6 @@ where
         camera_data: &Camera,
         aspect: f32,
         image_i: u32,
-        total_seconds: f32,
     ) {
         // sort renderobjects
         for object in objects {
@@ -176,7 +175,7 @@ where
         );
 
         // update scene data
-        let angle = total_seconds / 2.;
+        let angle = PI / 4.;
         let cgmath::Vector3::<f32> { x, y, z } =
             cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
         frame.update_scene_data(None, Some([x, y, z, 1.]), None);

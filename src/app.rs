@@ -1,13 +1,18 @@
 use std::iter::zip;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use cgmath::Matrix4;
+use cgmath::{Euler, Matrix4, Rad};
 use legion::*;
 use winit::event_loop::EventLoop;
 use winit::{event::ElementState, keyboard::KeyCode};
 
-use crate::render::RenderObject;
+use crate::game_objects::transform::Transform;
+use crate::render::mesh::Mesh;
+use crate::render::{DrawSystem, RenderObject, Renderer};
+use crate::shaders::basic::vs::GPUObjectData;
+use crate::VertexFull;
 use crate::{
     game_objects::{
         transform::{TransformID, TransformSystem},
@@ -44,6 +49,8 @@ pub struct App {
     keys: Keys,
     world: World,
     transforms: TransformSystem,
+    total_seconds: f32,
+    suzanne: TransformID,
 }
 
 impl App {
@@ -53,35 +60,205 @@ impl App {
 
         let mut world = World::default();
         let mut transforms = TransformSystem::new();
-        let (render_loop, render_objects) = RenderLoop::new(event_loop);
+        let mut render_loop = RenderLoop::new(event_loop);
 
-        let _entities = world.extend(zip(render_objects, &mut transforms));
+        let suzanne = Self::init_render_objects(
+            &mut world,
+            &mut transforms,
+            &render_loop.renderer,
+            &mut render_loop.render_data,
+        );
 
         Self {
             render_loop,
-            camera: Camera {
-                position: [0., 5., 0.].into(),
-                ..Default::default()
-            },
+            camera: Default::default(),
             keys: Keys::default(),
             world,
             transforms,
+            total_seconds: 0.,
+            suzanne,
         }
+    }
+    fn init_render_objects(
+        world: &mut World,
+        transform_sys: &mut TransformSystem,
+        renderer: &Renderer,
+        draw_system: &mut DrawSystem<GPUObjectData, Matrix4<f32>>,
+    ) -> TransformID {
+        let resource_loader = renderer.get_resource_loader();
+        let basic_id = 0;
+        let phong_id = 1;
+        let uv_id = 2;
+
+        // Texture
+        let le_texture = resource_loader.load_texture(Path::new("models/lost_empire-RGBA.png"));
+
+        let ina_textures = [
+            "models/ina/Hair_Base_Color.png",
+            "models/ina/Cloth_Base_Color.png",
+            "models/ina/Body_Base_Color.png",
+            "models/ina/Head_Base_Color.png",
+        ]
+        .map(|p| resource_loader.load_texture(Path::new(p)));
+
+        let linear_sampler = resource_loader.load_sampler(vulkano::image::sampler::Filter::Linear);
+
+        // materials
+        //  lost empire
+        let le_mat_id = draw_system.add_material(
+            basic_id,
+            "lost_empire",
+            Some(draw_system.get_pipeline(basic_id).create_material_set(
+                &renderer.allocators,
+                2,
+                le_texture,
+                linear_sampler.clone(),
+            )),
+        );
+
+        //  ina
+        let ina_ids: Vec<_> = zip(["hair", "cloth", "body", "head"], ina_textures)
+            .map(|(id, tex)| {
+                draw_system.add_material(
+                    phong_id,
+                    id,
+                    Some(draw_system.get_pipeline(phong_id).create_material_set(
+                        &renderer.allocators,
+                        2,
+                        tex,
+                        linear_sampler.clone(),
+                    )),
+                )
+            })
+            .collect();
+
+        //  uv
+        let uv_mat_id = draw_system.add_material(uv_id, "uv", None);
+
+        // meshes
+        //      suzanne
+        let Mesh(vertices, indices) = Mesh::from_obj(Path::new("models/suzanne.obj"))
+            .pop()
+            .unwrap();
+        let suzanne_mesh = resource_loader.load_mesh(vertices, indices);
+
+        //      square
+        let vertices = vec![
+            VertexFull {
+                position: [-0.25, -0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+                uv: [0.0, 0.0],
+            },
+            VertexFull {
+                position: [0.25, -0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+                uv: [1.0, 0.0],
+            },
+            VertexFull {
+                position: [-0.25, 0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+                uv: [0.0, 1.0],
+            },
+            VertexFull {
+                position: [0.25, 0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+                uv: [1.0, 1.0],
+            },
+        ];
+        let indices = vec![0, 1, 2, 2, 1, 3];
+        let square = resource_loader.load_mesh(vertices, indices);
+
+        //      lost empire
+        let le_meshes: Vec<_> = Mesh::from_obj(Path::new("models/lost_empire.obj"))
+            .into_iter()
+            .map(|Mesh(vertices, indices)| resource_loader.load_mesh(vertices, indices))
+            .collect();
+
+        //      ina
+        let ina_meshes: Vec<_> = Mesh::from_obj(Path::new("models/ina/ReadyToRigINA.obj"))
+            .into_iter()
+            .skip(2)
+            .map(|Mesh(vertices, indices)| resource_loader.load_mesh(vertices, indices))
+            .collect();
+
+        println!("[Rendering Data]");
+        println!("Lost empire mesh count: {}", le_meshes.len());
+        println!("Ina mesh count: {}", ina_meshes.len());
+
+        // objects
+        //  Suzanne
+        let suzanne_obj = Arc::new(RenderObject::new(suzanne_mesh, uv_mat_id.clone()));
+        let suzanne = transform_sys.next().unwrap();
+        world.push((suzanne, suzanne_obj));
+
+        //  Squares
+        for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
+            let square_obj = Arc::new(RenderObject::new(square.clone(), uv_mat_id.clone()));
+            let mut transform = Transform::default();
+            transform.set_translation([x, y, z]);
+
+            world.push((transform_sys.add_transform(transform), square_obj));
+        }
+
+        //  Ina
+        let mut ina_transform = Transform::default();
+        ina_transform.set_translation([0.0, 5.0, -1.0]);
+        let ina_transform = transform_sys.add_transform(ina_transform);
+        // world.push((ina_transform));
+
+        for (mesh, mat_id) in zip(ina_meshes, ina_ids.clone()) {
+            let obj = Arc::new(RenderObject::new(mesh, mat_id));
+            let mut transform = Transform::default();
+            transform.set_parent(ina_transform);
+
+            world.push((transform_sys.add_transform(transform), obj));
+        }
+
+        //  lost empires
+        let le_transform = transform_sys.add_transform(Transform::default());
+        for mesh in le_meshes {
+            let le_obj = Arc::new(RenderObject::new(mesh, le_mat_id.clone()));
+            let mut transform = Transform::default();
+            transform.set_parent(le_transform);
+
+            world.push((transform_sys.add_transform(transform), le_obj));
+        }
+
+        suzanne
     }
 
     pub fn update(&mut self, duration_since_last_update: &Duration) {
         let seconds_passed = duration_since_last_update.as_secs_f32();
+        self.total_seconds += seconds_passed;
         // println!("Current time: {}", seconds_passed);
 
+        // move cam
         self.update_movement(seconds_passed);
+
+        // rotate suzanne
+        self.transforms
+            .get_transform_mut(&self.suzanne)
+            .unwrap()
+            .set_rotation(Euler {
+                x: Rad(0.),
+                y: Rad(self.total_seconds),
+                z: Rad(0.),
+            });
 
         // update render objects
         let mut query = <(&TransformID, &mut Arc<RenderObject<Matrix4<f32>>>)>::query();
-        for (transform, render_object) in query.iter_mut(&mut self.world) {
+        // println!("==== RENDER OBJECT DATA ====");
+        for (transform_id, render_object) in query.iter_mut(&mut self.world) {
             // update object data
             match Arc::get_mut(render_object) {
                 Some(obj) => {
-                    obj.set_matrix(self.transforms.get_model(transform))
+                    let transfrom_matrix = self.transforms.get_model(transform_id);
+                    // println!("Obj {:?}: {:?}", transform_id, obj);
+                    obj.set_matrix(transfrom_matrix)
                     // obj.update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));
                 }
                 None => {
@@ -92,11 +269,8 @@ impl App {
         // query render objects
         let mut query = <&Arc<RenderObject<Matrix4<f32>>>>::query();
 
-        self.render_loop.update(
-            &self.camera,
-            query.iter_mut(&mut self.world),
-            seconds_passed,
-        );
+        self.render_loop
+            .update(&self.camera, query.iter_mut(&mut self.world));
     }
 
     fn update_movement(&mut self, seconds_passed: f32) {

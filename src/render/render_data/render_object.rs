@@ -6,6 +6,7 @@ use crate::{vulkano_objects::buffers::Buffers, VertexFull};
 
 use super::material::MaterialID;
 
+#[derive(Debug)]
 pub struct RenderObject<T: Clone> {
     pub mesh: Arc<Buffers<VertexFull>>,
     pub material_id: MaterialID,

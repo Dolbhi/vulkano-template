@@ -1,11 +1,14 @@
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
-use crate::vulkano_objects::{self, allocators::Allocators};
+use crate::{
+    vulkano_objects::{self, allocators::Allocators, buffers::Buffers},
+    VertexFull,
+};
 use vulkano::{
     buffer::BufferContents,
     command_buffer::{self, RenderPassBeginInfo},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
-    image::Image,
+    image::{sampler::Sampler, view::ImageView, Image},
     instance::Instance,
     pipeline::graphics::viewport::Viewport,
     render_pass::{Framebuffer, RenderPass},
@@ -26,7 +29,10 @@ use winit::{
     window::{CursorGrabMode, Window, WindowBuilder},
 };
 
-use super::render_data::DrawSystem;
+use super::render_data::{
+    texture::{create_sampler, load_texture},
+    DrawSystem,
+};
 
 pub type Fence = FenceSignalFuture<
     PresentFuture<
@@ -215,4 +221,36 @@ impl Renderer {
             )
             .then_signal_fence_and_flush()
     }
+
+    pub fn get_resource_loader(&self) -> ResourceLoader {
+        ResourceLoader { context: &self }
+    }
+}
+
+pub struct ResourceLoader<'a> {
+    context: &'a Renderer,
+    // draw_system: &'a mut DrawSystem<GPUObjectData, Matrix4<f32>>,
+}
+
+impl<'a> ResourceLoader<'a> {
+    pub fn load_texture(&self, path: &Path) -> Arc<ImageView> {
+        load_texture(&self.context.allocators, &self.context.queue, path)
+    }
+    pub fn load_sampler(&self, filer: vulkano::image::sampler::Filter) -> Arc<Sampler> {
+        create_sampler(self.context.device.clone(), filer)
+    }
+    pub fn load_mesh(
+        &self,
+        vertices: Vec<VertexFull>,
+        indices: Vec<u32>,
+    ) -> Arc<Buffers<VertexFull>> {
+        Arc::new(Buffers::initialize_device_local(
+            &self.context.allocators,
+            self.context.queue.clone(),
+            vertices,
+            indices,
+        ))
+    }
+    // pub fn build_material
+    // pub fn
 }

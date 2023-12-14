@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use cgmath::{Matrix4, Quaternion, SquareMatrix, Vector3, Zero};
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct TransformID(u32);
 
 #[derive(Clone)]
@@ -26,6 +26,33 @@ impl Transform {
             }
         }
     }
+
+    pub fn get_transform(&self) -> TransformView {
+        TransformView {
+            translation: &self.translation,
+            rotation: &self.rotation,
+            scale: &self.scale,
+        }
+    }
+    pub fn set_parent(&mut self, parent: TransformID) -> Option<TransformID> {
+        self.parent.replace(parent)
+    }
+    pub fn set_translation(&mut self, translation: impl Into<Vector3<f32>>) -> &mut Self {
+        self.translation = translation.into();
+        self.local_model = None;
+        self
+    }
+    pub fn set_rotation(&mut self, rotation: impl Into<Quaternion<f32>>) -> &mut Self {
+        self.rotation = rotation.into();
+        self.local_model = None;
+        self
+    }
+    pub fn set_scale(&mut self, scale: impl Into<Vector3<f32>>) -> &mut Self {
+        self.scale = scale.into();
+        self.local_model = None;
+        self
+    }
+
     // pub fn get_parent_mut<'a>(
     //     &self,
     //     transfrom_system: &'a mut TransformSystem,
@@ -46,6 +73,13 @@ impl Default for Transform {
             scale: Vector3::new(1., 1., 1.),
         }
     }
+}
+
+#[derive(Debug)]
+pub struct TransformView<'a> {
+    pub translation: &'a Vector3<f32>,
+    pub rotation: &'a Quaternion<f32>,
+    pub scale: &'a Vector3<f32>,
 }
 
 pub struct TransformSystem {

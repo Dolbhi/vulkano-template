@@ -15,7 +15,7 @@ pub struct Vertex3d {
     pub position: [f32; 3],
 }
 
-#[derive(BufferContents, Vertex, Clone)]
+#[derive(BufferContents, Vertex, Clone, Debug)]
 #[repr(C)]
 pub struct VertexFull {
     #[format(R32G32B32_SFLOAT)]
