@@ -10,7 +10,7 @@ use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::game_objects::transform::Transform;
 use crate::render::mesh::from_obj;
-use crate::render::{DrawSystem, RenderObject, Renderer};
+use crate::render::{DrawSystem, MaterialID, RenderObject, Renderer};
 use crate::shaders::basic::vs::GPUObjectData;
 use crate::VertexFull;
 use crate::{
@@ -109,6 +109,16 @@ impl App {
             basic_id,
             "lost_empire",
             Some(draw_system.get_pipeline(basic_id).create_material_set(
+                &renderer.allocators,
+                2,
+                le_texture.clone(),
+                linear_sampler.clone(),
+            )),
+        );
+        let le_lit_mat_id = draw_system.add_material(
+            phong_id,
+            "lost_empire_lit",
+            Some(draw_system.get_pipeline(phong_id).create_material_set(
                 &renderer.allocators,
                 2,
                 le_texture,
@@ -223,7 +233,14 @@ impl App {
             let mut transform = Transform::default();
             transform.set_parent(le_transform);
 
-            world.push((transform_sys.add_transform(transform), le_obj));
+            let mat_swapper = MaterialSwapper::new([
+                le_mat_id.clone(),
+                le_lit_mat_id.clone(),
+                uv_mat_id.clone(),
+                "cloth".into(),
+            ]);
+
+            world.push((transform_sys.add_transform(transform), le_obj, mat_swapper));
         }
 
         suzanne
@@ -311,7 +328,21 @@ impl App {
         match key_code {
             KeyCode::KeyQ => {
                 if state == Pressed && self.keys.q == Released {
-                    // self.square.change_to_random_color();
+                    let mut query =
+                        <(&mut MaterialSwapper, &mut Arc<RenderObject<Matrix4<f32>>>)>::query();
+
+                    query.for_each_mut(&mut self.world, |(swapper, render_object)| {
+                        let next_mat = swapper.swap_material();
+                        println!("Swapped mat: {:?}", next_mat);
+                        match Arc::get_mut(render_object) {
+                            Some(obj) => {
+                                obj.material_id = next_mat;
+                            }
+                            None => {
+                                panic!("Unable to swap material on render object");
+                            }
+                        }
+                    });
                 }
                 self.keys.q = state;
             }
@@ -330,5 +361,24 @@ impl App {
     }
     pub fn handle_window_wait(&self) {
         self.render_loop.handle_window_wait();
+    }
+}
+
+struct MaterialSwapper {
+    materials: Vec<MaterialID>,
+    curent_index: usize,
+}
+impl MaterialSwapper {
+    fn new(materials: impl IntoIterator<Item = impl Into<MaterialID>>) -> Self {
+        let materials = materials.into_iter().map(|m| m.into()).collect();
+        Self {
+            materials,
+            curent_index: 0,
+        }
+    }
+
+    fn swap_material(&mut self) -> MaterialID {
+        self.curent_index = (self.curent_index + 1) % self.materials.len();
+        self.materials[self.curent_index].clone()
     }
 }
