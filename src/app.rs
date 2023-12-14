@@ -333,7 +333,7 @@ impl App {
 
                     query.for_each_mut(&mut self.world, |(swapper, render_object)| {
                         let next_mat = swapper.swap_material();
-                        println!("Swapped mat: {:?}", next_mat);
+                        // println!("Swapped mat: {:?}", next_mat);
                         match Arc::get_mut(render_object) {
                             Some(obj) => {
                                 obj.material_id = next_mat;
