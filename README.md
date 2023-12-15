@@ -7,17 +7,18 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 
 ## To Do
 ### Misc.
-- [ ] Link to LinkedIn
+- [x] Link to LinkedIn
 	- [ ] Finish ReadMe
 - [ ] Combine render_data::mesh with vulkano_objects::buffers?
-- [ ] Refactor render_loop and renderer
-	- [ ] Move resize logic to render_loop?
+- [ ] Combine render_loop and renderer
 
 ### Features
-- [ ] Transparency
 - [ ] Asset loader
+	- [ ] Mesh, material and scene loading from files
+	- [ ] Conversion into fast loading format
+- [ ] Multiple subpasses
+- [ ] Transparency
 - [ ] Lighting (Deferred rendering)
-	- [ ] Multiple subpasses?
 - [ ] GUI
 - [ ] Dynamic meshes
 - [ ] Anti-aliasing (MSAA)
