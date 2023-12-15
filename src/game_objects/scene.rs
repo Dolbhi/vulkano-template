@@ -1,12 +1,12 @@
-use legion::World;
+// use legion::World;
 
-use super::transform::TransformSystem;
+// use super::transform::TransformSystem;
 
-pub struct Scene {
-    transforms: TransformSystem,
-    world: World,
-}
+// pub struct Scene {
+//     transforms: TransformSystem,
+//     world: World,
+// }
 
-impl Scene {
-    pub fn update() {}
-}
+// impl Scene {
+//     pub fn update() {}
+// }
