@@ -7,6 +7,7 @@ use crate::{
 use vulkano::{
     buffer::BufferContents,
     command_buffer::{self, RenderPassBeginInfo},
+    descriptor_set::PersistentDescriptorSet,
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
     image::{sampler::Sampler, view::ImageView, Image},
     instance::Instance,
@@ -30,6 +31,7 @@ use winit::{
 };
 
 use super::render_data::{
+    material::PipelineGroup,
     texture::{create_sampler, load_texture},
     DrawSystem,
 };
@@ -250,6 +252,15 @@ impl<'a> ResourceLoader<'a> {
             vertices,
             indices,
         ))
+    }
+    /// creates a texture sampler material set with the 3rd descriptor set layout of given pipeline
+    pub fn load_material_set(
+        &self,
+        pipeline_group: &PipelineGroup,
+        texture: Arc<ImageView>,
+        sampler: Arc<Sampler>,
+    ) -> Arc<PersistentDescriptorSet> {
+        pipeline_group.create_material_set(&self.context.allocators, 2, texture, sampler)
     }
     // pub fn build_material
     // pub fn
