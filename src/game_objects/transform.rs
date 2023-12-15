@@ -14,6 +14,23 @@ pub struct Transform {
     scale: Vector3<f32>,
 }
 impl Transform {
+    pub fn new(create_info: TransformCreateInfo) -> Self {
+        let TransformCreateInfo {
+            parent,
+            translation,
+            rotation,
+            scale,
+        } = create_info;
+
+        Transform {
+            local_model: None,
+            parent,
+            translation,
+            rotation,
+            scale,
+        }
+    }
+
     pub fn get_local_model(&mut self) -> Matrix4<f32> {
         match self.local_model {
             Some(matrix) => matrix,
@@ -63,11 +80,22 @@ impl Transform {
     //     }
     // }
 }
-impl Default for Transform {
+
+pub struct TransformCreateInfo {
+    pub parent: Option<TransformID>,
+    pub translation: Vector3<f32>,
+    pub rotation: Quaternion<f32>,
+    pub scale: Vector3<f32>,
+}
+impl Into<Transform> for TransformCreateInfo {
+    fn into(self) -> Transform {
+        Transform::new(self)
+    }
+}
+impl Default for TransformCreateInfo {
     fn default() -> Self {
         Self {
             parent: Default::default(),
-            local_model: Default::default(),
             translation: Zero::zero(),
             rotation: Zero::zero(),
             scale: Vector3::new(1., 1., 1.),
@@ -114,9 +142,9 @@ impl TransformSystem {
         model
     }
 
-    pub fn add_transform(&mut self, transform: Transform) -> TransformID {
+    pub fn add_transform(&mut self, transform: impl Into<Transform>) -> TransformID {
         let id = TransformID(self.next_id);
-        self.transforms.insert(id, transform);
+        self.transforms.insert(id, transform.into());
         self.next_id += 1;
         id
     }
@@ -131,6 +159,6 @@ impl Iterator for TransformSystem {
     type Item = TransformID;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.add_transform(Default::default()))
+        Some(self.add_transform(Transform::new(Default::default())))
     }
 }

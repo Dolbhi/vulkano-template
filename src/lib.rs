@@ -8,7 +8,7 @@ pub mod vulkano_objects;
 pub use vertex_data::{Vertex2d, Vertex3d, VertexFull};
 
 use crate::{
-    game_objects::transform::Transform,
+    game_objects::transform::TransformCreateInfo,
     render::{mesh::from_obj, RenderObject},
 };
 use cgmath::Matrix4;
@@ -151,32 +151,38 @@ fn init_render_objects(
     //  Squares
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
         let square_obj = Arc::new(RenderObject::new(square.clone(), uv_mat_id.clone()));
-        let mut transform = Transform::default();
-        transform.set_translation([x, y, z]);
+        let transform_id = transform_sys.add_transform(TransformCreateInfo {
+            translation: [x, y, z].into(),
+            ..Default::default()
+        });
 
-        world.push((transform_sys.add_transform(transform), square_obj));
+        world.push((transform_id, square_obj));
     }
 
     //  Ina
-    let mut ina_transform = Transform::default();
-    ina_transform.set_translation([0.0, 5.0, -1.0]);
-    let ina_transform = transform_sys.add_transform(ina_transform);
+    let ina_transform = transform_sys.add_transform(TransformCreateInfo {
+        translation: [0.0, 5.0, -1.0].into(),
+        ..Default::default()
+    });
     // world.push((ina_transform));
-
     for (mesh, mat_id) in zip(ina_meshes, ina_ids.clone()) {
         let obj = Arc::new(RenderObject::new(mesh, mat_id));
-        let mut transform = Transform::default();
-        transform.set_parent(ina_transform);
+        let transform_id = transform_sys.add_transform(TransformCreateInfo {
+            parent: Some(ina_transform),
+            ..Default::default()
+        });
 
-        world.push((transform_sys.add_transform(transform), obj));
+        world.push((transform_id, obj));
     }
 
     //  lost empires
-    let le_transform = transform_sys.add_transform(Transform::default());
+    let le_transform = transform_sys.add_transform(TransformCreateInfo::default());
     for mesh in le_meshes {
         let le_obj = Arc::new(RenderObject::new(mesh, le_mat_id.clone()));
-        let mut transform = Transform::default();
-        transform.set_parent(le_transform);
+        let transform_id = transform_sys.add_transform(TransformCreateInfo {
+            parent: Some(le_transform),
+            ..Default::default()
+        });
 
         let mat_swapper = MaterialSwapper::new([
             le_mat_id.clone(),
@@ -185,7 +191,7 @@ fn init_render_objects(
             "cloth".into(),
         ]);
 
-        world.push((transform_sys.add_transform(transform), le_obj, mat_swapper));
+        world.push((transform_id, le_obj, mat_swapper));
     }
 
     suzanne
