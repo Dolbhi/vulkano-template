@@ -7,7 +7,7 @@ use vulkano::{
 
 use crate::{
     game_objects::Camera,
-    shaders::basic::{fs::GPUSceneData, vs::GPUCameraData},
+    shaders::draw::{GPUCameraData, GPUSceneData},
     vulkano_objects::{
         buffers::{create_global_descriptors, create_storage_buffers},
         pipeline::PipelineHandler,

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::shaders::basic::{fs::GPUSceneData, vs::GPUCameraData};
+use crate::shaders::draw::{GPUCameraData, GPUSceneData};
 use cgmath::Matrix4;
 use vulkano::{
     buffer::{BufferContents, Subbuffer},
