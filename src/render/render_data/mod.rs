@@ -45,14 +45,19 @@ where
     T: Clone + 'a,
 {
     /// creates a pipelines collection using 1 pipeline that future added pipelines must match
-    pub fn new(context: &Renderer, vs: EntryPoint, fs: EntryPoint) -> Self {
+    pub fn new(
+        context: &Renderer,
+        shaders: impl IntoIterator<Item = (EntryPoint, EntryPoint)>,
+    ) -> Self {
         // initialize
         let mut data = DrawSystem {
             pipelines: vec![],
             frames: vec![],
             pending_objects: HashMap::new(),
         };
-        data.add_pipeline(&context, vs, fs);
+        for (vs, fs) in shaders {
+            data.add_pipeline(&context, vs, fs);
+        }
 
         let layout = data.pipelines[0].pipeline.layout();
         let image_count = context.swapchain.image_count() as usize;
@@ -89,8 +94,7 @@ where
 
         data
     }
-
-    pub fn add_pipeline(&mut self, context: &Renderer, vs: EntryPoint, fs: EntryPoint) -> usize {
+    fn add_pipeline(&mut self, context: &Renderer, vs: EntryPoint, fs: EntryPoint) -> usize {
         let pipeline = PipelineHandler::new(
             context.device.clone(),
             vs,
@@ -101,6 +105,7 @@ where
         self.pipelines.push(PipelineGroup::new(pipeline));
         self.pipelines.len() - 1
     }
+
     pub fn get_pipeline(&self, pipeline_index: usize) -> &PipelineGroup {
         &self.pipelines[pipeline_index]
     }
