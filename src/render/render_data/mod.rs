@@ -7,21 +7,23 @@ pub mod texture;
 use std::{collections::HashMap, f32::consts::PI, iter::zip, sync::Arc, vec};
 
 use vulkano::{
-    buffer::BufferContents, command_buffer::AutoCommandBufferBuilder,
-    descriptor_set::PersistentDescriptorSet, shader::EntryPoint,
+    buffer::BufferContents,
+    command_buffer::AutoCommandBufferBuilder,
+    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet},
+    shader::EntryPoint,
 };
 
 use crate::{
     game_objects::Camera,
-    shaders::draw::{GPUCameraData, GPUSceneData},
+    shaders::draw::GPUGlobalData,
     vulkano_objects::{
-        buffers::{create_double_global_descriptors, create_storage_buffers},
+        buffers::{create_global_descriptors, create_storage_buffers},
         pipeline::PipelineHandler,
     },
 };
 
 use self::{
-    frame_data::FrameData,
+    frame_data::DrawBuffers,
     material::{MaterialID, PipelineGroup},
     render_object::RenderObject,
 };
@@ -35,7 +37,8 @@ where
     T: Clone,
 {
     pipelines: Vec<PipelineGroup>,
-    frames: Vec<FrameData<O>>,
+    draw_buffers: Vec<DrawBuffers<O>>,
+    descriptor_sets: Vec<Vec<DescriptorSetWithOffsets>>,
     pending_objects: HashMap<MaterialID, Vec<Arc<RenderObject<T>>>>,
 }
 
@@ -52,7 +55,8 @@ where
         // initialize
         let mut data = DrawSystem {
             pipelines: vec![],
-            frames: vec![],
+            draw_buffers: vec![],
+            descriptor_sets: vec![],
             pending_objects: HashMap::new(),
         };
         for (vs, fs) in shaders {
@@ -63,7 +67,7 @@ where
         let image_count = context.swapchain.image_count() as usize;
 
         // create buffers and descriptors
-        let global_data = create_double_global_descriptors::<GPUCameraData, GPUSceneData>(
+        let global_data = create_global_descriptors::<GPUGlobalData>(
             &context.allocators,
             &context.device,
             layout.set_layouts().get(0).unwrap().clone(),
@@ -78,17 +82,15 @@ where
         );
 
         // create frame data
-        for ((cam_buffer, scene_buffer, global_set), (storage_buffer, object_descriptor)) in
+        for ((global_buffer, global_set), (storage_buffer, object_descriptor)) in
             zip(global_data, object_data)
         {
-            let mut frame = FrameData::new(
-                cam_buffer,
-                scene_buffer,
-                storage_buffer,
-                vec![global_set, object_descriptor.into()],
-            );
+            let mut frame = DrawBuffers::new(global_buffer, storage_buffer);
             frame.update_scene_data(Some([0.2, 0.2, 0.2, 1.]), None, Some([0.9, 0.9, 0.6, 1.]));
-            data.frames.push(frame);
+            data.draw_buffers.push(frame);
+
+            data.descriptor_sets
+                .push(vec![global_set, object_descriptor.into()]);
         }
 
         data
@@ -136,12 +138,11 @@ where
         image_i: usize,
         command_builder: &mut AutoCommandBufferBuilder<P, A>,
     ) {
-        let frame = &self.frames[image_i];
         let mut object_index = 0;
         for pipeline_group in self.pipelines.iter() {
             pipeline_group.draw_objects(
                 &mut object_index,
-                frame.descriptor_sets.clone(),
+                self.descriptor_sets[image_i].clone(),
                 command_builder,
                 &mut self.pending_objects,
             );
@@ -168,11 +169,11 @@ where
                 .material_iter()
                 .flat_map(|mat_id| self.pending_objects[mat_id].iter())
         });
-        let frame = &mut self.frames[image_i as usize];
-        frame.update_objects_data(obj_iter);
+        let buffers = &mut self.draw_buffers[image_i as usize];
+        buffers.update_objects_data(obj_iter);
 
         // update camera
-        frame.update_camera_data(
+        buffers.update_camera_data(
             camera_data.view_matrix(),
             camera_data.projection_matrix(aspect),
         );
@@ -181,7 +182,7 @@ where
         let angle = PI / 4.;
         let cgmath::Vector3::<f32> { x, y, z } =
             cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
-        frame.update_scene_data(None, Some([x, y, z, 1.]), None);
+        buffers.update_scene_data(None, Some([x, y, z, 1.]), None);
     }
 
     // fn clear_unused_resource(&mut self) {

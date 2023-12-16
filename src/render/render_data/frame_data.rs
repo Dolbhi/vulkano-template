@@ -1,39 +1,27 @@
 use std::sync::Arc;
 
-use crate::shaders::draw::{GPUCameraData, GPUSceneData};
+use crate::shaders::draw::GPUGlobalData;
 use cgmath::Matrix4;
-use vulkano::{
-    buffer::{BufferContents, Subbuffer},
-    descriptor_set::DescriptorSetWithOffsets,
-};
+use vulkano::buffer::{BufferContents, Subbuffer};
 
 use super::render_object::RenderObject;
 
-pub struct FrameData<O: BufferContents> {
-    camera_buffer: Subbuffer<GPUCameraData>,
-    global_buffer: Subbuffer<GPUSceneData>,
+pub struct DrawBuffers<O: BufferContents> {
+    global_buffer: Subbuffer<GPUGlobalData>,
     objects_buffer: Subbuffer<[O]>,
-    pub descriptor_sets: Vec<DescriptorSetWithOffsets>,
 }
 
-impl<O: BufferContents> FrameData<O> {
-    pub fn new(
-        camera_buffer: Subbuffer<GPUCameraData>,
-        global_buffer: Subbuffer<GPUSceneData>,
-        objects_buffer: Subbuffer<[O]>,
-        descriptor_sets: Vec<DescriptorSetWithOffsets>,
-    ) -> Self {
-        FrameData {
-            camera_buffer,
+impl<O: BufferContents> DrawBuffers<O> {
+    pub fn new(global_buffer: Subbuffer<GPUGlobalData>, objects_buffer: Subbuffer<[O]>) -> Self {
+        DrawBuffers {
             global_buffer,
             objects_buffer,
-            descriptor_sets,
         }
     }
 
     pub fn update_camera_data(&mut self, view: Matrix4<f32>, proj: Matrix4<f32>) {
         let mut cam_uniform_contents = self
-            .camera_buffer
+            .global_buffer
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
         cam_uniform_contents.view = view.into();

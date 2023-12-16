@@ -160,15 +160,13 @@ fn create_device_local_buffer<T: BufferContents>(
 /// Creates a dynamic buffer to store global data, and a descriptor set for those buffers to be used with offsets
 ///
 /// Returns vec of tuples containing the camera and scene subbuffers and the descriptor set with the offset for that frame
-pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
+pub fn create_global_descriptors<C: BufferContents>(
     allocators: &Allocators,
     device: &Arc<Device>,
     descriptor_set_layout: Arc<DescriptorSetLayout>,
     buffer_count: usize,
-) -> Vec<(Subbuffer<C>, Subbuffer<S>, DescriptorSetWithOffsets)> {
-    let c_size = size_of::<C>() as DeviceSize;
-    let s_size = size_of::<S>() as DeviceSize;
-    let total_size = c_size + s_size;
+) -> Vec<(Subbuffer<C>, DescriptorSetWithOffsets)> {
+    let content_size = size_of::<C>() as DeviceSize;
 
     let align = {
         let min_dynamic_align = device
@@ -178,7 +176,7 @@ pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
             .as_devicesize();
 
         // Round size up to the next multiple of align.
-        (total_size + min_dynamic_align - 1) & !(min_dynamic_align - 1)
+        (content_size + min_dynamic_align - 1) & !(min_dynamic_align - 1)
     };
     let dynamic_buffer = {
         let data_size = buffer_count as u64 * align;
@@ -203,23 +201,13 @@ pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
     let descriptor_set = PersistentDescriptorSet::new(
         &allocators.descriptor_set,
         descriptor_set_layout.clone(),
-        [
-            WriteDescriptorSet::buffer_with_range(
-                0,
-                DescriptorBufferInfo {
-                    buffer: dynamic_buffer.clone(),
-                    range: 0..c_size,
-                },
-            ),
-            // WriteDescriptorSet::buffer(1, scenes_buffer.clone().index(i as DeviceSize)),
-            WriteDescriptorSet::buffer_with_range(
-                1,
-                DescriptorBufferInfo {
-                    buffer: dynamic_buffer.clone(),
-                    range: c_size..total_size,
-                },
-            ),
-        ],
+        [WriteDescriptorSet::buffer_with_range(
+            0,
+            DescriptorBufferInfo {
+                buffer: dynamic_buffer.clone(),
+                range: 0..content_size,
+            },
+        )],
         [],
     )
     .unwrap();
@@ -227,25 +215,99 @@ pub fn create_global_descriptors<C: BufferContents, S: BufferContents>(
     (0..buffer_count as DeviceSize)
         .map(|i| {
             let start = i * align;
-            let c_end = start + c_size;
-            let s_end = start + total_size;
+            let end = start + content_size;
 
-            let cam_buffer = dynamic_buffer
-                .clone()
-                .slice(start..c_end)
-                .reinterpret::<C>();
-            let scene_buffer = dynamic_buffer
-                .clone()
-                .slice(c_end..s_end)
-                .reinterpret::<S>();
+            let buffer = dynamic_buffer.clone().slice(start..end).reinterpret::<C>();
 
             let offset = (align * i) as u32;
-            let set = descriptor_set.clone().offsets([offset; 2]);
+            let set = descriptor_set.clone().offsets([offset]);
 
-            (cam_buffer, scene_buffer, set)
+            (buffer, set)
         })
         .collect()
 }
+
+// /// Creates a dynamic buffer to store global data, and a descriptor set for those buffers to be used with offsets
+// ///
+// /// Returns vec of tuples containing the camera and scene subbuffers and the descriptor set with the offset for that frame
+// pub fn create_double_global_descriptors<C: BufferContents, S: BufferContents>(
+//     allocators: &Allocators,
+//     device: &Arc<Device>,
+//     descriptor_set_layout: Arc<DescriptorSetLayout>,
+//     buffer_count: usize,
+// ) -> Vec<(Subbuffer<C>, Subbuffer<S>, DescriptorSetWithOffsets)> {
+//     let c_size = size_of::<C>() as DeviceSize;
+//     let s_size = size_of::<S>() as DeviceSize;
+//     let total_size = c_size + s_size;
+//     let align = {
+//         let min_dynamic_align = device
+//             .physical_device()
+//             .properties()
+//             .min_uniform_buffer_offset_alignment
+//             .as_devicesize();
+//         // Round size up to the next multiple of align.
+//         (total_size + min_dynamic_align - 1) & !(min_dynamic_align - 1)
+//     };
+//     let dynamic_buffer = {
+//         let data_size = buffer_count as u64 * align;
+//         Buffer::new_slice::<u8>(
+//             allocators.memory.clone(),
+//             BufferCreateInfo {
+//                 usage: BufferUsage::UNIFORM_BUFFER,
+//                 ..Default::default()
+//             },
+//             AllocationCreateInfo {
+//                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+//                     | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+//                 ..Default::default()
+//             },
+//             data_size,
+//         )
+//         .unwrap()
+//     };
+//     // descriptor set is how we interface data between the buffer and the pipeline
+//     let descriptor_set = PersistentDescriptorSet::new(
+//         &allocators.descriptor_set,
+//         descriptor_set_layout.clone(),
+//         [
+//             WriteDescriptorSet::buffer_with_range(
+//                 0,
+//                 DescriptorBufferInfo {
+//                     buffer: dynamic_buffer.clone(),
+//                     range: 0..c_size,
+//                 },
+//             ),
+//             // WriteDescriptorSet::buffer(1, scenes_buffer.clone().index(i as DeviceSize)),
+//             WriteDescriptorSet::buffer_with_range(
+//                 1,
+//                 DescriptorBufferInfo {
+//                     buffer: dynamic_buffer.clone(),
+//                     range: c_size..total_size,
+//                 },
+//             ),
+//         ],
+//         [],
+//     )
+//     .unwrap();
+//     (0..buffer_count as DeviceSize)
+//         .map(|i| {
+//             let start = i * align;
+//             let c_end = start + c_size;
+//             let s_end = start + total_size;
+//             let cam_buffer = dynamic_buffer
+//                 .clone()
+//                 .slice(start..c_end)
+//                 .reinterpret::<C>();
+//             let scene_buffer = dynamic_buffer
+//                 .clone()
+//                 .slice(c_end..s_end)
+//                 .reinterpret::<S>();
+//             let offset = (align * i) as u32;
+//             let set = descriptor_set.clone().offsets([offset; 2]);
+//             (cam_buffer, scene_buffer, set)
+//         })
+//         .collect()
+// }
 
 /// Create descriptor sets of a storage buffer containing an array of the given data type
 pub fn create_storage_buffers<T: BufferContents>(
