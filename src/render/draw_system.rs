@@ -66,7 +66,6 @@ where
             layout.set_layouts().get(0).unwrap().clone(),
             image_count,
         );
-        // TODO: Have object data type be generic
         let object_data = create_storage_buffers(
             &context.allocators,
             layout.set_layouts().get(1).unwrap().clone(),

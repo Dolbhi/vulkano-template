@@ -69,7 +69,7 @@ impl<V: Vertex + BufferContents> Buffers<V> {
 }
 
 /// returns a device only buffer and a future that copies data to it
-fn create_device_local_buffer<T: BufferContents>(
+pub fn create_device_local_buffer<T: BufferContents>(
     allocators: &Allocators,
     queue: Arc<Queue>,
     values: Vec<T>,
@@ -345,3 +345,17 @@ pub fn create_storage_buffers<T: BufferContents>(
         })
         .collect()
 }
+
+// pub fn create_descriptor_set(
+//     allocators: &Allocators,
+//     descriptor_set_layout: Arc<DescriptorSetLayout>,
+//     writes: impl IntoIterator<Item = WriteDescriptorSet>,
+// ) -> Arc<PersistentDescriptorSet> {
+//     PersistentDescriptorSet::new(
+//         &allocators.descriptor_set,
+//         descriptor_set_layout,
+//         writes,
+//         [],
+//     )
+//     .unwrap()
+// }

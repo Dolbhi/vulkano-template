@@ -13,8 +13,8 @@ layout(set = 0, binding = 0) uniform GPULightingData {
     // The `screen_to_world` parameter of the `draw` method.
     mat4 screen_to_world;
     vec4 ambient_color;
-    int point_light_count;
-    int direction_light_count;
+    uint point_light_count;
+    uint direction_light_count;
 } scene_data;
 
 struct PointLight {
@@ -33,7 +33,7 @@ struct DirectionLight {
     // The `direction` parameter of the `draw` method.
     vec4 direction;
 };
-layout(set = 1, binding = 1) readonly buffer DirectionLights {
+layout(set = 2, binding = 0) readonly buffer DirectionLights {
     DirectionLight lights[];
 } direction_buffer;
 
