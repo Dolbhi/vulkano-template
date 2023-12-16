@@ -30,9 +30,11 @@ use winit::{
     window::{CursorGrabMode, Window, WindowBuilder},
 };
 
-use super::render_data::{
-    material::PipelineGroup,
-    texture::{create_sampler, load_texture},
+use super::{
+    render_data::{
+        material::PipelineGroup,
+        texture::{create_sampler, load_texture},
+    },
     DrawSystem,
 };
 

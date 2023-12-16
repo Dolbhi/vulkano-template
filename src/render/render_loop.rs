@@ -7,10 +7,7 @@ use vulkano::{sync::GpuFuture, Validated, VulkanError};
 use winit::event_loop::EventLoop;
 
 use super::renderer::Fence;
-use super::{
-    render_data::{render_object::RenderObject, DrawSystem},
-    renderer::Renderer,
-};
+use super::{render_data::render_object::RenderObject, renderer::Renderer, DrawSystem};
 
 use crate::{
     game_objects::Camera,
