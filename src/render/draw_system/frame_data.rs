@@ -1,24 +1,19 @@
 use std::sync::Arc;
 
-use crate::shaders::draw::GPUGlobalData;
+use crate::{render::RenderObject, shaders::draw::GPUGlobalData};
 use cgmath::Matrix4;
-use vulkano::buffer::{BufferContents, Subbuffer};
+use vulkano::{
+    buffer::{BufferContents, Subbuffer},
+    descriptor_set::DescriptorSetWithOffsets,
+};
 
-use super::render_object::RenderObject;
-
-pub struct DrawBuffers<O: BufferContents> {
-    global_buffer: Subbuffer<GPUGlobalData>,
-    objects_buffer: Subbuffer<[O]>,
+pub struct FrameData<O: BufferContents> {
+    pub global_buffer: Subbuffer<GPUGlobalData>,
+    pub objects_buffer: Subbuffer<[O]>,
+    pub descriptor_sets: Vec<DescriptorSetWithOffsets>,
 }
 
-impl<O: BufferContents> DrawBuffers<O> {
-    pub fn new(global_buffer: Subbuffer<GPUGlobalData>, objects_buffer: Subbuffer<[O]>) -> Self {
-        DrawBuffers {
-            global_buffer,
-            objects_buffer,
-        }
-    }
-
+impl<O: BufferContents> FrameData<O> {
     pub fn update_camera_data(&mut self, view: Matrix4<f32>, proj: Matrix4<f32>) {
         let mut cam_uniform_contents = self
             .global_buffer

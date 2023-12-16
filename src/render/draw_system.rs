@@ -1,10 +1,11 @@
+mod frame_data;
+use frame_data::FrameData;
+
 use std::{collections::HashMap, f32::consts::PI, iter::zip, sync::Arc, vec};
 
 use vulkano::{
-    buffer::BufferContents,
-    command_buffer::AutoCommandBufferBuilder,
-    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet},
-    shader::EntryPoint,
+    buffer::BufferContents, command_buffer::AutoCommandBufferBuilder,
+    descriptor_set::PersistentDescriptorSet, shader::EntryPoint,
 };
 
 use crate::{
@@ -18,7 +19,6 @@ use crate::{
 
 use super::{
     render_data::{
-        frame_data::DrawBuffers,
         material::{MaterialID, PipelineGroup},
         render_object::RenderObject,
     },
@@ -32,8 +32,7 @@ where
     T: Clone,
 {
     pipelines: Vec<PipelineGroup>,
-    draw_buffers: Vec<DrawBuffers<O>>,
-    descriptor_sets: Vec<Vec<DescriptorSetWithOffsets>>,
+    frame_data: Vec<FrameData<O>>,
     pending_objects: HashMap<MaterialID, Vec<Arc<RenderObject<T>>>>,
 }
 
@@ -50,8 +49,7 @@ where
         // initialize
         let mut data = DrawSystem {
             pipelines: vec![],
-            draw_buffers: vec![],
-            descriptor_sets: vec![],
+            frame_data: vec![],
             pending_objects: HashMap::new(),
         };
         for (vs, fs) in shaders {
@@ -77,15 +75,16 @@ where
         );
 
         // create frame data
-        for ((global_buffer, global_set), (storage_buffer, object_descriptor)) in
+        for ((global_buffer, global_set), (objects_buffer, object_descriptor)) in
             zip(global_data, object_data)
         {
-            let mut frame = DrawBuffers::new(global_buffer, storage_buffer);
+            let mut frame = FrameData {
+                global_buffer,
+                objects_buffer,
+                descriptor_sets: vec![global_set, object_descriptor.into()],
+            };
             frame.update_scene_data(Some([0.2, 0.2, 0.2, 1.]), None, Some([0.9, 0.9, 0.6, 1.]));
-            data.draw_buffers.push(frame);
-
-            data.descriptor_sets
-                .push(vec![global_set, object_descriptor.into()]);
+            data.frame_data.push(frame);
         }
 
         data
@@ -137,7 +136,7 @@ where
         for pipeline_group in self.pipelines.iter() {
             pipeline_group.draw_objects(
                 &mut object_index,
-                self.descriptor_sets[image_i].clone(),
+                self.frame_data[image_i].descriptor_sets.clone(),
                 command_builder,
                 &mut self.pending_objects,
             );
@@ -164,7 +163,7 @@ where
                 .material_iter()
                 .flat_map(|mat_id| self.pending_objects[mat_id].iter())
         });
-        let buffers = &mut self.draw_buffers[image_i as usize];
+        let buffers = &mut self.frame_data[image_i as usize];
         buffers.update_objects_data(obj_iter);
 
         // update camera
