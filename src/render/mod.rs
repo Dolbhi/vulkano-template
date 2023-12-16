@@ -1,3 +1,4 @@
+mod lighting_system;
 mod render_data;
 mod render_loop;
 mod renderer;

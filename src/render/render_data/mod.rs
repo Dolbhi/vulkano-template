@@ -1,3 +1,9 @@
+pub mod frame_data;
+pub mod material;
+pub mod mesh;
+pub mod render_object;
+pub mod texture;
+
 use std::{collections::HashMap, f32::consts::PI, iter::zip, sync::Arc, vec};
 
 use vulkano::{
@@ -9,7 +15,7 @@ use crate::{
     game_objects::Camera,
     shaders::draw::{GPUCameraData, GPUSceneData},
     vulkano_objects::{
-        buffers::{create_global_descriptors, create_storage_buffers},
+        buffers::{create_double_global_descriptors, create_storage_buffers},
         pipeline::PipelineHandler,
     },
 };
@@ -21,12 +27,6 @@ use self::{
 };
 
 use super::renderer::Renderer;
-
-pub mod frame_data;
-pub mod material;
-pub mod mesh;
-pub mod render_object;
-pub mod texture;
 
 /// Collection of all data needed for rendering
 pub struct DrawSystem<O, T>
@@ -63,7 +63,7 @@ where
         let image_count = context.swapchain.image_count() as usize;
 
         // create buffers and descriptors
-        let global_data = create_global_descriptors::<GPUCameraData, GPUSceneData>(
+        let global_data = create_double_global_descriptors::<GPUCameraData, GPUSceneData>(
             &context.allocators,
             &context.device,
             layout.set_layouts().get(0).unwrap().clone(),
