@@ -13,25 +13,21 @@ pub struct FrameData<O: BufferContents> {
     camera_buffer: Subbuffer<GPUCameraData>,
     global_buffer: Subbuffer<GPUSceneData>,
     objects_buffer: Subbuffer<[O]>,
-    pub global_descriptor: DescriptorSetWithOffsets,
-    pub objects_descriptor: DescriptorSetWithOffsets,
+    pub descriptor_sets: Vec<DescriptorSetWithOffsets>,
 }
 
 impl<O: BufferContents> FrameData<O> {
     pub fn new(
         camera_buffer: Subbuffer<GPUCameraData>,
         global_buffer: Subbuffer<GPUSceneData>,
-        global_descriptor: DescriptorSetWithOffsets,
         objects_buffer: Subbuffer<[O]>,
-        objects_descriptor: DescriptorSetWithOffsets,
+        descriptor_sets: Vec<DescriptorSetWithOffsets>,
     ) -> Self {
         FrameData {
-            // fence: None,
             camera_buffer,
             global_buffer,
-            global_descriptor,
             objects_buffer,
-            objects_descriptor,
+            descriptor_sets,
         }
     }
 

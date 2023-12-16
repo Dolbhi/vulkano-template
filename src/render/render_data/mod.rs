@@ -84,9 +84,8 @@ where
             let mut frame = FrameData::new(
                 cam_buffer,
                 scene_buffer,
-                global_set,
                 storage_buffer,
-                object_descriptor.into(),
+                vec![global_set, object_descriptor.into()],
             );
             frame.update_scene_data(Some([0.2, 0.2, 0.2, 1.]), None, Some([0.9, 0.9, 0.6, 1.]));
             data.frames.push(frame);
@@ -142,8 +141,7 @@ where
         for pipeline_group in self.pipelines.iter() {
             pipeline_group.draw_objects(
                 &mut object_index,
-                &frame.global_descriptor,
-                &frame.objects_descriptor,
+                frame.descriptor_sets.clone(),
                 command_builder,
                 &mut self.pending_objects,
             );

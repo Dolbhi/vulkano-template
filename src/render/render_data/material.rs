@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use vulkano::{
     command_buffer::{allocator::CommandBufferAllocator, AutoCommandBufferBuilder},
-    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
+    descriptor_set::{DescriptorSetsCollection, PersistentDescriptorSet, WriteDescriptorSet},
     image::{sampler::Sampler, view::ImageView},
     pipeline::{PipelineBindPoint, PipelineLayout},
 };
@@ -28,8 +28,7 @@ impl PipelineGroup {
     pub fn draw_objects<T: Clone, C, A: CommandBufferAllocator>(
         &self,
         object_index: &mut u32,
-        global_descriptor: &DescriptorSetWithOffsets,
-        objects_descriptor: &DescriptorSetWithOffsets,
+        descriptor_sets: impl DescriptorSetsCollection,
         command_builder: &mut AutoCommandBufferBuilder<C, A>,
         objects: &mut HashMap<MaterialID, Vec<Arc<RenderObject<T>>>>,
     ) {
@@ -42,7 +41,7 @@ impl PipelineGroup {
                 PipelineBindPoint::Graphics,
                 self.pipeline.layout().clone(),
                 0,
-                vec![global_descriptor.clone(), objects_descriptor.clone()],
+                descriptor_sets,
             )
             .unwrap();
 
