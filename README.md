@@ -7,22 +7,26 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 
 ## To Do
 ### Misc.
-- [x] Link to LinkedIn
-	- [ ] Finish ReadMe
-- [ ] Combine render_data::mesh with vulkano_objects::buffers?
 - [ ] Combine render_loop and renderer
 
 ### Features
+- [ ] Light data streaming
 - [ ] Asset loader
-	- [ ] Mesh, material and scene loading from files
+	- [ ] Mesh, material and scene loading from files (with universal IDs)
 	- [ ] Conversion into fast loading format
-- [ ] Multiple subpasses
+	- [ ] Loading objects/scenes from file (with auto loading of dependencies)
 - [ ] Transparency
-- [ ] Lighting (Deferred rendering)
 - [ ] GUI
 - [ ] Dynamic meshes
 - [ ] Anti-aliasing (MSAA)
-- [ ] Don't clean every frame?
+- [ ] Occlusion culling
+- [ ] Further lighting developments
+	- [ ] Specular lighting
+	- [ ] Ambient occlusion
+	- [ ] Shadows
+	- [ ] Multiple lighting materials
+- [x] Multiple subpasses
+- [x] Lighting (Deferred rendering)
 - [x] Pipeline cache between materials
 - [x] Multiple mesh rendering
 - [x] Multiple pipeline rendering
