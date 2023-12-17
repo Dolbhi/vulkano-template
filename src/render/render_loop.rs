@@ -95,10 +95,20 @@ impl RenderLoop {
         let aspect = extends.width as f32 / extends.height as f32;
         self.draw_system
             .upload_draw_data(render_objects, camera_data, aspect, image_i);
-        let point = PointLight {
-            color: [0.0, 0.0, 1.0, 1.0],
-            position: [0.0, 6.0, -1.0, 1.0],
-        };
+        let points = [
+            PointLight {
+                color: [1.0, 0.0, 0.0, 1.0],
+                position: [0.0, 5.0, -1.0, 1.0],
+            },
+            PointLight {
+                color: [0.0, 0.0, 1.0, 1.0],
+                position: [0.0, 6.0, -1.0, 1.0], //camera_data.position.extend(1.0).into(),
+            },
+            PointLight {
+                color: [1.0, 1.0, 1.0, 1.0],
+                position: camera_data.position.extend(1.0).into(),
+            },
+        ];
         let angle = PI / 4.;
         let cgmath::Vector3::<f32> { x, y, z } =
             cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
@@ -110,7 +120,7 @@ impl RenderLoop {
             .inverse_transform()
             .unwrap();
         self.lighting_system.upload_lights(
-            [point],
+            points,
             [dir],
             screen_to_world,
             [0.2, 0.2, 0.2, 1.],

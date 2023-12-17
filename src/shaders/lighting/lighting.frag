@@ -41,13 +41,14 @@ layout(location = 0) in vec2 v_screen_coords;
 layout(location = 0) out vec4 f_color;
 
 vec3 point_lighting(PointLight light, vec4 world, vec3 in_normal) {
-    vec3 light_direction = normalize(light.position.xyz - world.xyz);
+    vec3 light_displacement = world.xyz - light.position.xyz;
+    vec3 light_direction = normalize(light_displacement);
 
     // Calculate the percent of lighting that is received based on the orientation of 
     // the normal and the direction of the light.
     float light_percent = max(-dot(light_direction, in_normal), 0.0);
 
-    float light_distance = length(light.position.xyz - world.xyz);
+    float light_distance = length(light_displacement);
     // Further decrease light_percent based on the distance with the light position.
     light_percent *= 1.0 / exp(light_distance);
 
