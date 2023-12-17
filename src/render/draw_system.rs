@@ -1,7 +1,7 @@
 mod frame_data;
 use frame_data::FrameData;
 
-use std::{collections::HashMap, f32::consts::PI, iter::zip, sync::Arc, vec};
+use std::{collections::HashMap, iter::zip, sync::Arc, vec};
 
 use vulkano::{
     buffer::BufferContents, command_buffer::AutoCommandBufferBuilder,
@@ -77,12 +77,11 @@ where
         for ((global_buffer, global_set), (objects_buffer, object_descriptor)) in
             zip(global_data, object_data)
         {
-            let mut frame = FrameData {
+            let frame = FrameData {
                 global_buffer,
                 objects_buffer,
                 descriptor_sets: vec![global_set, object_descriptor.into()],
             };
-            frame.update_scene_data(Some([0.2, 0.2, 0.2, 1.]), None, Some([0.9, 0.9, 0.6, 1.]));
             data.frame_data.push(frame);
         }
 
@@ -168,16 +167,10 @@ where
         buffers.update_objects_data(obj_iter);
 
         // update camera
-        buffers.update_camera_data(
+        buffers.update_global_data(
             camera_data.view_matrix(),
             camera_data.projection_matrix(aspect),
         );
-
-        // update scene data
-        let angle = PI / 4.;
-        let cgmath::Vector3::<f32> { x, y, z } =
-            cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
-        buffers.update_scene_data(None, Some([x, y, z, 1.]), None);
     }
 
     // fn clear_unused_resource(&mut self) {

@@ -10,14 +10,6 @@ vulkano_shaders::shader! {
             ty: "fragment",
             path: "src/shaders/draw/basic/fragment.frag",
         },
-        phong_vs: {
-            ty: "vertex",
-            path: "src/shaders/draw/phong/vertex.vert",
-        },
-        phong_fs: {
-            ty: "fragment",
-            path: "src/shaders/draw/phong/fragment.frag",
-        },
         uv_fs: {
             ty: "fragment",
             path: "src/shaders/draw/uv/fragment.frag",

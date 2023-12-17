@@ -14,7 +14,7 @@ pub struct FrameData<O: BufferContents> {
 }
 
 impl<O: BufferContents> FrameData<O> {
-    pub fn update_camera_data(&mut self, view: Matrix4<f32>, proj: Matrix4<f32>) {
+    pub fn update_global_data(&mut self, view: Matrix4<f32>, proj: Matrix4<f32>) {
         let mut cam_uniform_contents = self
             .global_buffer
             .write()
@@ -22,29 +22,6 @@ impl<O: BufferContents> FrameData<O> {
         cam_uniform_contents.view = view.into();
         cam_uniform_contents.proj = proj.into();
         cam_uniform_contents.view_proj = (proj * view).into();
-    }
-
-    pub fn update_scene_data(
-        &mut self,
-        ambient_color: Option<[f32; 4]>,
-        sunlight_direction: Option<[f32; 4]>,
-        sunlight_color: Option<[f32; 4]>,
-    ) {
-        let mut scene_uniform_contents = self
-            .global_buffer
-            .write()
-            .unwrap_or_else(|e| panic!("Failed to write to scene uniform buffer\n{}", e));
-
-        if let Some(ambient) = ambient_color {
-            scene_uniform_contents.ambient_color = ambient;
-        }
-        if let Some(direction) = sunlight_direction {
-            scene_uniform_contents.sunlight_direction = direction;
-            // scene_uniform_contents.sunlight_direction[1] *= -1.;
-        }
-        if let Some(color) = sunlight_color {
-            scene_uniform_contents.sunlight_color = color;
-        }
     }
 
     pub fn update_objects_data<'a, T>(
