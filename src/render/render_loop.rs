@@ -96,7 +96,7 @@ impl RenderLoop {
         self.draw_system
             .upload_draw_data(render_objects, camera_data, aspect, image_i);
         let point = PointLight {
-            color: [1.0, 1.0, 1.0, 1.0],
+            color: [0.0, 0.0, 1.0, 1.0],
             position: [0.0, 6.0, -1.0, 1.0],
         };
         let angle = PI / 4.;
