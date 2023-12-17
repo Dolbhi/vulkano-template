@@ -21,6 +21,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [ ] Anti-aliasing (MSAA)
 - [ ] Occlusion culling
 - [ ] Further lighting developments
+	- [ ] Point light range and volumes
 	- [ ] Specular lighting
 	- [ ] Ambient occlusion
 	- [ ] Shadows
