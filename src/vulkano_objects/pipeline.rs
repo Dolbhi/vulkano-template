@@ -11,7 +11,10 @@ use vulkano::{
         GraphicsPipelineCreateInfo,
     },
     pipeline::{
-        graphics::rasterization::{CullMode, RasterizationState},
+        graphics::{
+            color_blend::{AttachmentBlend, BlendFactor, BlendOp, ColorBlendAttachmentState},
+            rasterization::{CullMode, RasterizationState},
+        },
         layout::PipelineDescriptorSetLayoutCreateInfo,
         GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
     },
@@ -26,6 +29,7 @@ pub struct PipelineHandler<V: Vertex> {
     pub pipeline: Arc<GraphicsPipeline>,
     vertex_type: PhantomData<V>,
     dynamic_bindings: Vec<(usize, u32)>,
+    pipeline_type: PipelineType,
 }
 
 impl<V: Vertex> PipelineHandler<V> {
@@ -36,6 +40,7 @@ impl<V: Vertex> PipelineHandler<V> {
         viewport: Viewport,
         render_pass: Arc<RenderPass>,
         dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
+        pipeline_type: PipelineType,
     ) -> Self {
         let pipeline = window_size_dependent_pipeline::<V>(
             device,
@@ -44,6 +49,7 @@ impl<V: Vertex> PipelineHandler<V> {
             viewport,
             render_pass,
             dynamic_bindings.clone(),
+            pipeline_type,
         );
         Self {
             vs,
@@ -51,6 +57,7 @@ impl<V: Vertex> PipelineHandler<V> {
             pipeline,
             vertex_type: PhantomData,
             dynamic_bindings: dynamic_bindings.into_iter().collect(),
+            pipeline_type,
         }
     }
 
@@ -71,20 +78,84 @@ impl<V: Vertex> PipelineHandler<V> {
             viewport,
             render_pass,
             self.dynamic_bindings.clone(),
+            self.pipeline_type,
         );
     }
 }
 
-/// Create pipeline made for rarely size changing windows, with the 2nd binding on the 1st set being dynamic
-///
-/// ### Descriptor Set Layout
-/// Descriptor set 0, binding 0 and 1 are set to dynamic
+#[derive(Clone, Copy)]
+pub enum PipelineType {
+    Drawing,
+    Lighting,
+}
+
+impl PipelineType {
+    /// assigns the following members for the given pipeline create info
+    /// - rasterization_state
+    /// - depth_stencil_state
+    /// - multisample_state
+    /// - color_blend_state
+    /// - subpass
+    fn apply_to_create_info(
+        self,
+        create_info: GraphicsPipelineCreateInfo,
+        render_pass: Arc<RenderPass>,
+    ) -> GraphicsPipelineCreateInfo {
+        match self {
+            Self::Drawing => {
+                let subpass = Subpass::from(render_pass, 0).unwrap();
+                GraphicsPipelineCreateInfo {
+                    rasterization_state: Some(RasterizationState {
+                        cull_mode: CullMode::Back,
+                        ..Default::default()
+                    }),
+                    depth_stencil_state: Some(DepthStencilState {
+                        depth: Some(DepthState::simple()),
+                        ..Default::default()
+                    }),
+                    multisample_state: Some(Default::default()),
+                    color_blend_state: Some(ColorBlendState::with_attachment_states(
+                        subpass.num_color_attachments(),
+                        Default::default(),
+                    )),
+                    subpass: Some(subpass.into()),
+                    ..create_info
+                }
+            }
+            Self::Lighting => {
+                let subpass = Subpass::from(render_pass, 1).unwrap();
+                GraphicsPipelineCreateInfo {
+                    rasterization_state: Some(Default::default()),
+                    depth_stencil_state: None,
+                    multisample_state: Some(Default::default()),
+                    color_blend_state: Some(ColorBlendState::with_attachment_states(
+                        // additive blending (not needed as all lighting is done in one draw call)
+                        subpass.num_color_attachments(),
+                        ColorBlendAttachmentState {
+                            blend: Some(AttachmentBlend {
+                                color_blend_op: BlendOp::Add,
+                                src_color_blend_factor: BlendFactor::One,
+                                dst_color_blend_factor: BlendFactor::One,
+                                alpha_blend_op: BlendOp::Max,
+                                src_alpha_blend_factor: BlendFactor::One,
+                                dst_alpha_blend_factor: BlendFactor::One,
+                            }),
+                            ..Default::default()
+                        },
+                    )),
+                    subpass: Some(subpass.into()),
+                    ..create_info
+                }
+            }
+        }
+    }
+}
+
+/// Create pipeline made for rarely size changing windows
 ///
 /// ### Pipeline Sates
-/// - vertex input: `VertexFull`
+/// - vertex input: based on given generic
 /// - viewport: given
-/// - rasterization: culls back faces
-/// - depth stencil: simple
 pub fn window_size_dependent_pipeline<V: Vertex>(
     device: Arc<Device>,
     vs: EntryPoint,
@@ -93,6 +164,7 @@ pub fn window_size_dependent_pipeline<V: Vertex>(
     // images: &[Arc<Image>],
     render_pass: Arc<RenderPass>,
     dynamic_bindings: impl IntoIterator<Item = (usize, u32)>,
+    pipeline_type: PipelineType,
 ) -> Arc<GraphicsPipeline> {
     let vertex_input_state = V::per_vertex()
         .definition(&vs.info().input_interface) //[Position::per_vertex(), Normal::per_vertex()]
@@ -120,41 +192,29 @@ pub fn window_size_dependent_pipeline<V: Vertex>(
         )
         .unwrap()
     };
-    let subpass = Subpass::from(render_pass, 0).unwrap();
 
     GraphicsPipeline::new(
         device,
         None,
-        GraphicsPipelineCreateInfo {
-            stages: stages.into_iter().collect(),
-            vertex_input_state: Some(vertex_input_state),
-            input_assembly_state: Some(Default::default()),
-            viewport_state: Some(ViewportState {
-                viewports: [Viewport {
-                    offset: [0.0, 0.0],
-                    extent: viewport.extent,
-                    depth_range: 0.0..=1.0,
-                }]
-                .into_iter()
-                .collect(),
-                ..Default::default()
-            }),
-            rasterization_state: Some(RasterizationState {
-                cull_mode: CullMode::Back,
-                ..Default::default()
-            }),
-            depth_stencil_state: Some(DepthStencilState {
-                depth: Some(DepthState::simple()),
-                ..Default::default()
-            }),
-            multisample_state: Some(Default::default()),
-            color_blend_state: Some(ColorBlendState::with_attachment_states(
-                subpass.num_color_attachments(),
-                Default::default(),
-            )),
-            subpass: Some(subpass.into()),
-            ..GraphicsPipelineCreateInfo::layout(layout)
-        },
+        pipeline_type.apply_to_create_info(
+            GraphicsPipelineCreateInfo {
+                stages: stages.into_iter().collect(),
+                vertex_input_state: Some(vertex_input_state),
+                input_assembly_state: Some(Default::default()),
+                viewport_state: Some(ViewportState {
+                    viewports: [Viewport {
+                        offset: [0.0, 0.0],
+                        extent: viewport.extent,
+                        depth_range: 0.0..=1.0,
+                    }]
+                    .into_iter()
+                    .collect(),
+                    ..Default::default()
+                }),
+                ..GraphicsPipelineCreateInfo::layout(layout)
+            },
+            render_pass,
+        ),
     )
     .unwrap()
 }

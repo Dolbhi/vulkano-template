@@ -48,6 +48,7 @@ impl LightingSystem {
                 context.viewport.clone(),
                 context.render_pass.clone(),
                 [(1, 0)],
+                crate::vulkano_objects::pipeline::PipelineType::Lighting,
             )
         };
 
@@ -67,6 +68,7 @@ impl LightingSystem {
         )
         .unwrap()
         .into();
+
         let mut global_data = create_global_descriptors::<GPULightingData>(
             &context.allocators,
             &context.device,
@@ -92,6 +94,8 @@ impl LightingSystem {
             let (global_buffer, global_set) = global_data.pop().unwrap();
             let (point_buffer, point_set) = point_data.pop().unwrap();
             let (dir_buffer, dir_set) = dir_data.pop().unwrap();
+
+            // println!("Creation layout: {:?}", global_set.as_ref().0.layout());
 
             frame_data.push(FrameData {
                 global_buffer,
@@ -139,7 +143,7 @@ impl LightingSystem {
 
     /// recreate the descriptor set describing the framebuffer attachments, must be done after recreating framebuffer (see `DrawSystem::recreate_pipelines`)
     pub fn recreate_descriptor(&mut self, context: &Renderer) {
-        let attachments: DescriptorSetWithOffsets = PersistentDescriptorSet::new(
+        let attachments = PersistentDescriptorSet::new(
             &context.allocators.descriptor_set,
             self.pipeline.layout().set_layouts().get(0).unwrap().clone(),
             [
@@ -149,12 +153,9 @@ impl LightingSystem {
             ],
             [],
         )
-        .unwrap()
-        .into();
+        .unwrap();
 
-        for frame in &mut self.frame_data {
-            *frame.descriptor_sets.get_mut(0).unwrap() = attachments.clone();
-        }
+        self.attachments_set = attachments;
     }
 
     pub fn upload_lights(
@@ -179,6 +180,15 @@ impl LightingSystem {
         command_builder: &mut AutoCommandBufferBuilder<P, A>,
     ) {
         let frame = &self.frame_data[image_i];
+
+        // println!(
+        //     "Pipeline layout: {:?}",
+        //     self.pipeline.layout().set_layouts()[1]
+        // );
+        // println!(
+        //     "Set layout:      {:?}",
+        //     frame.descriptor_sets[0].as_ref().0.layout()
+        // );
 
         // bind commands
         command_builder
@@ -256,8 +266,8 @@ impl FrameData {
         });
 
         *contents = GPULightingData {
-            screen_to_world: screen_to_world,
-            ambient_color: ambient_color,
+            screen_to_world,
+            ambient_color,
             point_light_count: point_light_count as u32,
             direction_light_count: direction_light_count as u32,
         };

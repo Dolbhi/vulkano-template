@@ -96,6 +96,7 @@ where
             context.viewport.clone(),
             context.render_pass.clone(),
             [(0, 0)],
+            crate::vulkano_objects::pipeline::PipelineType::Drawing,
         );
         self.pipelines.push(PipelineGroup::new(pipeline));
         self.pipelines.len() - 1

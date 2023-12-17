@@ -62,15 +62,15 @@ fn init_render_objects(
             linear_sampler.clone(),
         )),
     );
-    let le_lit_mat_id = draw_system.add_material(
-        phong_id,
-        "lost_empire_lit",
-        Some(resource_loader.load_material_set(
-            draw_system.get_pipeline(phong_id),
-            le_texture,
-            linear_sampler.clone(),
-        )),
-    );
+    // let le_lit_mat_id = draw_system.add_material(
+    //     phong_id,
+    //     "lost_empire_lit",
+    //     Some(resource_loader.load_material_set(
+    //         draw_system.get_pipeline(phong_id),
+    //         le_texture,
+    //         linear_sampler.clone(),
+    //     )),
+    // );
 
     //  ina
     let ina_ids: Vec<_> = zip(["hair", "cloth", "body", "head"], ina_textures)
