@@ -1,14 +1,17 @@
+use std::f32::consts::PI;
 use std::sync::Arc;
 use std::vec;
 
-use cgmath::Matrix4;
+use cgmath::{Matrix4, Transform};
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use winit::event_loop::EventLoop;
 
+use super::lighting_system::LightingSystem;
 use super::renderer::Fence;
 use super::{render_data::render_object::RenderObject, renderer::Renderer, DrawSystem};
 
+use crate::shaders::lighting::fs::{DirectionLight, PointLight};
 use crate::{
     game_objects::Camera,
     shaders::draw::{self, GPUObjectData},
@@ -16,7 +19,8 @@ use crate::{
 
 pub struct RenderLoop {
     pub renderer: Renderer,
-    pub render_data: DrawSystem<GPUObjectData, Matrix4<f32>>,
+    pub draw_system: DrawSystem<GPUObjectData, Matrix4<f32>>,
+    pub lighting_system: LightingSystem,
     recreate_swapchain: bool,
     window_resized: bool,
     fences: Vec<Option<Arc<Fence>>>,
@@ -27,13 +31,14 @@ impl RenderLoop {
     pub fn new(event_loop: &EventLoop<()>) -> Self {
         let renderer = Renderer::initialize(event_loop);
 
-        let render_data = Self::init_render_objects(&renderer);
-
+        let draw_system = Self::init_render_objects(&renderer);
+        let lighting_system = LightingSystem::new(&renderer);
         let fences = vec![None; renderer.swapchain.image_count() as usize]; //(0..frames.len()).map(|_| None).collect();
 
         Self {
             renderer,
-            render_data,
+            draw_system,
+            lighting_system,
             recreate_swapchain: false,
             window_resized: false,
             fences,
@@ -58,10 +63,13 @@ impl RenderLoop {
             self.window_resized = false;
             self.recreate_swapchain = false;
             self.renderer.recreate_swapchain();
-            self.render_data.recreate_pipelines(&self.renderer);
+            self.lighting_system.recreate_descriptor(&self.renderer);
+            self.draw_system.recreate_pipelines(&self.renderer);
+            self.lighting_system.recreate_pipeline(&self.renderer);
         } else if self.recreate_swapchain {
             self.recreate_swapchain = false;
             self.renderer.recreate_swapchain();
+            self.lighting_system.recreate_descriptor(&self.renderer);
         }
 
         // get upcoming image to display and future of when it is ready
@@ -84,11 +92,29 @@ impl RenderLoop {
         }
 
         let extends = self.renderer.window.inner_size();
-        self.render_data.upload_draw_data(
-            render_objects,
-            camera_data,
-            extends.width as f32 / extends.height as f32,
-            image_i,
+        let aspect = extends.width as f32 / extends.height as f32;
+        self.draw_system
+            .upload_draw_data(render_objects, camera_data, aspect, image_i);
+        let point = PointLight {
+            color: [1.0, 1.0, 1.0, 1.0],
+            position: [0.0, 6.0, -1.0, 1.0],
+        };
+        let angle = PI / 4.;
+        let cgmath::Vector3::<f32> { x, y, z } =
+            cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
+        let dir = DirectionLight {
+            color: [1., 1., 0., 1.],
+            direction: [x, y, z, 1.],
+        };
+        let screen_to_world = (camera_data.projection_matrix(aspect) * camera_data.view_matrix())
+            .inverse_transform()
+            .unwrap();
+        self.lighting_system.upload_lights(
+            [point],
+            [dir],
+            screen_to_world,
+            [0.2, 0.2, 0.2, 1.],
+            image_i as usize,
         );
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
@@ -112,7 +138,8 @@ impl RenderLoop {
             previous_future,
             acquire_future,
             image_i,
-            &mut self.render_data,
+            &mut self.draw_system,
+            &mut self.lighting_system,
         );
         // replace fence of upcoming image with new one
         self.fences[image_i as usize] = match result {
@@ -146,18 +173,18 @@ impl RenderLoop {
                 draw::load_basic_fs(renderer.device.clone())
                     .expect("failed to create basic shader module"),
             ),
-            (
-                draw::load_phong_vs(renderer.device.clone())
-                    .expect("failed to create phong shader module"),
-                draw::load_phong_fs(renderer.device.clone())
-                    .expect("failed to create phong shader module"),
-            ),
-            (
-                draw::load_basic_vs(renderer.device.clone())
-                    .expect("failed to create uv shader module"),
-                draw::load_uv_fs(renderer.device.clone())
-                    .expect("failed to create uv shader module"),
-            ),
+            // (
+            //     draw::load_phong_vs(renderer.device.clone())
+            //         .expect("failed to create phong shader module"),
+            //     draw::load_phong_fs(renderer.device.clone())
+            //         .expect("failed to create phong shader module"),
+            // ),
+            // (
+            //     draw::load_basic_vs(renderer.device.clone())
+            //         .expect("failed to create uv shader module"),
+            //     draw::load_uv_fs(renderer.device.clone())
+            //         .expect("failed to create uv shader module"),
+            // ),
         ];
 
         DrawSystem::new(

@@ -95,6 +95,7 @@ where
             fs,
             context.viewport.clone(),
             context.render_pass.clone(),
+            [(0, 0)],
         );
         self.pipelines.push(PipelineGroup::new(pipeline));
         self.pipelines.len() - 1

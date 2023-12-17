@@ -61,7 +61,7 @@ impl App {
             &mut world,
             &mut transforms,
             &render_loop.renderer,
-            &mut render_loop.render_data,
+            &mut render_loop.draw_system,
         );
 
         Self {

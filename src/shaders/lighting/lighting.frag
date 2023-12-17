@@ -9,7 +9,7 @@ layout(input_attachment_index = 1, set = 0, binding = 1) uniform subpassInput u_
 // The `depth_input` parameter of the `draw` method.
 layout(input_attachment_index = 2, set = 0, binding = 2) uniform subpassInput u_depth;
 
-layout(set = 0, binding = 0) uniform GPULightingData {
+layout(set = 1, binding = 0) uniform GPULightingData {
     // The `screen_to_world` parameter of the `draw` method.
     mat4 screen_to_world;
     vec4 ambient_color;
@@ -23,7 +23,7 @@ struct PointLight {
     // The `position` parameter of the `draw` method.
     vec4 position;
 };
-layout(set = 1, binding = 0) readonly buffer PointLights {
+layout(set = 2, binding = 0) readonly buffer PointLights {
     PointLight lights[];
 } point_buffer;
 
@@ -33,7 +33,7 @@ struct DirectionLight {
     // The `direction` parameter of the `draw` method.
     vec4 direction;
 };
-layout(set = 2, binding = 0) readonly buffer DirectionLights {
+layout(set = 3, binding = 0) readonly buffer DirectionLights {
     DirectionLight lights[];
 } direction_buffer;
 

@@ -15,6 +15,7 @@ layout(set = 0, binding = 0) uniform GPUGlobalData {
 layout(set = 2, binding = 0) uniform sampler2D s;
 
 layout(location = 0) out vec4 f_color;
+layout(location = 1) out vec4 f_normal;
 
 void main()
 {
@@ -26,4 +27,5 @@ void main()
 	vec3 diffuse = max(diffuse_factor, 0) * vec3(tex_color) * vec3(global_data.sunlight_color);
 
 	f_color = vec4(ambient + diffuse, 1.0);
+	f_normal = vec4(normal, 0.0);
 }

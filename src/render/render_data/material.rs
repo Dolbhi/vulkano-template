@@ -7,17 +7,20 @@ use vulkano::{
     pipeline::{PipelineBindPoint, PipelineLayout},
 };
 
-use crate::vulkano_objects::{allocators::Allocators, pipeline::PipelineHandler};
+use crate::{
+    vulkano_objects::{allocators::Allocators, pipeline::PipelineHandler},
+    VertexFull,
+};
 
 use super::render_object::RenderObject;
 
 pub struct PipelineGroup {
-    pub pipeline: PipelineHandler,
+    pub pipeline: PipelineHandler<VertexFull>,
     materials: Vec<Material>,
 }
 
 impl PipelineGroup {
-    pub fn new(pipeline: PipelineHandler) -> Self {
+    pub fn new(pipeline: PipelineHandler<VertexFull>) -> Self {
         PipelineGroup {
             pipeline,
             materials: vec![],

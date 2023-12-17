@@ -35,8 +35,8 @@ fn init_render_objects(
 ) -> TransformID {
     let resource_loader = renderer.get_resource_loader();
     let basic_id = 0;
-    let phong_id = 1;
-    let uv_id = 2;
+    let phong_id = 0;
+    let uv_id = 0;
 
     // Texture
     let le_texture = resource_loader.load_texture(Path::new("models/lost_empire-RGBA.png"));
@@ -184,14 +184,14 @@ fn init_render_objects(
             ..Default::default()
         });
 
-        let mat_swapper = MaterialSwapper::new([
-            le_mat_id.clone(),
-            le_lit_mat_id.clone(),
-            uv_mat_id.clone(),
-            "cloth".into(),
-        ]);
+        // let mat_swapper = MaterialSwapper::new([
+        //     le_mat_id.clone(),
+        //     le_lit_mat_id.clone(),
+        //     uv_mat_id.clone(),
+        //     "cloth".into(),
+        // ]);
 
-        world.push((transform_id, le_obj, mat_swapper));
+        world.push((transform_id, le_obj));
     }
 
     suzanne

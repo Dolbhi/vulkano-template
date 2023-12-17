@@ -87,21 +87,21 @@ pub fn create_deferred_render_pass(
                 load_op: Clear,
                 store_op: Store,
             },
-            // Will be bound to `self.diffuse_buffer`.
+            // Diffuse buffer (unlit color)
             diffuse: {
                 format: Format::A2B10G10R10_UNORM_PACK32,
                 samples: 1,
                 load_op: Clear,
                 store_op: DontCare,
             },
-            // Will be bound to `self.normals_buffer`.
+            // Normal buffer
             normals: {
                 format: Format::R16G16B16A16_SFLOAT,
                 samples: 1,
                 load_op: Clear,
                 store_op: DontCare,
             },
-            // Will be bound to `self.depth_buffer`.
+            // Depth buffer
             depth_stencil: {
                 format: Format::D32_SFLOAT,
                 samples: 1,
@@ -130,12 +130,12 @@ pub fn create_deferred_render_pass(
 pub fn create_deferred_framebuffers_from_images(
     images: &[Arc<Image>],
     render_pass: Arc<RenderPass>,
-    memory_allocator: &Allocators,
-) -> Vec<Arc<Framebuffer>> {
+    allocator: &Allocators,
+) -> (FramebufferAttachments, Vec<Arc<Framebuffer>>) {
     let extent = images[0].extent();
     let diffuse_attachment = ImageView::new_default(
         Image::new(
-            memory_allocator.memory.clone(),
+            allocator.memory.clone(),
             ImageCreateInfo {
                 extent,
                 format: Format::A2B10G10R10_UNORM_PACK32,
@@ -151,7 +151,7 @@ pub fn create_deferred_framebuffers_from_images(
     .unwrap();
     let normals_attachment = ImageView::new_default(
         Image::new(
-            memory_allocator.memory.clone(),
+            allocator.memory.clone(),
             ImageCreateInfo {
                 extent,
                 format: Format::R16G16B16A16_SFLOAT,
@@ -167,7 +167,7 @@ pub fn create_deferred_framebuffers_from_images(
     .unwrap();
     let depth_attachment = ImageView::new_default(
         Image::new(
-            memory_allocator.memory.clone(),
+            allocator.memory.clone(),
             ImageCreateInfo {
                 extent,
                 format: Format::D32_SFLOAT,
@@ -182,7 +182,7 @@ pub fn create_deferred_framebuffers_from_images(
     )
     .unwrap();
 
-    images
+    let framebuffers = images
         .iter()
         .map(|image| {
             let view = ImageView::new_default(image.clone()).unwrap();
@@ -200,5 +200,12 @@ pub fn create_deferred_framebuffers_from_images(
             )
             .unwrap()
         })
-        .collect::<Vec<_>>()
+        .collect::<Vec<_>>();
+
+    (
+        (diffuse_attachment, normals_attachment, depth_attachment),
+        framebuffers,
+    )
 }
+
+pub type FramebufferAttachments = (Arc<ImageView>, Arc<ImageView>, Arc<ImageView>);

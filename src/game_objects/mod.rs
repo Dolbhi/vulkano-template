@@ -1,4 +1,5 @@
 mod camera;
+pub mod light;
 mod scene;
 pub mod transform;
 

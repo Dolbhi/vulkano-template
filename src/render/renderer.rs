@@ -1,7 +1,9 @@
 use std::{path::Path, sync::Arc};
 
 use crate::{
-    vulkano_objects::{self, allocators::Allocators, buffers::Buffers},
+    vulkano_objects::{
+        self, allocators::Allocators, buffers::Buffers, render_pass::FramebufferAttachments,
+    },
     VertexFull,
 };
 use vulkano::{
@@ -31,6 +33,7 @@ use winit::{
 };
 
 use super::{
+    lighting_system::LightingSystem,
     render_data::{
         material::PipelineGroup,
         texture::{create_sampler, load_texture},
@@ -57,6 +60,7 @@ pub struct Renderer {
     images: Vec<Arc<Image>>, // only used for getting image count
     pub render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>, // deferred examples remakes fb's every frame
+    pub attachments: FramebufferAttachments,
     pub allocators: Allocators,
     pub viewport: Viewport,
 }
@@ -109,13 +113,16 @@ impl Renderer {
 
         let allocators = Allocators::new(device.clone());
 
-        let render_pass =
-            vulkano_objects::render_pass::create_render_pass(device.clone(), swapchain.clone());
-        let framebuffers = vulkano_objects::render_pass::create_framebuffers_from_swapchain_images(
-            &images,
-            render_pass.clone(),
-            &allocators,
+        let render_pass = vulkano_objects::render_pass::create_deferred_render_pass(
+            device.clone(),
+            swapchain.clone(),
         );
+        let (attachments, framebuffers) =
+            vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
+                &images,
+                render_pass.clone(),
+                &allocators,
+            );
 
         let viewport = Viewport {
             extent: window.inner_size().into(),
@@ -142,6 +149,7 @@ impl Renderer {
             images,
             render_pass,
             framebuffers,
+            attachments,
             allocators,
             viewport,
         }
@@ -160,11 +168,12 @@ impl Renderer {
 
         self.swapchain = new_swapchain;
         self.images = new_images;
-        self.framebuffers = vulkano_objects::render_pass::create_framebuffers_from_swapchain_images(
-            &self.images,
-            self.render_pass.clone(),
-            &self.allocators,
-        );
+        (self.attachments, self.framebuffers) =
+            vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
+                &self.images,
+                self.render_pass.clone(),
+                &self.allocators,
+            );
     }
 
     /// Gets future where next image in swapchain is ready
@@ -187,12 +196,16 @@ impl Renderer {
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
-        render_data: &mut DrawSystem<O, T>,
+        draw_system: &mut DrawSystem<O, T>,
+        lighting_system: &mut LightingSystem,
     ) -> Result<Fence, Validated<VulkanError>>
     where
         O: BufferContents + From<T>,
         T: Clone,
     {
+        let index = image_i as usize;
+
+        // create builder
         let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
             self.queue.queue_family_index(),
@@ -200,18 +213,31 @@ impl Renderer {
         )
         .unwrap();
 
+        // start render pass
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![Some([0.1, 0.1, 0.1, 1.0].into()), Some(1.0.into())],
-                    ..RenderPassBeginInfo::framebuffer(self.framebuffers[image_i as usize].clone())
+                    clear_values: vec![
+                        Some([0.0, 0.0, 0.0, 0.0].into()), // swapchain image
+                        Some([0.0, 0.0, 0.0, 0.0].into()), // diffuse buffer
+                        Some([0.0, 0.0, 0.0, 0.0].into()), // normal buffer
+                        Some(1.0f32.into()),               // depth buffer
+                    ],
+                    ..RenderPassBeginInfo::framebuffer(self.framebuffers[index].clone())
                 },
                 Default::default(),
             )
             .unwrap();
 
-        render_data.render(image_i as usize, &mut builder);
-
+        // draw pass
+        draw_system.render(index, &mut builder);
+        // end subpass
+        builder
+            .next_subpass(Default::default(), Default::default())
+            .unwrap();
+        // lighting pass
+        lighting_system.render(index, &mut builder);
+        // end render pass
         builder.end_render_pass(Default::default()).unwrap();
 
         // Join given futures then execute new commands and present the swapchain image corresponding to the given image_i

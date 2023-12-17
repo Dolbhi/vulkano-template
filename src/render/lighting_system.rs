@@ -1,8 +1,9 @@
-use cgmath::{Matrix4, Vector4};
+use std::sync::Arc;
+
 use vulkano::{
     buffer::{BufferUsage, Subbuffer},
     command_buffer::AutoCommandBufferBuilder,
-    descriptor_set::DescriptorSetWithOffsets,
+    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
     pipeline::PipelineBindPoint,
     sync::GpuFuture,
 };
@@ -22,9 +23,10 @@ use crate::{
 use super::Renderer;
 
 pub struct LightingSystem {
-    pipeline: PipelineHandler,
+    pipeline: PipelineHandler<Vertex2d>,
     frame_data: Vec<FrameData>,
     vertex_buffer: Subbuffer<[Vertex2d]>,
+    attachments_set: Arc<PersistentDescriptorSet>,
 }
 
 impl LightingSystem {
@@ -45,6 +47,7 @@ impl LightingSystem {
                 fs,
                 context.viewport.clone(),
                 context.render_pass.clone(),
+                [(1, 0)],
             )
         };
 
@@ -52,21 +55,33 @@ impl LightingSystem {
         let image_count = context.swapchain.image_count() as usize;
 
         // create buffers and descriptor sets
+        let attachments_set = PersistentDescriptorSet::new(
+            &context.allocators.descriptor_set,
+            layout.set_layouts().get(0).unwrap().clone(),
+            [
+                WriteDescriptorSet::image_view(0, context.attachments.0.clone()),
+                WriteDescriptorSet::image_view(1, context.attachments.1.clone()),
+                WriteDescriptorSet::image_view(2, context.attachments.2.clone()),
+            ],
+            [],
+        )
+        .unwrap()
+        .into();
         let mut global_data = create_global_descriptors::<GPULightingData>(
             &context.allocators,
             &context.device,
-            layout.set_layouts().get(0).unwrap().clone(),
+            layout.set_layouts().get(1).unwrap().clone(),
             image_count,
         );
         let mut point_data = create_storage_buffers::<PointLight>(
             &context.allocators,
-            layout.set_layouts().get(1).unwrap().clone(),
+            layout.set_layouts().get(2).unwrap().clone(),
             image_count,
             1000,
         );
         let mut dir_data = create_storage_buffers::<DirectionLight>(
             &context.allocators,
-            layout.set_layouts().get(1).unwrap().clone(),
+            layout.set_layouts().get(3).unwrap().clone(),
             image_count,
             1000,
         );
@@ -110,18 +125,52 @@ impl LightingSystem {
             pipeline,
             frame_data,
             vertex_buffer,
+            attachments_set,
+        }
+    }
+
+    pub fn recreate_pipeline(&mut self, context: &Renderer) {
+        self.pipeline.recreate_pipeline(
+            context.device.clone(),
+            context.render_pass.clone(),
+            context.viewport.clone(),
+        );
+    }
+
+    /// recreate the descriptor set describing the framebuffer attachments, must be done after recreating framebuffer (see `DrawSystem::recreate_pipelines`)
+    pub fn recreate_descriptor(&mut self, context: &Renderer) {
+        let attachments: DescriptorSetWithOffsets = PersistentDescriptorSet::new(
+            &context.allocators.descriptor_set,
+            self.pipeline.layout().set_layouts().get(0).unwrap().clone(),
+            [
+                WriteDescriptorSet::image_view(0, context.attachments.0.clone()),
+                WriteDescriptorSet::image_view(1, context.attachments.1.clone()),
+                WriteDescriptorSet::image_view(2, context.attachments.2.clone()),
+            ],
+            [],
+        )
+        .unwrap()
+        .into();
+
+        for frame in &mut self.frame_data {
+            *frame.descriptor_sets.get_mut(0).unwrap() = attachments.clone();
         }
     }
 
     pub fn upload_lights(
         &self,
-        point_lights: impl Iterator<Item = PointLight>,
-        dir_lights: impl Iterator<Item = DirectionLight>,
-        screen_to_world: Matrix4<f32>,
-        ambient_color: Vector4<f32>,
+        point_lights: impl IntoIterator<Item = PointLight>,
+        dir_lights: impl IntoIterator<Item = DirectionLight>,
+        screen_to_world: impl Into<[[f32; 4]; 4]>,
+        ambient_color: impl Into<[f32; 4]>,
         image_i: usize,
     ) {
-        self.frame_data[image_i].update(point_lights, dir_lights, screen_to_world, ambient_color);
+        self.frame_data[image_i].update(
+            point_lights.into_iter(),
+            dir_lights.into_iter(),
+            screen_to_world.into(),
+            ambient_color.into(),
+        );
     }
 
     pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
@@ -139,6 +188,13 @@ impl LightingSystem {
                 PipelineBindPoint::Graphics,
                 self.pipeline.layout().clone(),
                 0,
+                self.attachments_set.clone(),
+            )
+            .unwrap()
+            .bind_descriptor_sets(
+                PipelineBindPoint::Graphics,
+                self.pipeline.layout().clone(),
+                1,
                 frame.descriptor_sets.clone(),
             )
             .unwrap()
@@ -161,8 +217,8 @@ impl FrameData {
         &self,
         point_lights: impl Iterator<Item = PointLight>,
         dir_lights: impl Iterator<Item = DirectionLight>,
-        screen_to_world: Matrix4<f32>,
-        ambient_color: Vector4<f32>,
+        screen_to_world: [[f32; 4]; 4],
+        ambient_color: [f32; 4],
     ) {
         // point lights
         let mut point_light_count = 0;
@@ -200,8 +256,8 @@ impl FrameData {
         });
 
         *contents = GPULightingData {
-            screen_to_world: screen_to_world.into(),
-            ambient_color: ambient_color.into(),
+            screen_to_world: screen_to_world,
+            ambient_color: ambient_color,
             point_light_count: point_light_count as u32,
             direction_light_count: direction_light_count as u32,
         };
