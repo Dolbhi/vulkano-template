@@ -9,7 +9,6 @@ use vulkano::{
 };
 
 use crate::{
-    game_objects::Camera,
     shaders::draw::GPUGlobalData,
     vulkano_objects::{
         buffers::{create_global_descriptors, create_storage_buffers},
@@ -145,10 +144,11 @@ where
     /// write gpu data to respective buffers (currently auto rotates sunlight)
     pub fn upload_draw_data(
         &mut self,
-        objects: impl Iterator<Item = &'a Arc<RenderObject<T>>>,
-        camera_data: &Camera,
-        aspect: f32,
         image_i: u32,
+        objects: impl Iterator<Item = &'a Arc<RenderObject<T>>>,
+        proj: impl Into<[[f32; 4]; 4]>,
+        view: impl Into<[[f32; 4]; 4]>,
+        proj_view: impl Into<[[f32; 4]; 4]>,
     ) {
         // sort renderobjects
         for object in objects {
@@ -167,10 +167,11 @@ where
         buffers.update_objects_data(obj_iter);
 
         // update camera
-        buffers.update_global_data(
-            camera_data.view_matrix(),
-            camera_data.projection_matrix(aspect),
-        );
+        buffers.update_global_data(GPUGlobalData {
+            proj: proj.into(),
+            view: view.into(),
+            view_proj: proj_view.into(),
+        });
     }
 
     // fn clear_unused_resource(&mut self) {

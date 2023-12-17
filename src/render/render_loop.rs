@@ -91,10 +91,16 @@ impl RenderLoop {
             image_fence.cleanup_finished();
         }
 
+        // cam matrcies
         let extends = self.renderer.window.inner_size();
         let aspect = extends.width as f32 / extends.height as f32;
+        let proj = camera_data.projection_matrix(aspect);
+        let view = camera_data.view_matrix();
+        let proj_view = proj * view;
+
         self.draw_system
-            .upload_draw_data(render_objects, camera_data, aspect, image_i);
+            .upload_draw_data(image_i, render_objects, proj, view, proj_view);
+
         let points = [
             PointLight {
                 color: [1.0, 0.0, 0.0, 1.0],
@@ -116,9 +122,7 @@ impl RenderLoop {
             color: [1., 1., 0., 1.],
             direction: [x, y, z, 1.],
         };
-        let screen_to_world = (camera_data.projection_matrix(aspect) * camera_data.view_matrix())
-            .inverse_transform()
-            .unwrap();
+        let screen_to_world = proj_view.inverse_transform().unwrap();
         self.lighting_system.upload_lights(
             points,
             [dir],

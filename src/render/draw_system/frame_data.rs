@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use crate::{render::RenderObject, shaders::draw::GPUGlobalData};
-use cgmath::Matrix4;
 use vulkano::{
     buffer::{BufferContents, Subbuffer},
     descriptor_set::DescriptorSetWithOffsets,
@@ -14,14 +13,12 @@ pub struct FrameData<O: BufferContents> {
 }
 
 impl<O: BufferContents> FrameData<O> {
-    pub fn update_global_data(&mut self, view: Matrix4<f32>, proj: Matrix4<f32>) {
-        let mut cam_uniform_contents = self
+    pub fn update_global_data(&mut self, data: impl Into<GPUGlobalData>) {
+        let mut uniform_contents = self
             .global_buffer
             .write()
             .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
-        cam_uniform_contents.view = view.into();
-        cam_uniform_contents.proj = proj.into();
-        cam_uniform_contents.view_proj = (proj * view).into();
+        *uniform_contents = data.into();
     }
 
     pub fn update_objects_data<'a, T>(
