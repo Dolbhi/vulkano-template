@@ -14,10 +14,6 @@ vulkano_shaders::shader! {
             ty: "fragment",
             path: "src/shaders/draw/uv/fragment.frag",
         },
-        alpha_fs: {
-            ty: "fragment",
-            path: "src/shaders/draw/alpha/fragment.frag",
-        }
     }
 }
 

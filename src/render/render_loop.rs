@@ -187,18 +187,12 @@ impl RenderLoop {
                 draw::load_basic_fs(renderer.device.clone())
                     .expect("failed to create basic shader module"),
             ),
-            // (
-            //     draw::load_phong_vs(renderer.device.clone())
-            //         .expect("failed to create phong shader module"),
-            //     draw::load_phong_fs(renderer.device.clone())
-            //         .expect("failed to create phong shader module"),
-            // ),
-            // (
-            //     draw::load_basic_vs(renderer.device.clone())
-            //         .expect("failed to create uv shader module"),
-            //     draw::load_uv_fs(renderer.device.clone())
-            //         .expect("failed to create uv shader module"),
-            // ),
+            (
+                draw::load_basic_vs(renderer.device.clone())
+                    .expect("failed to create uv shader module"),
+                draw::load_uv_fs(renderer.device.clone())
+                    .expect("failed to create uv shader module"),
+            ),
         ];
 
         DrawSystem::new(

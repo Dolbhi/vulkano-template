@@ -35,8 +35,7 @@ fn init_render_objects(
 ) -> TransformID {
     let resource_loader = renderer.get_resource_loader();
     let basic_id = 0;
-    let phong_id = 0;
-    let uv_id = 0;
+    let uv_id = 1;
 
     // Texture
     let le_texture = resource_loader.load_texture(Path::new("models/lost_empire-RGBA.png"));
@@ -62,24 +61,16 @@ fn init_render_objects(
             linear_sampler.clone(),
         )),
     );
-    // let le_lit_mat_id = draw_system.add_material(
-    //     phong_id,
-    //     "lost_empire_lit",
-    //     Some(resource_loader.load_material_set(
-    //         draw_system.get_pipeline(phong_id),
-    //         le_texture,
-    //         linear_sampler.clone(),
-    //     )),
-    // );
+    let le_uv_mat_id = draw_system.add_material(uv_id, "lost_empire_uv", None);
 
     //  ina
     let ina_ids: Vec<_> = zip(["hair", "cloth", "body", "head"], ina_textures)
         .map(|(id, tex)| {
             draw_system.add_material(
-                phong_id,
+                basic_id,
                 id,
                 Some(resource_loader.load_material_set(
-                    draw_system.get_pipeline(phong_id),
+                    draw_system.get_pipeline(basic_id),
                     tex,
                     linear_sampler.clone(),
                 )),
@@ -184,14 +175,10 @@ fn init_render_objects(
             ..Default::default()
         });
 
-        // let mat_swapper = MaterialSwapper::new([
-        //     le_mat_id.clone(),
-        //     le_lit_mat_id.clone(),
-        //     uv_mat_id.clone(),
-        //     "cloth".into(),
-        // ]);
+        let mat_swapper =
+            MaterialSwapper::new([le_mat_id.clone(), le_uv_mat_id.clone(), "cloth".into()]);
 
-        world.push((transform_id, le_obj));
+        world.push((transform_id, le_obj, mat_swapper));
     }
 
     suzanne
