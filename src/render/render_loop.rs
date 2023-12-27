@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 use std::sync::Arc;
 use std::vec;
 
-use cgmath::{Matrix4, Transform};
+use cgmath::{Matrix4, Transform, Vector3};
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use winit::event_loop::EventLoop;
@@ -126,7 +126,9 @@ impl RenderLoop {
             },
             PointLight {
                 color: [1.0, 1.0, 1.0, 1.0],
-                position: camera_data.position.extend(1.0).into(),
+                position: (camera_data.position + Vector3::new(0., 0., 0.01))
+                    .extend(1.0)
+                    .into(),
             },
         ];
         let angle = PI / 4.;

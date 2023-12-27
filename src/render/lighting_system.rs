@@ -304,14 +304,12 @@ impl LightingSystem {
             )
             .unwrap()
             .bind_vertex_buffers(0, self.point_vertices.clone())
-            .unwrap()
-            .draw(
-                self.point_vertices.len() as u32,
-                frame.last_point_index as u32 + 1,
-                0,
-                0,
-            )
             .unwrap();
+        for i in 0..=frame.last_point_index as u32 {
+            command_builder
+                .draw(self.point_vertices.len() as u32, 1, 0, i)
+                .unwrap();
+        }
         // directional lights
         let pipeline = &self.direction_pipeline.pipeline;
         let layout = self.direction_pipeline.layout();
@@ -333,14 +331,12 @@ impl LightingSystem {
             )
             .unwrap()
             .bind_vertex_buffers(0, self.screen_vertices.clone())
-            .unwrap()
-            .draw(
-                self.screen_vertices.len() as u32,
-                frame.last_dir_count as u32 + 1,
-                0,
-                0,
-            )
             .unwrap();
+        for i in 0..=frame.last_dir_count as u32 {
+            command_builder
+                .draw(self.screen_vertices.len() as u32, 1, 0, i)
+                .unwrap();
+        }
         // ambient light
         let pipeline = &self.ambient_pipeline.pipeline;
         let layout = self.ambient_pipeline.layout();
