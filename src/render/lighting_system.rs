@@ -121,6 +121,31 @@ impl LightingSystem {
             ],
             BufferUsage::VERTEX_BUFFER,
         );
+        // let (point_vertices, point_future) = create_device_local_buffer(
+        //     &context.allocators,
+        //     context.queue.clone(),
+        //     vec![
+        //         Vertex2d {
+        //             position: [-1.0, -1.0],
+        //         },
+        //         Vertex2d {
+        //             position: [-1.0, 1.0],
+        //         },
+        //         Vertex2d {
+        //             position: [1.0, -1.0],
+        //         },
+        //         Vertex2d {
+        //             position: [1.0, -1.0],
+        //         },
+        //         Vertex2d {
+        //             position: [-1.0, 1.0],
+        //         },
+        //         Vertex2d {
+        //             position: [1.0, 1.0],
+        //         },
+        //     ],
+        //     BufferUsage::VERTEX_BUFFER,
+        // );
 
         let fence = vertex_future.then_signal_fence_and_flush().unwrap();
         fence.wait(None).unwrap();
@@ -140,7 +165,6 @@ impl LightingSystem {
             context.viewport.clone(),
         );
     }
-
     /// recreate the descriptor set describing the framebuffer attachments, must be done after recreating framebuffer (see `DrawSystem::recreate_pipelines`)
     pub fn recreate_descriptor(&mut self, context: &Renderer) {
         let attachments = PersistentDescriptorSet::new(

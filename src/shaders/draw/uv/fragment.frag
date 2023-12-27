@@ -16,6 +16,6 @@ void main()
 {
     // float step_alpha = floor(tex_color.a * 10) / 10.f;
 
-	f_color = vec4(v_tex_coord, 0.0, 1.0);// vec4(v_tex_coord, 0.0f, 1.0f);
+	f_color = vec4(v_tex_coord, 0.0, 1.0);
     f_normal = vec4(v_normal, 0.0);
 }
