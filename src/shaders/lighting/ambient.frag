@@ -9,14 +9,14 @@ layout(input_attachment_index = 1, set = 0, binding = 1) uniform subpassInput u_
 // The `depth_input` parameter of the `draw` method.
 layout(input_attachment_index = 2, set = 0, binding = 2) uniform subpassInput u_depth;
 
-layout(set = 1, binding = 0) uniform GPUGlobalData {
-    mat4 view;
-    mat4 proj;
-    mat4 view_proj;
-    mat4 inv_view_proj;
-} scene_data;
+// layout(set = 1, binding = 0) uniform GPUGlobalData {
+//     mat4 view;
+//     mat4 proj;
+//     mat4 view_proj;
+//     mat4 inv_view_proj;
+// } scene_data;
 
-layout(push_constant) uniform constant {
+layout(push_constant) uniform GPUAmbientData {
     vec4 ambient_color;
 };
 
@@ -31,6 +31,8 @@ void main() {
     if (in_depth >= 1.0) {
         discard;
     }
+
+    vec3 in_normal = normalize(subpassLoad(u_normals).rgb);
 
     vec3 in_diffuse = subpassLoad(u_diffuse).rgb;
     f_color = vec4(in_diffuse * ambient_color.xyz, 1.0);

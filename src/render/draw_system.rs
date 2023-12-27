@@ -130,9 +130,10 @@ where
         &mut self,
         image_i: u32,
         objects: impl Iterator<Item = &'a Arc<RenderObject<T>>>,
-        proj: impl Into<[[f32; 4]; 4]>,
-        view: impl Into<[[f32; 4]; 4]>,
-        proj_view: impl Into<[[f32; 4]; 4]>,
+        global_data: impl Into<GPUGlobalData>,
+        // proj: impl Into<[[f32; 4]; 4]>,
+        // view: impl Into<[[f32; 4]; 4]>,
+        // proj_view: impl Into<[[f32; 4]; 4]>,
     ) {
         // sort renderobjects
         for object in objects {
@@ -151,11 +152,7 @@ where
         buffers.update_objects_data(obj_iter);
 
         // update camera
-        buffers.update_global_data(GPUGlobalData {
-            proj: proj.into(),
-            view: view.into(),
-            view_proj: proj_view.into(),
-        });
+        buffers.update_global_data(global_data);
     }
     /// bind draw calls to the given command buffer builder, be sure to call `upload_draw_data()` before hand
     pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(

@@ -53,8 +53,13 @@ void main() {
 
     // Further decrease light_percent based on the distance with the light position.
     float light_distance = dot(light_displacement, light_displacement);
-    light_percent *= 1.0 / light_distance;
+    light_percent *= 1.0 / (light_distance + 1.0);
 
+    // if (light_distance < 0.1) {
+    //     f_color = vec4(1.0);
+    // } else {
     vec3 in_diffuse = subpassLoad(u_diffuse).rgb;
     f_color = vec4(light.color.rgb * light_percent * in_diffuse, 1.0);
+    
+    // f_color = vec4(1.0,0.0,0.0,1.0);
 }

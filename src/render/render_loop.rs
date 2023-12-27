@@ -11,7 +11,8 @@ use super::lighting_system::LightingSystem;
 use super::renderer::Fence;
 use super::{render_data::render_object::RenderObject, renderer::Renderer, DrawSystem};
 
-use crate::shaders::lighting::fs::{DirectionLight, PointLight};
+use crate::shaders::draw::GPUGlobalData;
+use crate::shaders::lighting::{DirectionLight, PointLight};
 use crate::{
     game_objects::Camera,
     shaders::draw::{self, GPUObjectData},
@@ -96,10 +97,17 @@ impl RenderLoop {
         let aspect = extends.width as f32 / extends.height as f32;
         let proj = camera_data.projection_matrix(aspect);
         let view = camera_data.view_matrix();
-        let proj_view = proj * view;
+        let view_proj = proj * view;
+        let inv_view_proj = view_proj.inverse_transform().unwrap();
+        let global_data = GPUGlobalData {
+            view: view.into(),
+            proj: proj.into(),
+            view_proj: view_proj.into(),
+            inv_view_proj: inv_view_proj.into(),
+        };
 
         self.draw_system
-            .upload_draw_data(image_i, render_objects, proj, view, proj_view);
+            .upload_draw_data(image_i, render_objects, global_data);
 
         // println!("Projection view:");
         // let matrix: [[f32; 4]; 4] = proj_view.clone().into();
@@ -128,11 +136,10 @@ impl RenderLoop {
             color: [1., 1., 0., 1.],
             direction: [x, y, z, 1.],
         };
-        let screen_to_world = proj_view.inverse_transform().unwrap();
         self.lighting_system.upload_lights(
             points,
             [dir],
-            screen_to_world,
+            global_data,
             [0.2, 0.2, 0.2, 1.],
             image_i as usize,
         );

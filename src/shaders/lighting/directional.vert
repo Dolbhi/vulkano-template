@@ -2,12 +2,12 @@
 
 #version 460
 
-layout(set = 1, binding = 0) uniform GPUGlobalData {
-    mat4 view;
-    mat4 proj;
-    mat4 view_proj;
-    mat4 inv_view_proj;
-} scene_data;
+// layout(set = 1, binding = 0) uniform GPUGlobalData {
+//     mat4 view;
+//     mat4 proj;
+//     mat4 view_proj;
+//     mat4 inv_view_proj;
+// } scene_data;
 
 layout(location = 0) in vec2 position;
 layout(location = 0) out vec2 v_screen_coords;
