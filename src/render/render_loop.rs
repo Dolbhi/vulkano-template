@@ -101,6 +101,12 @@ impl RenderLoop {
         self.draw_system
             .upload_draw_data(image_i, render_objects, proj, view, proj_view);
 
+        // println!("Projection view:");
+        // let matrix: [[f32; 4]; 4] = proj_view.clone().into();
+        // for x in matrix {
+        //     println!("{:11}, {:11}, {:11}, {:11},", x[0], x[1], x[2], x[3]);
+        // }
+
         let points = [
             PointLight {
                 color: [1.0, 0.0, 0.0, 1.0],
