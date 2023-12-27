@@ -24,7 +24,11 @@ use super::{
     renderer::Renderer,
 };
 
-/// Collection of all data needed for rendering
+/// Collection of pipelines and associated rendering data
+///
+/// All pipelines share sets 1 and 2, describing scene data and an array of object data (storage buffer) respectively
+///
+/// Materials can optionally add more sets
 pub struct DrawSystem<O, T>
 where
     O: BufferContents + From<T>,
@@ -40,22 +44,28 @@ where
     O: BufferContents + From<T>,
     T: Clone + 'a,
 {
-    /// creates a pipelines collection using 1 pipeline that future added pipelines must match
+    /// creates from a collection of shader entry points
     pub fn new(
         context: &Renderer,
         shaders: impl IntoIterator<Item = (EntryPoint, EntryPoint)>,
     ) -> Self {
-        // initialize
-        let mut data = DrawSystem {
-            pipelines: vec![],
-            frame_data: vec![],
-            pending_objects: HashMap::new(),
-        };
-        for (vs, fs) in shaders {
-            data.add_pipeline(&context, vs, fs);
-        }
+        let pipelines: Vec<PipelineGroup> = shaders
+            .into_iter()
+            .map(|(vs, fs)| {
+                PipelineHandler::new(
+                    context.device.clone(),
+                    vs,
+                    fs,
+                    context.viewport.clone(),
+                    context.render_pass.clone(),
+                    [(0, 0)],
+                    crate::vulkano_objects::pipeline::PipelineType::Drawing,
+                )
+            })
+            .map(PipelineGroup::new)
+            .collect();
 
-        let layout = data.pipelines[0].pipeline.layout();
+        let layout = pipelines[0].pipeline.layout();
         let image_count = context.swapchain.image_count() as usize;
 
         // create buffers and descriptors
@@ -73,31 +83,21 @@ where
         );
 
         // create frame data
-        for ((global_buffer, global_set), (objects_buffer, object_descriptor)) in
-            zip(global_data, object_data)
-        {
-            let frame = FrameData {
-                global_buffer,
-                objects_buffer,
-                descriptor_sets: vec![global_set, object_descriptor.into()],
-            };
-            data.frame_data.push(frame);
-        }
+        let frame_data = zip(global_data, object_data)
+            .map(
+                |((global_buffer, global_set), (objects_buffer, object_descriptor))| FrameData {
+                    global_buffer,
+                    objects_buffer,
+                    descriptor_sets: vec![global_set, object_descriptor.into()],
+                },
+            )
+            .collect();
 
-        data
-    }
-    fn add_pipeline(&mut self, context: &Renderer, vs: EntryPoint, fs: EntryPoint) -> usize {
-        let pipeline = PipelineHandler::new(
-            context.device.clone(),
-            vs,
-            fs,
-            context.viewport.clone(),
-            context.render_pass.clone(),
-            [(0, 0)],
-            crate::vulkano_objects::pipeline::PipelineType::Drawing,
-        );
-        self.pipelines.push(PipelineGroup::new(pipeline));
-        self.pipelines.len() - 1
+        DrawSystem {
+            pipelines,
+            frame_data,
+            pending_objects: HashMap::new(),
+        }
     }
 
     pub fn get_pipeline(&self, pipeline_index: usize) -> &PipelineGroup {
@@ -125,22 +125,6 @@ where
         id
     }
 
-    /// bind draw calls to the given command buffer builder, be sure to call `upload_draw_data()` before hand
-    pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
-        &mut self,
-        image_i: usize,
-        command_builder: &mut AutoCommandBufferBuilder<P, A>,
-    ) {
-        let mut object_index = 0;
-        for pipeline_group in self.pipelines.iter() {
-            pipeline_group.draw_objects(
-                &mut object_index,
-                self.frame_data[image_i].descriptor_sets.clone(),
-                command_builder,
-                &mut self.pending_objects,
-            );
-        }
-    }
     /// write gpu data to respective buffers (currently auto rotates sunlight)
     pub fn upload_draw_data(
         &mut self,
@@ -172,6 +156,22 @@ where
             view: view.into(),
             view_proj: proj_view.into(),
         });
+    }
+    /// bind draw calls to the given command buffer builder, be sure to call `upload_draw_data()` before hand
+    pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
+        &mut self,
+        image_i: usize,
+        command_builder: &mut AutoCommandBufferBuilder<P, A>,
+    ) {
+        let mut object_index = 0;
+        for pipeline_group in self.pipelines.iter() {
+            pipeline_group.draw_objects(
+                &mut object_index,
+                self.frame_data[image_i].descriptor_sets.clone(),
+                command_builder,
+                &mut self.pending_objects,
+            );
+        }
     }
 
     // fn clear_unused_resource(&mut self) {
