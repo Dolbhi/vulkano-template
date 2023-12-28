@@ -254,8 +254,8 @@ impl LightingSystem {
         &mut self,
         point_lights: impl IntoIterator<Item = PointLight>,
         dir_lights: impl IntoIterator<Item = DirectionLight>,
-        global_data: impl Into<GPUGlobalData>,
         ambient_color: impl Into<[f32; 4]>,
+        global_data: impl Into<GPUGlobalData>,
         image_i: usize,
     ) {
         self.frame_data[image_i].update(

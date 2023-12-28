@@ -1,12 +1,15 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use cgmath::{Euler, Matrix4, Rad};
-use legion::*;
+use cgmath::{Euler, Matrix4, Rad, Vector3, Vector4};
+use legion::{IntoQuery, *};
 use winit::event_loop::EventLoop;
 use winit::{event::ElementState, keyboard::KeyCode};
 
+use crate::game_objects::light::PointLightComponent;
+use crate::game_objects::transform::TransformCreateInfo;
 use crate::render::RenderObject;
+use crate::shaders::lighting::DirectionLight;
 use crate::{
     game_objects::{
         transform::{TransformID, TransformSystem},
@@ -46,6 +49,7 @@ pub struct App {
     transforms: TransformSystem,
     total_seconds: f32,
     suzanne: TransformID,
+    camera_transform: TransformID,
 }
 
 impl App {
@@ -64,6 +68,37 @@ impl App {
             &mut render_loop.draw_system,
         );
 
+        let camera_transform = {
+            world.push((
+                transforms.add_transform(TransformCreateInfo {
+                    scale: Vector3::new(0.1, 0.1, 0.1),
+                    translation: Vector3::new(0., 5., -1.),
+                    ..Default::default()
+                }),
+                PointLightComponent {
+                    color: Vector4::new(1., 0., 0., 1.),
+                },
+            ));
+            world.push((
+                transforms.add_transform(TransformCreateInfo {
+                    scale: Vector3::new(0.1, 0.1, 0.1),
+                    translation: Vector3::new(0.0, 6.0, -1.0),
+                    ..Default::default()
+                }),
+                PointLightComponent {
+                    color: Vector4::new(0., 0., 1., 1.),
+                },
+            ));
+            let cam_transform = transforms.next().unwrap();
+            world.push((
+                cam_transform,
+                PointLightComponent {
+                    color: Vector4::new(1., 1., 1., 1.),
+                },
+            ));
+            cam_transform
+        };
+
         Self {
             render_loop,
             camera: Default::default(),
@@ -72,6 +107,7 @@ impl App {
             transforms,
             total_seconds: 0.,
             suzanne,
+            camera_transform,
         }
     }
 
@@ -82,6 +118,10 @@ impl App {
 
         // move cam
         self.update_movement(seconds_passed);
+        self.transforms
+            .get_transform_mut(&self.camera_transform)
+            .unwrap()
+            .set_translation(self.camera.position + Vector3::new(0., 0., 0.01)); // light pos cannot = cam pos else the light will glitch
 
         // rotate suzanne
         self.transforms
@@ -111,10 +151,36 @@ impl App {
             }
         }
         // query render objects
-        let mut query = <&Arc<RenderObject<Matrix4<f32>>>>::query();
+        let mut ro_query = <&Arc<RenderObject<Matrix4<f32>>>>::query();
+        let point_lights: Vec<_> = <(&TransformID, &PointLightComponent)>::query()
+            .iter(&self.world)
+            .map(|(t, pl)| {
+                pl.clone().into_light(
+                    self.transforms
+                        .get_transform(t)
+                        .unwrap()
+                        .get_transform()
+                        .translation
+                        .clone(),
+                )
+            })
+            .collect();
+        // let mut dl_query = <(&TransformID, &DirectionalLightComponent)>::query();
 
-        self.render_loop
-            .update(&self.camera, query.iter_mut(&mut self.world));
+        let angle = self.total_seconds / 4.;
+        let direction = cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
+        let dir = DirectionLight {
+            color: [1., 1., 0., 1.],
+            direction: direction.extend(1.).into(),
+        };
+
+        self.render_loop.update(
+            &self.camera,
+            ro_query.iter_mut(&mut self.world),
+            point_lights,
+            [dir],
+            [0.2, 0.2, 0.2, 1.],
+        );
     }
 
     fn update_movement(&mut self, seconds_passed: f32) {

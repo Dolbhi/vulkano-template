@@ -1,8 +1,7 @@
-use std::f32::consts::PI;
 use std::sync::Arc;
 use std::vec;
 
-use cgmath::{Matrix4, Transform, Vector3};
+use cgmath::{Matrix4, Transform};
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use winit::event_loop::EventLoop;
@@ -52,6 +51,9 @@ impl RenderLoop {
         &mut self,
         camera_data: &Camera,
         render_objects: impl Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
+        point_lights: impl IntoIterator<Item = PointLight>,
+        dir_lights: impl IntoIterator<Item = DirectionLight>,
+        ambient_color: impl Into<[f32; 4]>,
     ) {
         // check zero sized window
         let image_extent: [u32; 2] = self.renderer.window.inner_size().into();
@@ -115,34 +117,11 @@ impl RenderLoop {
         //     println!("{:11}, {:11}, {:11}, {:11},", x[0], x[1], x[2], x[3]);
         // }
 
-        let points = [
-            PointLight {
-                color: [1.0, 0.0, 0.0, 1.0],
-                position: [0.0, 5.0, -1.0, 1.0],
-            },
-            PointLight {
-                color: [0.0, 0.0, 1.0, 1.0],
-                position: [0.0, 6.0, -1.0, 1.0], //camera_data.position.extend(1.0).into(),
-            },
-            PointLight {
-                color: [1.0, 1.0, 1.0, 1.0],
-                position: (camera_data.position + Vector3::new(0., 0., 0.01))
-                    .extend(1.0)
-                    .into(),
-            },
-        ];
-        let angle = PI / 4.;
-        let cgmath::Vector3::<f32> { x, y, z } =
-            cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
-        let dir = DirectionLight {
-            color: [1., 1., 0., 1.],
-            direction: [x, y, z, 1.],
-        };
         self.lighting_system.upload_lights(
-            points,
-            [dir],
+            point_lights,
+            dir_lights,
+            ambient_color,
             global_data,
-            [0.2, 0.2, 0.2, 1.],
             image_i as usize,
         );
 
