@@ -1,3 +1,6 @@
+//! Pipeline handling and creating
+//! NOT reusable for multiple renderers (mostly)
+
 use std::{marker::PhantomData, sync::Arc};
 
 use vulkano::{
@@ -156,7 +159,7 @@ impl PipelineType {
 /// ### Pipeline Sates
 /// - vertex input: based on given generic
 /// - viewport: given
-pub fn window_size_dependent_pipeline<V: Vertex>(
+fn window_size_dependent_pipeline<V: Vertex>(
     device: Arc<Device>,
     vs: EntryPoint,
     fs: EntryPoint,

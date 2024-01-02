@@ -18,7 +18,7 @@ use crate::{
         PointLight,
     },
     vulkano_objects::{
-        buffers::{create_device_local_buffer, create_global_descriptors, create_storage_buffers},
+        buffers::{create_device_local_buffer, create_dynamic_buffers, create_storage_buffers},
         pipeline::PipelineHandler,
     },
     Vertex2d,
@@ -97,7 +97,7 @@ impl LightingSystem {
         // create buffers and descriptor sets
         let attachments_set = Self::create_attachment_set(&point_pipeline, context);
 
-        let mut global_data = create_global_descriptors::<GPUGlobalData>(
+        let mut global_data = create_dynamic_buffers::<GPUGlobalData>(
             &context.allocators,
             &context.device,
             point_pipeline

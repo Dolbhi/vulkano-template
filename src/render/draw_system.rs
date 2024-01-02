@@ -11,7 +11,7 @@ use vulkano::{
 use crate::{
     shaders::draw::GPUGlobalData,
     vulkano_objects::{
-        buffers::{create_global_descriptors, create_storage_buffers},
+        buffers::{create_dynamic_buffers, create_storage_buffers},
         pipeline::PipelineHandler,
     },
 };
@@ -69,7 +69,7 @@ where
         let image_count = context.swapchain.image_count() as usize;
 
         // create buffers and descriptors
-        let global_data = create_global_descriptors::<GPUGlobalData>(
+        let global_data = create_dynamic_buffers::<GPUGlobalData>(
             &context.allocators,
             &context.device,
             layout.set_layouts().get(0).unwrap().clone(),

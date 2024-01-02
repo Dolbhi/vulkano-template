@@ -1,3 +1,6 @@
+//! Contain functions for creating various types of buffers and descriptor sets
+//! Reusable for multiple renderers
+
 use std::{mem::size_of, sync::Arc};
 
 use vulkano::{
@@ -21,7 +24,7 @@ use super::allocators::Allocators;
 
 type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
 
-/// Struct with a vertex and index, using VertexFull for vertices
+/// Buffers for vertcies and indecies, essentially a struct containing mesh data
 #[derive(Debug)]
 pub struct Buffers<V: Vertex + BufferContents> {
     pub vertex: Subbuffer<[V]>,
@@ -160,7 +163,7 @@ pub fn create_device_local_buffer<T: BufferContents>(
 /// Creates a dynamic buffer to store global data, and a descriptor set for those buffers to be used with offsets
 ///
 /// Returns vec of tuples containing the subbuffers and the descriptor set with the offset for that frame
-pub fn create_global_descriptors<C: BufferContents>(
+pub fn create_dynamic_buffers<C: BufferContents>(
     allocators: &Allocators,
     device: &Arc<Device>,
     descriptor_set_layout: Arc<DescriptorSetLayout>,

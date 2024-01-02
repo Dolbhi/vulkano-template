@@ -10,7 +10,6 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [ ] Combine render_loop and renderer
 
 ### Features
-- [ ] Light data streaming
 - [ ] Asset loader
 	- [ ] Mesh, material and scene loading from files (with universal IDs)
 	- [ ] Conversion into fast loading format
@@ -21,11 +20,12 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [ ] Anti-aliasing (MSAA)
 - [ ] Occlusion culling
 - [ ] Further lighting developments
-	- [ ] Point light range and volumes
+	- [x] Point light range and volumes
 	- [ ] Specular lighting
 	- [ ] Ambient occlusion
 	- [ ] Shadows
-	- [ ] Multiple lighting materials
+	- [x] Multiple lighting materials
+- [x] Light data streaming
 - [x] Multiple subpasses
 - [x] Lighting (Deferred rendering)
 - [x] Pipeline cache between materials

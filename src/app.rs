@@ -176,7 +176,7 @@ impl App {
 
         self.render_loop.update(
             &self.camera,
-            ro_query.iter_mut(&mut self.world),
+            ro_query.iter(&self.world),
             point_lights,
             [dir],
             [0.2, 0.2, 0.2, 1.],
@@ -258,3 +258,110 @@ impl App {
         self.render_loop.handle_window_wait();
     }
 }
+
+// impl<'a, P>
+//     RenderUpload<
+//         'a,
+//         std::iter::Flatten<
+//             query::ChunkIter<
+//                 'a,
+//                 'a,
+//                 legion::Read<Arc<RenderObject<Matrix4<f32>>>>,
+//                 query::EntityFilterTuple<
+//                     query::ComponentFilter<Arc<RenderObject<Matrix4<f32>>>>,
+//                     query::Passthrough,
+//                 >,
+//             >,
+//         >,
+//         P,
+//         [DirectionLight; 1],
+//     > for App
+// where
+//     P: IntoIterator<Item = PointLight>,
+// {
+//     fn get_scene_data(&self, extends: &PhysicalSize<u32>) -> crate::shaders::draw::GPUGlobalData {
+//         let aspect = extends.width as f32 / extends.height as f32;
+//         let proj = self.camera.projection_matrix(aspect);
+//         let view = self.camera.view_matrix();
+//         let view_proj = proj * view;
+//         let inv_view_proj = view_proj.inverse_transform().unwrap();
+//         crate::shaders::draw::GPUGlobalData {
+//             view: view.into(),
+//             proj: proj.into(),
+//             view_proj: view_proj.into(),
+//             inv_view_proj: inv_view_proj.into(),
+//         }
+//     }
+
+//     fn get_render_objects(
+//         &'a self,
+//     ) -> std::iter::Flatten<
+//         query::ChunkIter<
+//             '_,
+//             'a,
+//             legion::Read<Arc<RenderObject<Matrix4<f32>>>>,
+//             query::EntityFilterTuple<
+//                 query::ComponentFilter<Arc<RenderObject<Matrix4<f32>>>>,
+//                 query::Passthrough,
+//             >,
+//         >,
+//     > {
+//         let mut ro_query = <&Arc<RenderObject<Matrix4<f32>>>>::query();
+//         let test = ro_query.iter(&self.world);
+//         test
+//     }
+
+//     fn get_point_lights<T>(
+//         &self,
+//     ) -> std::iter::Map<
+//         std::iter::Flatten<
+//             query::ChunkIter<
+//                 '_,
+//                 '_,
+//                 (legion::Read<TransformID>, legion::Read<PointLightComponent>),
+//                 query::EntityFilterTuple<
+//                     legion::query::And<(
+//                         query::ComponentFilter<TransformID>,
+//                         query::ComponentFilter<PointLightComponent>,
+//                     )>,
+//                     legion::query::And<(query::Passthrough, query::Passthrough)>,
+//                 >,
+//             >,
+//         >,
+//         T,
+//     >
+//     where
+//         T: FnMut(
+//             // (
+//             //     &crate::game_objects::transform::TransformID,
+//             //     &crate::game_objects::light::PointLightComponent,
+//             // ),
+//         ) -> (),
+//     {
+//         <(&TransformID, &PointLightComponent)>::query()
+//             .iter(&self.world)
+//             .map(|(t, pl): (_, &PointLightComponent)| {
+//                 pl.clone().into_light(
+//                     self.transforms
+//                         .get_transform(t)
+//                         .unwrap()
+//                         .get_transform()
+//                         .translation
+//                         .clone(),
+//                 )
+//             })
+//     }
+
+//     fn get_direction_lights(&self) -> [DirectionLight; 1] {
+//         let angle = self.total_seconds / 4.;
+//         let direction = cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
+//         [DirectionLight {
+//             color: [1., 1., 0., 1.],
+//             direction: direction.extend(1.).into(),
+//         }]
+//     }
+
+//     fn get_ambient_color(&self) -> [f32; 4] {
+//         [0.2, 0.2, 0.2, 1.]
+//     }
+// }

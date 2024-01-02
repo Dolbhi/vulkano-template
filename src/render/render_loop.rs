@@ -200,3 +200,16 @@ impl RenderLoop {
         )
     }
 }
+
+// pub trait RenderUpload<'a, O, P, D>
+// where
+//     O: Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
+//     P: IntoIterator<Item = PointLight>,
+//     D: IntoIterator<Item = DirectionLight>,
+// {
+//     fn get_scene_data(&self, extends: &winit::dpi::PhysicalSize<u32>) -> GPUGlobalData;
+//     fn get_render_objects(&'a self) -> O;
+//     fn get_point_lights(&self) -> P;
+//     fn get_direction_lights(&self) -> D;
+//     fn get_ambient_color(&self) -> [f32; 4];
+// }

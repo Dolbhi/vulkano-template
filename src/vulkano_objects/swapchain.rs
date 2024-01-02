@@ -1,3 +1,5 @@
+//! Reusable for multiple renderers
+
 use std::sync::Arc;
 
 use vulkano::device::physical::PhysicalDevice;

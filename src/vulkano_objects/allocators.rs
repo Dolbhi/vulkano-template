@@ -1,3 +1,6 @@
+//! Convientient collection of default allocators
+//! Reusable for multiple renderers
+
 use std::sync::Arc;
 
 use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;

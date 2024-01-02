@@ -1,3 +1,6 @@
+//! Single function for comparing and selecting an appropriate device
+//! Reusable for multiple renderers
+
 use std::sync::Arc;
 
 use vulkano::device::physical::{PhysicalDevice, PhysicalDeviceType};

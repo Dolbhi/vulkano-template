@@ -1,3 +1,6 @@
+//! Convient renderpass and framebuffer creation functions
+//! VERY NOT reusable for multiple renderers
+
 use std::sync::Arc;
 
 use vulkano::device::Device;
@@ -69,7 +72,7 @@ pub fn create_framebuffers_from_swapchain_images(
             )
             .unwrap()
         })
-        .collect::<Vec<_>>()
+        .collect()
 }
 
 pub fn create_deferred_render_pass(
@@ -200,7 +203,7 @@ pub fn create_deferred_framebuffers_from_images(
             )
             .unwrap()
         })
-        .collect::<Vec<_>>();
+        .collect();
 
     (
         (diffuse_attachment, normals_attachment, depth_attachment),
