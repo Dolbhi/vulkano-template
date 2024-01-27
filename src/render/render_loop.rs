@@ -33,7 +33,7 @@ impl RenderLoop {
 
         let draw_system = Self::init_render_objects(&renderer);
         let lighting_system = LightingSystem::new(&renderer);
-        let fences = vec![None; renderer.swapchain.image_count() as usize]; //(0..frames.len()).map(|_| None).collect();
+        let fences = vec![None; renderer.get_image_count()]; //(0..frames.len()).map(|_| None).collect();
 
         Self {
             renderer,

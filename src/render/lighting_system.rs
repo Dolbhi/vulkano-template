@@ -92,7 +92,7 @@ impl LightingSystem {
             .expect("failed to create ambient shader module");
         let ambient_pipeline = Self::create_lighting_pipeline(&context, vs.clone(), fs, []);
 
-        let image_count = context.swapchain.image_count() as usize;
+        let image_count = context.get_image_count();
 
         // create buffers and descriptor sets
         let attachments_set = Self::create_attachment_set(&point_pipeline, context);

@@ -66,7 +66,7 @@ where
             .collect();
 
         let layout = pipelines[0].pipeline.layout();
-        let image_count = context.swapchain.image_count() as usize;
+        let image_count = context.get_image_count();
 
         // create buffers and descriptors
         let global_data = create_dynamic_buffers::<GPUGlobalData>(

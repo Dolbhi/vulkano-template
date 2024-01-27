@@ -11,7 +11,7 @@ use vulkano::{
     command_buffer::{self, RenderPassBeginInfo},
     descriptor_set::PersistentDescriptorSet,
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
-    image::{sampler::Sampler, view::ImageView, Image},
+    image::{sampler::Sampler, view::ImageView},
     instance::Instance,
     pipeline::graphics::viewport::Viewport,
     render_pass::{Framebuffer, RenderPass},
@@ -53,16 +53,15 @@ const INIT_WINDOW_SIZE: LogicalSize<f32> = LogicalSize::new(1000.0f32, 600.0);
 
 pub struct Renderer {
     _instance: Arc<Instance>,
-    pub window: Arc<Window>, // pending refactor with swapchain
+    pub window: Arc<Window>, // for get inner size and request redraw
+    pub viewport: Viewport,  // just for pipeline creation
     pub device: Arc<Device>,
-    pub queue: Arc<Queue>,
-    pub swapchain: Arc<Swapchain>,
-    images: Vec<Arc<Image>>, // only used for getting image count
-    pub render_pass: Arc<RenderPass>,
-    framebuffers: Vec<Arc<Framebuffer>>, // deferred examples remakes fb's every frame
-    pub attachments: FramebufferAttachments,
+    pub queue: Arc<Queue>, // for submitting command buffers
     pub allocators: Allocators,
-    pub viewport: Viewport,
+    swapchain: Arc<Swapchain>, // swapchain recreation and image presenting
+    pub render_pass: Arc<RenderPass>,
+    framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
+    pub attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
 }
 
 impl Renderer {
@@ -80,6 +79,12 @@ impl Renderer {
             .set_cursor_grab(CursorGrabMode::Confined)
             .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
             .unwrap();
+
+        let viewport: Viewport = Viewport {
+            extent: window.inner_size().into(),
+            ..Default::default() // offset: [0.0, 0.0],
+                                 // depth_range: 0.0..=1.0,
+        };
 
         let device_extensions = DeviceExtensions {
             khr_swapchain: true,
@@ -106,12 +111,12 @@ impl Renderer {
         )
         .expect("failed to create device");
 
+        let allocators = Allocators::new(device.clone());
+
         let queue = queues.next().unwrap();
 
         let (swapchain, images) =
             vulkano_objects::swapchain::create_swapchain(&physical_device, device.clone(), surface);
-
-        let allocators = Allocators::new(device.clone());
 
         let render_pass = vulkano_objects::render_pass::create_deferred_render_pass(
             device.clone(),
@@ -123,12 +128,6 @@ impl Renderer {
                 render_pass.clone(),
                 &allocators,
             );
-
-        let viewport = Viewport {
-            extent: window.inner_size().into(),
-            ..Default::default() // offset: [0.0, 0.0],
-                                 // depth_range: 0.0..=1.0,
-        };
 
         println!(
             "[Renderer info]\nswapchain image count: {}\nQueue family: {}\nrgba format properties: {:?}",
@@ -145,14 +144,17 @@ impl Renderer {
             window,
             device,
             queue,
+            allocators,
             swapchain,
-            images,
             render_pass,
             framebuffers,
             attachments,
-            allocators,
             viewport,
         }
+    }
+
+    pub fn get_image_count(&self) -> usize {
+        self.swapchain.image_count() as usize
     }
 
     /// recreates swapchain and framebuffers
@@ -167,10 +169,9 @@ impl Renderer {
         };
 
         self.swapchain = new_swapchain;
-        self.images = new_images;
         (self.attachments, self.framebuffers) =
             vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
-                &self.images,
+                &new_images,
                 self.render_pass.clone(),
                 &self.allocators,
             );

@@ -1,5 +1,6 @@
 mod draw_system;
 mod lighting_system;
+mod render_context;
 mod render_data;
 mod render_loop;
 mod renderer;
