@@ -5,6 +5,7 @@ use vulkano::{
     command_buffer::AutoCommandBufferBuilder,
     descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
     pipeline::PipelineBindPoint,
+    render_pass::RenderPass,
     shader::ShaderModule,
     sync::GpuFuture,
 };
@@ -20,6 +21,7 @@ use crate::{
     vulkano_objects::{
         buffers::{create_device_local_buffer, create_dynamic_buffers, create_storage_buffers},
         pipeline::PipelineHandler,
+        render_pass::FramebufferAttachments,
     },
     Vertex2d,
 };
@@ -40,6 +42,7 @@ pub struct LightingSystem {
 impl LightingSystem {
     fn create_lighting_pipeline(
         context: &Renderer,
+        render_pass: Arc<RenderPass>,
         vs: Arc<ShaderModule>,
         fs: Arc<ShaderModule>,
         dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
@@ -49,12 +52,16 @@ impl LightingSystem {
             vs.entry_point("main").unwrap(),
             fs.entry_point("main").unwrap(),
             context.viewport.clone(),
-            context.render_pass.clone(),
+            render_pass,
             dynamic_bindings,
             crate::vulkano_objects::pipeline::PipelineType::Lighting,
         )
     }
-    pub fn new(context: &Renderer) -> Self {
+    pub fn new(
+        context: &Renderer,
+        render_pass: &Arc<RenderPass>,
+        attachments: &FramebufferAttachments,
+    ) -> Self {
         // let pipeline = {
         //     let vs = lighting::vs::load(context.device.clone())
         //         .expect("failed to create lighting shader module")
@@ -80,22 +87,25 @@ impl LightingSystem {
             .expect("failed to create point shader module");
         let fs = lighting::load_point_fs(context.device.clone())
             .expect("failed to create point shader module");
-        let point_pipeline = Self::create_lighting_pipeline(&context, vs, fs, [(1, 0)]); // global data is dynamic
+        let point_pipeline =
+            Self::create_lighting_pipeline(&context, render_pass.clone(), vs, fs, [(1, 0)]); // global data is dynamic
 
         let vs = lighting::load_direction_vs(context.device.clone())
             .expect("failed to create directional shader module");
         let fs = lighting::load_direction_fs(context.device.clone())
             .expect("failed to create directional shader module");
-        let direction_pipeline = Self::create_lighting_pipeline(&context, vs.clone(), fs, []);
+        let direction_pipeline =
+            Self::create_lighting_pipeline(&context, render_pass.clone(), vs.clone(), fs, []);
 
         let fs = lighting::load_ambient_fs(context.device.clone())
             .expect("failed to create ambient shader module");
-        let ambient_pipeline = Self::create_lighting_pipeline(&context, vs.clone(), fs, []);
+        let ambient_pipeline =
+            Self::create_lighting_pipeline(&context, render_pass.clone(), vs.clone(), fs, []);
 
         let image_count = context.get_image_count();
 
         // create buffers and descriptor sets
-        let attachments_set = Self::create_attachment_set(&point_pipeline, context);
+        let attachments_set = Self::create_attachment_set(&point_pipeline, context, attachments);
 
         let mut global_data = create_dynamic_buffers::<GPUGlobalData>(
             &context.allocators,
@@ -212,38 +222,44 @@ impl LightingSystem {
         }
     }
 
-    pub fn recreate_pipeline(&mut self, context: &Renderer) {
+    pub fn recreate_pipeline(&mut self, context: &Renderer, render_pass: &Arc<RenderPass>) {
         self.point_pipeline.recreate_pipeline(
             context.device.clone(),
-            context.render_pass.clone(),
+            render_pass.clone(),
             context.viewport.clone(),
         );
         self.direction_pipeline.recreate_pipeline(
             context.device.clone(),
-            context.render_pass.clone(),
+            render_pass.clone(),
             context.viewport.clone(),
         );
         self.ambient_pipeline.recreate_pipeline(
             context.device.clone(),
-            context.render_pass.clone(),
+            render_pass.clone(),
             context.viewport.clone(),
         );
     }
     /// recreate the descriptor set describing the framebuffer attachments, must be done after recreating framebuffer (see `DrawSystem::recreate_pipelines`)
-    pub fn recreate_descriptor(&mut self, context: &Renderer) {
-        self.attachments_set = Self::create_attachment_set(&self.point_pipeline, context);
+    pub fn recreate_descriptor(
+        &mut self,
+        context: &Renderer,
+        attachments: &FramebufferAttachments,
+    ) {
+        self.attachments_set =
+            Self::create_attachment_set(&self.point_pipeline, context, attachments);
     }
     fn create_attachment_set(
         pipeline: &PipelineHandler<Vertex2d>,
         context: &Renderer,
+        attachments: &FramebufferAttachments,
     ) -> Arc<PersistentDescriptorSet> {
         PersistentDescriptorSet::new(
             &context.allocators.descriptor_set,
             pipeline.layout().set_layouts().get(0).unwrap().clone(),
             [
-                WriteDescriptorSet::image_view(0, context.attachments.0.clone()),
-                WriteDescriptorSet::image_view(1, context.attachments.1.clone()),
-                WriteDescriptorSet::image_view(2, context.attachments.2.clone()),
+                WriteDescriptorSet::image_view(0, attachments.0.clone()),
+                WriteDescriptorSet::image_view(1, attachments.1.clone()),
+                WriteDescriptorSet::image_view(2, attachments.2.clone()),
             ],
             [],
         )

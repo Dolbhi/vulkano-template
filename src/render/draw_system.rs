@@ -5,7 +5,7 @@ use std::{collections::HashMap, iter::zip, sync::Arc, vec};
 
 use vulkano::{
     buffer::BufferContents, command_buffer::AutoCommandBufferBuilder,
-    descriptor_set::PersistentDescriptorSet, shader::EntryPoint,
+    descriptor_set::PersistentDescriptorSet, render_pass::RenderPass, shader::EntryPoint,
 };
 
 use crate::{
@@ -47,6 +47,7 @@ where
     /// creates from a collection of shader entry points
     pub fn new(
         context: &Renderer,
+        render_pass: &Arc<RenderPass>,
         shaders: impl IntoIterator<Item = (EntryPoint, EntryPoint)>,
     ) -> Self {
         let pipelines: Vec<PipelineGroup> = shaders
@@ -57,7 +58,7 @@ where
                     vs,
                     fs,
                     context.viewport.clone(),
-                    context.render_pass.clone(),
+                    render_pass.clone(),
                     [(0, 0)],
                     crate::vulkano_objects::pipeline::PipelineType::Drawing,
                 )
@@ -103,11 +104,11 @@ where
     pub fn get_pipeline(&self, pipeline_index: usize) -> &PipelineGroup {
         &self.pipelines[pipeline_index]
     }
-    pub fn recreate_pipelines(&mut self, context: &Renderer) {
+    pub fn recreate_pipelines(&mut self, context: &Renderer, render_pass: &Arc<RenderPass>) {
         for pipeline in self.pipelines.iter_mut() {
             pipeline.pipeline.recreate_pipeline(
                 context.device.clone(),
-                context.render_pass.clone(),
+                render_pass.clone(),
                 context.viewport.clone(),
             );
         }

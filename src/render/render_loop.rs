@@ -2,16 +2,23 @@ use std::sync::Arc;
 use std::vec;
 
 use cgmath::{Matrix4, Transform};
+use vulkano::command_buffer::{
+    AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo,
+};
+use vulkano::render_pass::{Framebuffer, RenderPass};
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use winit::event_loop::EventLoop;
 
+use super::draw_system;
 use super::lighting_system::LightingSystem;
 use super::renderer::Fence;
 use super::{render_data::render_object::RenderObject, renderer::Renderer, DrawSystem};
 
 use crate::shaders::draw::GPUGlobalData;
 use crate::shaders::lighting::{DirectionLight, PointLight};
+use crate::vulkano_objects;
+use crate::vulkano_objects::render_pass::FramebufferAttachments;
 use crate::{
     game_objects::Camera,
     shaders::draw::{self, GPUObjectData},
@@ -19,8 +26,13 @@ use crate::{
 
 pub struct RenderLoop {
     pub renderer: Renderer,
+    pub render_pass: Arc<RenderPass>,
+    framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
+    pub attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
+
     pub draw_system: DrawSystem<GPUObjectData, Matrix4<f32>>,
     pub lighting_system: LightingSystem,
+
     recreate_swapchain: bool,
     window_resized: bool,
     fences: Vec<Option<Arc<Fence>>>,
@@ -29,14 +41,29 @@ pub struct RenderLoop {
 
 impl RenderLoop {
     pub fn new(event_loop: &EventLoop<()>) -> Self {
-        let renderer = Renderer::initialize(event_loop);
+        let (renderer, images) = Renderer::initialize(event_loop);
 
-        let draw_system = Self::init_render_objects(&renderer);
-        let lighting_system = LightingSystem::new(&renderer);
+        let render_pass = vulkano_objects::render_pass::create_deferred_render_pass(
+            renderer.device.clone(),
+            renderer.swapchain.clone(),
+        );
+        let (attachments, framebuffers) =
+            vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
+                &images,
+                render_pass.clone(),
+                &renderer.allocators,
+            );
+
+        let draw_system = Self::init_render_objects(&renderer, render_pass.clone());
+        let lighting_system = LightingSystem::new(&renderer, &render_pass, &attachments);
         let fences = vec![None; renderer.get_image_count()]; //(0..frames.len()).map(|_| None).collect();
 
         Self {
             renderer,
+            render_pass,
+            framebuffers,
+            attachments,
+
             draw_system,
             lighting_system,
             recreate_swapchain: false,
@@ -64,15 +91,13 @@ impl RenderLoop {
         // do recreation if necessary
         if self.window_resized {
             self.window_resized = false;
-            self.recreate_swapchain = false;
-            self.renderer.recreate_swapchain();
-            self.lighting_system.recreate_descriptor(&self.renderer);
-            self.draw_system.recreate_pipelines(&self.renderer);
-            self.lighting_system.recreate_pipeline(&self.renderer);
+            self.recreate_swapchain();
+            self.draw_system
+                .recreate_pipelines(&self.renderer, &self.render_pass);
+            self.lighting_system
+                .recreate_pipeline(&self.renderer, &self.render_pass);
         } else if self.recreate_swapchain {
-            self.recreate_swapchain = false;
-            self.renderer.recreate_swapchain();
-            self.lighting_system.recreate_descriptor(&self.renderer);
+            self.recreate_swapchain();
         }
 
         // get upcoming image to display and future of when it is ready
@@ -146,8 +171,16 @@ impl RenderLoop {
             previous_future,
             acquire_future,
             image_i,
-            &mut self.draw_system,
-            &mut self.lighting_system,
+            |a, b| {
+                Self::render(
+                    &self.framebuffers,
+                    &mut self.draw_system,
+                    &mut self.lighting_system,
+                    a,
+                    b,
+                )
+            }, // &mut self.draw_system,
+               // &mut self.lighting_system,
         );
         // replace fence of upcoming image with new one
         self.fences[image_i as usize] = match result {
@@ -164,6 +197,42 @@ impl RenderLoop {
         self.previous_frame_i = image_i;
     }
 
+    fn render(
+        framebuffers: &Vec<Arc<Framebuffer>>,
+        draw_system: &mut DrawSystem<GPUObjectData, Matrix4<f32>>,
+        lighting_system: &mut LightingSystem,
+        // &mut self,
+        index: usize,
+        command_builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+    ) {
+        // start render pass
+        command_builder
+            .begin_render_pass(
+                RenderPassBeginInfo {
+                    clear_values: vec![
+                        Some([0.0, 0.0, 0.0, 0.0].into()), // swapchain image
+                        Some([0.0, 0.0, 0.0, 0.0].into()), // diffuse buffer
+                        Some([0.0, 0.0, 0.0, 0.0].into()), // normal buffer
+                        Some(1.0f32.into()),               // depth buffer
+                    ],
+                    ..RenderPassBeginInfo::framebuffer(framebuffers[index].clone())
+                },
+                Default::default(),
+            )
+            .unwrap();
+
+        // draw pass
+        draw_system.render(index, command_builder);
+        // end subpass
+        command_builder
+            .next_subpass(Default::default(), Default::default())
+            .unwrap();
+        // lighting pass
+        lighting_system.render(index, command_builder);
+        // end render pass
+        command_builder.end_render_pass(Default::default()).unwrap();
+    }
+
     pub fn handle_window_resize(&mut self) {
         // impacts the next update
         self.window_resized = true;
@@ -172,7 +241,23 @@ impl RenderLoop {
         self.renderer.window.request_redraw();
     }
 
-    fn init_render_objects(renderer: &Renderer) -> DrawSystem<GPUObjectData, Matrix4<f32>> {
+    fn recreate_swapchain(&mut self) {
+        self.recreate_swapchain = false;
+        let images = self.renderer.recreate_swapchain();
+        (self.attachments, self.framebuffers) =
+            vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
+                &images,
+                self.render_pass.clone(),
+                &self.renderer.allocators,
+            );
+        self.lighting_system
+            .recreate_descriptor(&self.renderer, &self.attachments);
+    }
+
+    fn init_render_objects(
+        renderer: &Renderer,
+        render_pass: Arc<RenderPass>,
+    ) -> DrawSystem<GPUObjectData, Matrix4<f32>> {
         // pipelines
         let shaders = [
             (
@@ -191,6 +276,7 @@ impl RenderLoop {
 
         DrawSystem::new(
             &renderer,
+            &render_pass,
             shaders.map(|(v, f)| {
                 (
                     v.entry_point("main").unwrap(),

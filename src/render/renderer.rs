@@ -8,10 +8,12 @@ use crate::{
 };
 use vulkano::{
     buffer::BufferContents,
-    command_buffer::{self, RenderPassBeginInfo},
+    command_buffer::{
+        self, AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo,
+    },
     descriptor_set::PersistentDescriptorSet,
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
-    image::{sampler::Sampler, view::ImageView},
+    image::{sampler::Sampler, view::ImageView, Image},
     instance::Instance,
     pipeline::graphics::viewport::Viewport,
     render_pass::{Framebuffer, RenderPass},
@@ -58,14 +60,14 @@ pub struct Renderer {
     pub device: Arc<Device>,
     pub queue: Arc<Queue>, // for submitting command buffers
     pub allocators: Allocators,
-    swapchain: Arc<Swapchain>, // swapchain recreation and image presenting
-    pub render_pass: Arc<RenderPass>,
-    framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
-    pub attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
+    pub swapchain: Arc<Swapchain>, // swapchain recreation and image presenting
+                                   // pub render_pass: Arc<RenderPass>,
+                                   // framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
+                                   // pub attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
 }
 
 impl Renderer {
-    pub fn initialize(event_loop: &EventLoop<()>) -> Self {
+    pub fn initialize(event_loop: &EventLoop<()>) -> (Self, Vec<Arc<Image>>) {
         let instance = vulkano_objects::instance::get_instance(event_loop);
 
         let window = Arc::new(WindowBuilder::new().build(&event_loop).unwrap());
@@ -118,16 +120,16 @@ impl Renderer {
         let (swapchain, images) =
             vulkano_objects::swapchain::create_swapchain(&physical_device, device.clone(), surface);
 
-        let render_pass = vulkano_objects::render_pass::create_deferred_render_pass(
-            device.clone(),
-            swapchain.clone(),
-        );
-        let (attachments, framebuffers) =
-            vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
-                &images,
-                render_pass.clone(),
-                &allocators,
-            );
+        // let render_pass = vulkano_objects::render_pass::create_deferred_render_pass(
+        //     device.clone(),
+        //     swapchain.clone(),
+        // );
+        // let (attachments, framebuffers) =
+        //     vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
+        //         &images,
+        //         render_pass.clone(),
+        //         &allocators,
+        //     );
 
         println!(
             "[Renderer info]\nswapchain image count: {}\nQueue family: {}\nrgba format properties: {:?}",
@@ -139,18 +141,21 @@ impl Renderer {
                 .optimal_tiling_features,
         );
 
-        Self {
-            _instance: instance,
-            window,
-            device,
-            queue,
-            allocators,
-            swapchain,
-            render_pass,
-            framebuffers,
-            attachments,
-            viewport,
-        }
+        (
+            Self {
+                _instance: instance,
+                window,
+                device,
+                queue,
+                allocators,
+                swapchain,
+                // render_pass,
+                // framebuffers,
+                // attachments,
+                viewport,
+            },
+            images,
+        )
     }
 
     pub fn get_image_count(&self) -> usize {
@@ -158,7 +163,7 @@ impl Renderer {
     }
 
     /// recreates swapchain and framebuffers
-    pub fn recreate_swapchain(&mut self) {
+    pub fn recreate_swapchain(&mut self) -> Vec<Arc<Image>> {
         let (new_swapchain, new_images) = match self.swapchain.recreate(SwapchainCreateInfo {
             image_extent: self.window.inner_size().into(),
             ..self.swapchain.create_info()
@@ -169,12 +174,13 @@ impl Renderer {
         };
 
         self.swapchain = new_swapchain;
-        (self.attachments, self.framebuffers) =
-            vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
-                &new_images,
-                self.render_pass.clone(),
-                &self.allocators,
-            );
+        new_images
+        // (self.attachments, self.framebuffers) =
+        //     vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
+        //         &new_images,
+        //         self.render_pass.clone(),
+        //         &self.allocators,
+        //     );
     }
 
     /// Gets future where next image in swapchain is ready
@@ -192,17 +198,26 @@ impl Renderer {
     }
 
     /// Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
-    pub fn flush_next_future<O, T>(
+    pub fn flush_next_future<
+        // O,
+        // T,
+        F,
+        // P,
+        // A,
+    >(
         &self,
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
-        draw_system: &mut DrawSystem<O, T>,
-        lighting_system: &mut LightingSystem,
+        build_commands: F,
+        // draw_system: &mut DrawSystem<O, T>,
+        // lighting_system: &mut LightingSystem,
     ) -> Result<Fence, Validated<VulkanError>>
     where
-        O: BufferContents + From<T>,
-        T: Clone,
+        // O: BufferContents + From<T>,
+        // T: Clone,
+        F: FnOnce(usize, &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>),
+        // A: vulkano::command_buffer::allocator::CommandBufferAllocator,
     {
         let index = image_i as usize;
 
@@ -214,32 +229,34 @@ impl Renderer {
         )
         .unwrap();
 
-        // start render pass
-        builder
-            .begin_render_pass(
-                RenderPassBeginInfo {
-                    clear_values: vec![
-                        Some([0.0, 0.0, 0.0, 0.0].into()), // swapchain image
-                        Some([0.0, 0.0, 0.0, 0.0].into()), // diffuse buffer
-                        Some([0.0, 0.0, 0.0, 0.0].into()), // normal buffer
-                        Some(1.0f32.into()),               // depth buffer
-                    ],
-                    ..RenderPassBeginInfo::framebuffer(self.framebuffers[index].clone())
-                },
-                Default::default(),
-            )
-            .unwrap();
+        build_commands(index, &mut builder);
 
-        // draw pass
-        draw_system.render(index, &mut builder);
-        // end subpass
-        builder
-            .next_subpass(Default::default(), Default::default())
-            .unwrap();
-        // lighting pass
-        lighting_system.render(index, &mut builder);
-        // end render pass
-        builder.end_render_pass(Default::default()).unwrap();
+        // // start render pass
+        // builder
+        //     .begin_render_pass(
+        //         RenderPassBeginInfo {
+        //             clear_values: vec![
+        //                 Some([0.0, 0.0, 0.0, 0.0].into()), // swapchain image
+        //                 Some([0.0, 0.0, 0.0, 0.0].into()), // diffuse buffer
+        //                 Some([0.0, 0.0, 0.0, 0.0].into()), // normal buffer
+        //                 Some(1.0f32.into()),               // depth buffer
+        //             ],
+        //             ..RenderPassBeginInfo::framebuffer(self.framebuffers[index].clone())
+        //         },
+        //         Default::default(),
+        //     )
+        //     .unwrap();
+
+        // // draw pass
+        // draw_system.render(index, &mut builder);
+        // // end subpass
+        // builder
+        //     .next_subpass(Default::default(), Default::default())
+        //     .unwrap();
+        // // lighting pass
+        // lighting_system.render(index, &mut builder);
+        // // end render pass
+        // builder.end_render_pass(Default::default()).unwrap();
 
         // Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
         previous_future
