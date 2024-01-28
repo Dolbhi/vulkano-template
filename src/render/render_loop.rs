@@ -5,31 +5,37 @@ use cgmath::{Matrix4, Transform};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo,
 };
-use vulkano::render_pass::{Framebuffer, RenderPass};
-use vulkano::{sync::GpuFuture, Validated, VulkanError};
+use vulkano::{
+    render_pass::{Framebuffer, RenderPass},
+    sync::GpuFuture,
+    Validated, VulkanError,
+};
 
 use winit::event_loop::EventLoop;
 
-use super::draw_system;
-use super::lighting_system::LightingSystem;
-use super::renderer::Fence;
-use super::{render_data::render_object::RenderObject, renderer::Renderer, DrawSystem};
+use super::{
+    context::Context, context::Fence, lighting_system::LightingSystem,
+    render_data::render_object::RenderObject, DrawSystem,
+};
 
-use crate::shaders::draw::GPUGlobalData;
-use crate::shaders::lighting::{DirectionLight, PointLight};
-use crate::vulkano_objects;
-use crate::vulkano_objects::render_pass::FramebufferAttachments;
 use crate::{
-    game_objects::Camera,
-    shaders::draw::{self, GPUObjectData},
+    shaders::{
+        draw::GPUGlobalData,
+        lighting::{DirectionLight, PointLight},
+    },
+    vulkano_objects::{self, render_pass::FramebufferAttachments},
+    {
+        game_objects::Camera,
+        shaders::draw::{self, GPUObjectData},
+    },
 };
 
 pub struct RenderLoop {
-    pub renderer: Renderer,
+    pub context: Context,
+
     pub render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
     pub attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
-
     pub draw_system: DrawSystem<GPUObjectData, Matrix4<f32>>,
     pub lighting_system: LightingSystem,
 
@@ -41,31 +47,32 @@ pub struct RenderLoop {
 
 impl RenderLoop {
     pub fn new(event_loop: &EventLoop<()>) -> Self {
-        let (renderer, images) = Renderer::initialize(event_loop);
+        let context = Context::initialize(event_loop);
 
         let render_pass = vulkano_objects::render_pass::create_deferred_render_pass(
-            renderer.device.clone(),
-            renderer.swapchain.clone(),
+            context.device.clone(),
+            context.swapchain.clone(),
         );
         let (attachments, framebuffers) =
             vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
-                &images,
+                &context.images,
                 render_pass.clone(),
-                &renderer.allocators,
+                &context.allocators,
             );
 
-        let draw_system = Self::init_render_objects(&renderer, render_pass.clone());
-        let lighting_system = LightingSystem::new(&renderer, &render_pass, &attachments);
-        let fences = vec![None; renderer.get_image_count()]; //(0..frames.len()).map(|_| None).collect();
+        let draw_system = Self::init_draw_system(&context, render_pass.clone());
+        let lighting_system = LightingSystem::new(&context, &render_pass, &attachments);
+        let fences = vec![None; context.get_image_count()];
 
         Self {
-            renderer,
+            context,
+
             render_pass,
             framebuffers,
             attachments,
-
             draw_system,
             lighting_system,
+
             recreate_swapchain: false,
             window_resized: false,
             fences,
@@ -83,7 +90,7 @@ impl RenderLoop {
         ambient_color: impl Into<[f32; 4]>,
     ) {
         // check zero sized window
-        let image_extent: [u32; 2] = self.renderer.window.inner_size().into();
+        let image_extent: [u32; 2] = self.context.window.inner_size().into();
         if image_extent.contains(&0) {
             return;
         }
@@ -93,15 +100,15 @@ impl RenderLoop {
             self.window_resized = false;
             self.recreate_swapchain();
             self.draw_system
-                .recreate_pipelines(&self.renderer, &self.render_pass);
+                .recreate_pipelines(&self.context, &self.render_pass);
             self.lighting_system
-                .recreate_pipeline(&self.renderer, &self.render_pass);
+                .recreate_pipeline(&self.context, &self.render_pass);
         } else if self.recreate_swapchain {
             self.recreate_swapchain();
         }
 
         // get upcoming image to display and future of when it is ready
-        let (image_i, suboptimal, acquire_future) = match self.renderer.acquire_swapchain_image() {
+        let (image_i, suboptimal, acquire_future) = match self.context.acquire_swapchain_image() {
             Ok(r) => r,
             Err(Validated::Error(VulkanError::OutOfDate)) => {
                 self.recreate_swapchain = true;
@@ -120,7 +127,7 @@ impl RenderLoop {
         }
 
         // cam matrcies
-        let extends = self.renderer.window.inner_size();
+        let extends = self.context.window.inner_size();
         let aspect = extends.width as f32 / extends.height as f32;
         let proj = camera_data.projection_matrix(aspect);
         let view = camera_data.view_matrix();
@@ -153,7 +160,7 @@ impl RenderLoop {
         // logic that uses the GPU resources that are currently not used (have been waited upon)
         let something_needs_all_gpu_resources = false;
         let previous_future = match self.fences[self.previous_frame_i as usize].clone() {
-            None => self.renderer.synchronize().boxed(),
+            None => self.context.synchronize().boxed(),
             Some(fence) => {
                 if something_needs_all_gpu_resources {
                     fence.wait(None).unwrap();
@@ -167,16 +174,17 @@ impl RenderLoop {
 
         // RENDER
         // println!("[Pre-render state] seconds_passed: {}, image_i: {}, window_resized: {}, recreate_swapchain: {}", seconds_passed, image_i, self.window_resized, self.recreate_swapchain);
-        let result = self.renderer.flush_next_future(
+        let index = image_i as usize;
+        let result = self.context.flush_next_future(
             previous_future,
             acquire_future,
             image_i,
-            |a, b| {
+            |b| {
                 Self::render(
-                    &self.framebuffers,
+                    self.framebuffers[index].clone(),
                     &mut self.draw_system,
                     &mut self.lighting_system,
-                    a,
+                    index,
                     b,
                 )
             }, // &mut self.draw_system,
@@ -198,10 +206,9 @@ impl RenderLoop {
     }
 
     fn render(
-        framebuffers: &Vec<Arc<Framebuffer>>,
+        framebuffer: Arc<Framebuffer>,
         draw_system: &mut DrawSystem<GPUObjectData, Matrix4<f32>>,
         lighting_system: &mut LightingSystem,
-        // &mut self,
         index: usize,
         command_builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     ) {
@@ -215,7 +222,7 @@ impl RenderLoop {
                         Some([0.0, 0.0, 0.0, 0.0].into()), // normal buffer
                         Some(1.0f32.into()),               // depth buffer
                     ],
-                    ..RenderPassBeginInfo::framebuffer(framebuffers[index].clone())
+                    ..RenderPassBeginInfo::framebuffer(framebuffer)
                 },
                 Default::default(),
             )
@@ -238,24 +245,24 @@ impl RenderLoop {
         self.window_resized = true;
     }
     pub fn handle_window_wait(&self) {
-        self.renderer.window.request_redraw();
+        self.context.window.request_redraw();
     }
 
     fn recreate_swapchain(&mut self) {
         self.recreate_swapchain = false;
-        let images = self.renderer.recreate_swapchain();
+        self.context.recreate_swapchain();
         (self.attachments, self.framebuffers) =
             vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
-                &images,
+                &self.context.images,
                 self.render_pass.clone(),
-                &self.renderer.allocators,
+                &self.context.allocators,
             );
         self.lighting_system
-            .recreate_descriptor(&self.renderer, &self.attachments);
+            .recreate_descriptor(&self.context, &self.attachments);
     }
 
-    fn init_render_objects(
-        renderer: &Renderer,
+    fn init_draw_system(
+        renderer: &Context,
         render_pass: Arc<RenderPass>,
     ) -> DrawSystem<GPUObjectData, Matrix4<f32>> {
         // pipelines

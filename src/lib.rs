@@ -14,7 +14,7 @@ use crate::{
 use cgmath::Matrix4;
 use game_objects::transform::{TransformID, TransformSystem};
 use legion::World;
-use render::{DrawSystem, MaterialID, Renderer};
+use render::{Context, DrawSystem, MaterialID};
 use shaders::draw::GPUObjectData;
 use std::{iter::zip, path::Path, sync::Arc};
 
@@ -30,7 +30,7 @@ mod tests {
 fn init_render_objects(
     world: &mut World,
     transform_sys: &mut TransformSystem,
-    renderer: &Renderer,
+    renderer: &Context,
     draw_system: &mut DrawSystem<GPUObjectData, Matrix4<f32>>,
 ) -> TransformID {
     let resource_loader = renderer.get_resource_loader();

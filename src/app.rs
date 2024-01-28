@@ -64,7 +64,7 @@ impl App {
         let suzanne = init_render_objects(
             &mut world,
             &mut transforms,
-            &render_loop.renderer,
+            &render_loop.context,
             &mut render_loop.draw_system,
         );
 

@@ -26,7 +26,7 @@ use crate::{
     Vertex2d,
 };
 
-use super::Renderer;
+use super::Context;
 
 pub struct LightingSystem {
     point_pipeline: PipelineHandler<Vertex2d>,
@@ -41,7 +41,7 @@ pub struct LightingSystem {
 
 impl LightingSystem {
     fn create_lighting_pipeline(
-        context: &Renderer,
+        context: &Context,
         render_pass: Arc<RenderPass>,
         vs: Arc<ShaderModule>,
         fs: Arc<ShaderModule>,
@@ -58,7 +58,7 @@ impl LightingSystem {
         )
     }
     pub fn new(
-        context: &Renderer,
+        context: &Context,
         render_pass: &Arc<RenderPass>,
         attachments: &FramebufferAttachments,
     ) -> Self {
@@ -222,7 +222,7 @@ impl LightingSystem {
         }
     }
 
-    pub fn recreate_pipeline(&mut self, context: &Renderer, render_pass: &Arc<RenderPass>) {
+    pub fn recreate_pipeline(&mut self, context: &Context, render_pass: &Arc<RenderPass>) {
         self.point_pipeline.recreate_pipeline(
             context.device.clone(),
             render_pass.clone(),
@@ -240,17 +240,13 @@ impl LightingSystem {
         );
     }
     /// recreate the descriptor set describing the framebuffer attachments, must be done after recreating framebuffer (see `DrawSystem::recreate_pipelines`)
-    pub fn recreate_descriptor(
-        &mut self,
-        context: &Renderer,
-        attachments: &FramebufferAttachments,
-    ) {
+    pub fn recreate_descriptor(&mut self, context: &Context, attachments: &FramebufferAttachments) {
         self.attachments_set =
             Self::create_attachment_set(&self.point_pipeline, context, attachments);
     }
     fn create_attachment_set(
         pipeline: &PipelineHandler<Vertex2d>,
-        context: &Renderer,
+        context: &Context,
         attachments: &FramebufferAttachments,
     ) -> Arc<PersistentDescriptorSet> {
         PersistentDescriptorSet::new(

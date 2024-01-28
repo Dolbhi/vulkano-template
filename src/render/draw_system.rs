@@ -17,11 +17,11 @@ use crate::{
 };
 
 use super::{
+    context::Context,
     render_data::{
         material::{MaterialID, PipelineGroup},
         render_object::RenderObject,
     },
-    renderer::Renderer,
 };
 
 /// Collection of pipelines and associated rendering data
@@ -46,7 +46,7 @@ where
 {
     /// creates from a collection of shader entry points
     pub fn new(
-        context: &Renderer,
+        context: &Context,
         render_pass: &Arc<RenderPass>,
         shaders: impl IntoIterator<Item = (EntryPoint, EntryPoint)>,
     ) -> Self {
@@ -104,7 +104,7 @@ where
     pub fn get_pipeline(&self, pipeline_index: usize) -> &PipelineGroup {
         &self.pipelines[pipeline_index]
     }
-    pub fn recreate_pipelines(&mut self, context: &Renderer, render_pass: &Arc<RenderPass>) {
+    pub fn recreate_pipelines(&mut self, context: &Context, render_pass: &Arc<RenderPass>) {
         for pipeline in self.pipelines.iter_mut() {
             pipeline.pipeline.recreate_pipeline(
                 context.device.clone(),

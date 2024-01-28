@@ -1,22 +1,16 @@
 use std::{path::Path, sync::Arc};
 
 use crate::{
-    vulkano_objects::{
-        self, allocators::Allocators, buffers::Buffers, render_pass::FramebufferAttachments,
-    },
+    vulkano_objects::{self, allocators::Allocators, buffers::Buffers},
     VertexFull,
 };
 use vulkano::{
-    buffer::BufferContents,
-    command_buffer::{
-        self, AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo,
-    },
+    command_buffer::{self, AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     descriptor_set::PersistentDescriptorSet,
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
     image::{sampler::Sampler, view::ImageView, Image},
     instance::Instance,
     pipeline::graphics::viewport::Viewport,
-    render_pass::{Framebuffer, RenderPass},
     swapchain::{
         self, PresentFuture, Surface, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
         SwapchainPresentInfo,
@@ -34,13 +28,9 @@ use winit::{
     window::{CursorGrabMode, Window, WindowBuilder},
 };
 
-use super::{
-    lighting_system::LightingSystem,
-    render_data::{
-        material::PipelineGroup,
-        texture::{create_sampler, load_texture},
-    },
-    DrawSystem,
+use super::render_data::{
+    material::PipelineGroup,
+    texture::{create_sampler, load_texture},
 };
 
 pub type Fence = FenceSignalFuture<
@@ -53,7 +43,7 @@ pub type Fence = FenceSignalFuture<
 
 const INIT_WINDOW_SIZE: LogicalSize<f32> = LogicalSize::new(1000.0f32, 600.0);
 
-pub struct Renderer {
+pub struct Context {
     _instance: Arc<Instance>,
     pub window: Arc<Window>, // for get inner size and request redraw
     pub viewport: Viewport,  // just for pipeline creation
@@ -61,13 +51,11 @@ pub struct Renderer {
     pub queue: Arc<Queue>, // for submitting command buffers
     pub allocators: Allocators,
     pub swapchain: Arc<Swapchain>, // swapchain recreation and image presenting
-                                   // pub render_pass: Arc<RenderPass>,
-                                   // framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
-                                   // pub attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
+    pub images: Vec<Arc<Image>>,
 }
 
-impl Renderer {
-    pub fn initialize(event_loop: &EventLoop<()>) -> (Self, Vec<Arc<Image>>) {
+impl Context {
+    pub fn initialize(event_loop: &EventLoop<()>) -> Self {
         let instance = vulkano_objects::instance::get_instance(event_loop);
 
         let window = Arc::new(WindowBuilder::new().build(&event_loop).unwrap());
@@ -120,17 +108,6 @@ impl Renderer {
         let (swapchain, images) =
             vulkano_objects::swapchain::create_swapchain(&physical_device, device.clone(), surface);
 
-        // let render_pass = vulkano_objects::render_pass::create_deferred_render_pass(
-        //     device.clone(),
-        //     swapchain.clone(),
-        // );
-        // let (attachments, framebuffers) =
-        //     vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
-        //         &images,
-        //         render_pass.clone(),
-        //         &allocators,
-        //     );
-
         println!(
             "[Renderer info]\nswapchain image count: {}\nQueue family: {}\nrgba format properties: {:?}",
             images.len(),
@@ -141,29 +118,25 @@ impl Renderer {
                 .optimal_tiling_features,
         );
 
-        (
-            Self {
-                _instance: instance,
-                window,
-                device,
-                queue,
-                allocators,
-                swapchain,
-                // render_pass,
-                // framebuffers,
-                // attachments,
-                viewport,
-            },
+        Self {
+            _instance: instance,
+            window,
+            viewport,
+            device,
+            queue,
+            allocators,
+            swapchain,
             images,
-        )
+        }
     }
 
     pub fn get_image_count(&self) -> usize {
-        self.swapchain.image_count() as usize
+        self.images.len()
+        // self.swapchain.image_count() as usize
     }
 
     /// recreates swapchain and framebuffers
-    pub fn recreate_swapchain(&mut self) -> Vec<Arc<Image>> {
+    pub fn recreate_swapchain(&mut self) {
         let (new_swapchain, new_images) = match self.swapchain.recreate(SwapchainCreateInfo {
             image_extent: self.window.inner_size().into(),
             ..self.swapchain.create_info()
@@ -174,13 +147,7 @@ impl Renderer {
         };
 
         self.swapchain = new_swapchain;
-        new_images
-        // (self.attachments, self.framebuffers) =
-        //     vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
-        //         &new_images,
-        //         self.render_pass.clone(),
-        //         &self.allocators,
-        //     );
+        self.images = new_images;
     }
 
     /// Gets future where next image in swapchain is ready
@@ -198,29 +165,16 @@ impl Renderer {
     }
 
     /// Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
-    pub fn flush_next_future<
-        // O,
-        // T,
-        F,
-        // P,
-        // A,
-    >(
+    pub fn flush_next_future<F>(
         &self,
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
         build_commands: F,
-        // draw_system: &mut DrawSystem<O, T>,
-        // lighting_system: &mut LightingSystem,
     ) -> Result<Fence, Validated<VulkanError>>
     where
-        // O: BufferContents + From<T>,
-        // T: Clone,
-        F: FnOnce(usize, &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>),
-        // A: vulkano::command_buffer::allocator::CommandBufferAllocator,
+        F: FnOnce(&mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>),
     {
-        let index = image_i as usize;
-
         // create builder
         let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
@@ -229,34 +183,7 @@ impl Renderer {
         )
         .unwrap();
 
-        build_commands(index, &mut builder);
-
-        // // start render pass
-        // builder
-        //     .begin_render_pass(
-        //         RenderPassBeginInfo {
-        //             clear_values: vec![
-        //                 Some([0.0, 0.0, 0.0, 0.0].into()), // swapchain image
-        //                 Some([0.0, 0.0, 0.0, 0.0].into()), // diffuse buffer
-        //                 Some([0.0, 0.0, 0.0, 0.0].into()), // normal buffer
-        //                 Some(1.0f32.into()),               // depth buffer
-        //             ],
-        //             ..RenderPassBeginInfo::framebuffer(self.framebuffers[index].clone())
-        //         },
-        //         Default::default(),
-        //     )
-        //     .unwrap();
-
-        // // draw pass
-        // draw_system.render(index, &mut builder);
-        // // end subpass
-        // builder
-        //     .next_subpass(Default::default(), Default::default())
-        //     .unwrap();
-        // // lighting pass
-        // lighting_system.render(index, &mut builder);
-        // // end render pass
-        // builder.end_render_pass(Default::default()).unwrap();
+        build_commands(&mut builder);
 
         // Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
         previous_future
@@ -276,7 +203,7 @@ impl Renderer {
 }
 
 pub struct ResourceLoader<'a> {
-    context: &'a Renderer,
+    context: &'a Context,
     // draw_system: &'a mut DrawSystem<GPUObjectData, Matrix4<f32>>,
 }
 
