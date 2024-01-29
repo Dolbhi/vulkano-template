@@ -81,11 +81,12 @@ impl RenderLoop {
         // do recreation if necessary
         if self.window_resized {
             self.window_resized = false;
-            self.handle_window_resize();
+            self.context.handle_window_resize();
             renderer.renderer.recreate_framebuffers(&self.context);
             renderer.renderer.recreate_pipelines(&self.context);
         } else if self.recreate_swapchain {
-            self.recreate_swapchain();
+            self.recreate_swapchain = false;
+            self.context.recreate_swapchain();
             renderer.renderer.recreate_framebuffers(&self.context);
         }
 
@@ -194,19 +195,6 @@ impl RenderLoop {
     }
     pub fn handle_window_wait(&self) {
         self.context.window.request_redraw();
-    }
-
-    fn recreate_swapchain(&mut self) {
-        self.recreate_swapchain = false;
-        self.context.recreate_swapchain();
-        // (self.attachments, self.framebuffers) =
-        //     vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
-        //         &self.context.images,
-        //         self.render_pass.clone(),
-        //         &self.context.allocators,
-        //     );
-        // self.lighting_system
-        //     .recreate_descriptor(&self.context, &self.attachments);
     }
 }
 
