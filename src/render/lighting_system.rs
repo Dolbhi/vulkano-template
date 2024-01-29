@@ -19,7 +19,10 @@ use crate::{
         PointLight,
     },
     vulkano_objects::{
-        buffers::{create_device_local_buffer, create_dynamic_buffers, create_storage_buffers},
+        buffers::{
+            create_device_local_buffer, create_dynamic_buffers, create_storage_buffers,
+            write_to_buffer, write_to_storage_buffer,
+        },
         pipeline::PipelineHandler,
         render_pass::FramebufferAttachments,
     },
@@ -137,8 +140,8 @@ impl LightingSystem {
                 global_set,
                 point_set: point_set.into(),
                 dir_set: dir_set.into(),
-                last_point_index: 0,
-                last_dir_count: 0,
+                last_point_index: None,
+                last_dir_index: None,
             });
         }
 
@@ -276,58 +279,52 @@ impl LightingSystem {
 
         // bind commands
         // point lights
-        let pipeline = &self.point_pipeline.pipeline;
-        let layout = self.point_pipeline.layout();
-        command_builder
-            .bind_pipeline_graphics(pipeline.clone())
-            .unwrap()
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                layout.clone(),
-                0,
-                self.attachments_set.clone(),
-            )
-            .unwrap()
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                layout.clone(),
-                1,
-                vec![frame.global_set.clone(), frame.point_set.clone()],
-            )
-            .unwrap()
-            .bind_vertex_buffers(0, self.point_vertices.clone())
-            .unwrap();
-        for i in 0..=frame.last_point_index as u32 {
+        if let Some(last_index) = frame.last_point_index {
+            let pipeline = &self.point_pipeline.pipeline;
+            let layout = self.point_pipeline.layout();
             command_builder
-                .draw(self.point_vertices.len() as u32, 1, 0, i)
+                .bind_pipeline_graphics(pipeline.clone())
+                .unwrap()
+                .bind_descriptor_sets(
+                    PipelineBindPoint::Graphics,
+                    layout.clone(),
+                    0,
+                    vec![
+                        self.attachments_set.clone().into(),
+                        frame.global_set.clone(),
+                        frame.point_set.clone(),
+                    ],
+                )
+                .unwrap()
+                .bind_vertex_buffers(0, self.point_vertices.clone())
                 .unwrap();
+            for i in 0..=last_index as u32 {
+                command_builder
+                    .draw(self.point_vertices.len() as u32, 1, 0, i)
+                    .unwrap();
+            }
         }
         // directional lights
-        let pipeline = &self.direction_pipeline.pipeline;
-        let layout = self.direction_pipeline.layout();
-        command_builder
-            .bind_pipeline_graphics(pipeline.clone())
-            .unwrap()
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                layout.clone(),
-                0,
-                self.attachments_set.clone(),
-            )
-            .unwrap()
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                layout.clone(),
-                1,
-                frame.dir_set.clone(),
-            )
-            .unwrap()
-            .bind_vertex_buffers(0, self.screen_vertices.clone())
-            .unwrap();
-        for i in 0..=frame.last_dir_count as u32 {
+        if let Some(last_index) = frame.last_dir_index {
+            let pipeline = &self.direction_pipeline.pipeline;
+            let layout = self.direction_pipeline.layout();
             command_builder
-                .draw(self.screen_vertices.len() as u32, 1, 0, i)
+                .bind_pipeline_graphics(pipeline.clone())
+                .unwrap()
+                .bind_descriptor_sets(
+                    PipelineBindPoint::Graphics,
+                    layout.clone(),
+                    0,
+                    vec![self.attachments_set.clone().into(), frame.dir_set.clone()],
+                )
+                .unwrap()
+                .bind_vertex_buffers(0, self.screen_vertices.clone())
                 .unwrap();
+            for i in 0..=last_index as u32 {
+                command_builder
+                    .draw(self.screen_vertices.len() as u32, 1, 0, i)
+                    .unwrap();
+            }
         }
         // ambient light
         let pipeline = &self.ambient_pipeline.pipeline;
@@ -364,8 +361,8 @@ struct FrameData {
     global_set: DescriptorSetWithOffsets,
     point_set: DescriptorSetWithOffsets,
     dir_set: DescriptorSetWithOffsets,
-    last_point_index: usize,
-    last_dir_count: usize,
+    last_point_index: Option<usize>,
+    last_dir_index: Option<usize>,
 }
 
 impl FrameData {
@@ -376,34 +373,8 @@ impl FrameData {
         global_data: impl Into<GPUGlobalData>,
         // ambient_color: [f32; 4],
     ) {
-        // point lights
-        let mut contents = self
-            .point_buffer
-            .write()
-            .unwrap_or_else(|e| panic!("Failed to write to point lights storage buffer\n{}", e));
-        for (i, light) in point_lights.enumerate() {
-            contents[i] = light;
-            self.last_point_index = i;
-        }
-
-        // directional lights
-        let mut contents = self.dir_buffer.write().unwrap_or_else(|e| {
-            panic!(
-                "Failed to write to directional lights storage buffer\n{}",
-                e
-            )
-        });
-        for (i, light) in dir_lights.enumerate() {
-            contents[i] = light;
-            self.last_dir_count = i;
-        }
-
-        // global
-        let mut contents = self
-            .global_buffer
-            .write()
-            .unwrap_or_else(|e| panic!("Failed to write to lighting global buffer\n{}", e));
-
-        *contents = global_data.into();
+        self.last_point_index = write_to_storage_buffer(&self.point_buffer, point_lights);
+        self.last_dir_index = write_to_storage_buffer(&self.dir_buffer, dir_lights);
+        write_to_buffer(&self.global_buffer, global_data);
     }
 }

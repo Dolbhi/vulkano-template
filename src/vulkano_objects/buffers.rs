@@ -362,3 +362,27 @@ pub fn create_storage_buffers<T: BufferContents>(
 //     )
 //     .unwrap()
 // }
+
+/// Write to a storage buffer from an iterator
+/// returns the index of the last item added or None if no items were added
+pub fn write_to_storage_buffer<T: BufferContents>(
+    buffer: &Subbuffer<[T]>,
+    writes: impl Iterator<Item = impl Into<T>>,
+) -> Option<usize> {
+    let mut contents = buffer
+        .write()
+        .unwrap_or_else(|e| panic!("Failed to write to storage buffer\n{}", e));
+    let mut last = None;
+    for (i, write) in writes.enumerate() {
+        contents[i] = write.into();
+        last = Some(i);
+    }
+    last
+}
+
+pub fn write_to_buffer<T: BufferContents>(buffer: &Subbuffer<T>, data: impl Into<T>) {
+    let mut contents = buffer
+        .write()
+        .unwrap_or_else(|e| panic!("Failed to write to buffer\n{}", e));
+    *contents = data.into();
+}

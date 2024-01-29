@@ -24,6 +24,7 @@ layout(location = 0) out vec2 v_screen_coords;
 layout(location = 1) out uint v_light_index;
 
 void main() {
+    // billboard shenanigans
     vec3 offset_right = position.x * vec3(scene_data.view[0][0],scene_data.view[1][0],scene_data.view[2][0]);
     vec3 offset_up = position.y * vec3(scene_data.view[0][1],scene_data.view[1][1],scene_data.view[2][1]);
 

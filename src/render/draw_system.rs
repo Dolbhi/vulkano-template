@@ -14,7 +14,10 @@ use vulkano::{
 use crate::{
     shaders::draw::GPUGlobalData,
     vulkano_objects::{
-        buffers::{create_dynamic_buffers, create_storage_buffers},
+        buffers::{
+            create_dynamic_buffers, create_storage_buffers, write_to_buffer,
+            write_to_storage_buffer,
+        },
         pipeline::PipelineHandler,
     },
 };
@@ -192,11 +195,7 @@ pub struct FrameData<O: BufferContents> {
 
 impl<O: BufferContents> FrameData<O> {
     pub fn update_global_data(&mut self, data: impl Into<GPUGlobalData>) {
-        let mut uniform_contents = self
-            .global_buffer
-            .write()
-            .unwrap_or_else(|e| panic!("Failed to write to camera uniform buffer\n{}", e));
-        *uniform_contents = data.into();
+        write_to_buffer(&self.global_buffer, data);
     }
 
     pub fn update_objects_data<'a, T>(
@@ -205,13 +204,6 @@ impl<O: BufferContents> FrameData<O> {
     ) where
         T: Into<O> + Clone + 'a,
     {
-        let mut storage_buffer_contents = self
-            .objects_buffer
-            .write()
-            .unwrap_or_else(|e| panic!("Failed to write to object storage buffer\n{}", e));
-
-        for (i, render_object) in render_objects.enumerate() {
-            storage_buffer_contents[i] = render_object.get_data().into();
-        }
+        write_to_storage_buffer(&self.objects_buffer, render_objects.map(|ro| ro.get_data()));
     }
 }
