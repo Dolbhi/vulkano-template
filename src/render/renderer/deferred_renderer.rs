@@ -1,29 +1,30 @@
 use std::sync::Arc;
 
+use super::Renderer;
 use crate::{
+    render::{lighting_system::LightingSystem, Context, DrawSystem, RenderObject},
     shaders::{
         draw::{self, GPUGlobalData, GPUObjectData},
         lighting::{DirectionLight, PointLight},
     },
     vulkano_objects::{self, render_pass::FramebufferAttachments},
 };
+
 use cgmath::Matrix4;
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
     render_pass::{Framebuffer, RenderPass},
 };
 
-use super::{lighting_system::LightingSystem, Context, DrawSystem, RenderObject};
-
-pub struct Renderer {
-    pub render_pass: Arc<RenderPass>,
+pub struct DeferredRenderer {
+    render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
-    pub attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
+    attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
     pub draw_system: DrawSystem<GPUObjectData, Matrix4<f32>>,
     pub lighting_system: LightingSystem,
 }
 
-impl Renderer {
+impl DeferredRenderer {
     pub fn new(context: &Context) -> Self {
         let render_pass = vulkano_objects::render_pass::create_deferred_render_pass(
             context.device.clone(),
@@ -74,32 +75,7 @@ impl Renderer {
         }
     }
 
-    pub fn prime<'a>(
-        &'a mut self,
-        global_data: GPUGlobalData,
-        render_objects: impl Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
-        point_lights: impl IntoIterator<Item = PointLight>,
-        dir_lights: impl IntoIterator<Item = DirectionLight>,
-        ambient_color: impl Into<[f32; 4]>,
-    ) -> PrimeRenderer<
-        'a,
-        impl Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
-        impl IntoIterator<Item = PointLight>,
-        impl IntoIterator<Item = DirectionLight>,
-    > {
-        PrimeRenderer {
-            renderer: self,
-            upload_data: UploadData {
-                global_data,
-                render_objects,
-                point_lights,
-                dir_lights,
-                ambient_color: ambient_color.into(),
-            },
-        }
-    }
-
-    fn upload_data<'a>(
+    pub fn upload_data<'a>(
         &mut self,
         image_i: usize,
         global_data: GPUGlobalData,
@@ -108,20 +84,6 @@ impl Renderer {
         dir_lights: impl IntoIterator<Item = DirectionLight>,
         ambient_color: impl Into<[f32; 4]>,
     ) {
-        // cam matrcies
-        // let extends = self.context.window.inner_size();
-        // let aspect = extends.width as f32 / extends.height as f32;
-        // let proj = camera_data.projection_matrix(aspect);
-        // let view = camera_data.view_matrix();
-        // let view_proj = proj * view;
-        // let inv_view_proj = view_proj.inverse_transform().unwrap();
-        // let global_data = GPUGlobalData {
-        //     view: view.into(),
-        //     proj: proj.into(),
-        //     view_proj: view_proj.into(),
-        //     inv_view_proj: inv_view_proj.into(),
-        // };
-
         self.draw_system
             .upload_draw_data(image_i, render_objects, global_data);
 
@@ -139,8 +101,9 @@ impl Renderer {
             image_i,
         );
     }
-
-    pub fn build_command_buffer(
+}
+impl Renderer for DeferredRenderer {
+    fn build_command_buffer(
         &mut self,
         index: usize,
         command_builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -173,13 +136,13 @@ impl Renderer {
         command_builder.end_render_pass(Default::default()).unwrap();
     }
 
-    pub fn recreate_pipelines(&mut self, context: &Context) {
+    fn recreate_pipelines(&mut self, context: &Context) {
         self.draw_system
             .recreate_pipelines(context, &self.render_pass);
         self.lighting_system
             .recreate_pipeline(context, &self.render_pass);
     }
-    pub fn recreate_framebuffers(&mut self, context: &Context) {
+    fn recreate_framebuffers(&mut self, context: &Context) {
         (self.attachments, self.framebuffers) =
             vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
                 &context.images,
@@ -188,51 +151,5 @@ impl Renderer {
             );
         self.lighting_system
             .recreate_descriptor(context, &self.attachments);
-    }
-}
-
-struct UploadData<'a, R, L, D>
-where
-    R: Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
-    L: IntoIterator<Item = PointLight>,
-    D: IntoIterator<Item = DirectionLight>,
-{
-    global_data: GPUGlobalData,
-    render_objects: R,
-    point_lights: L,
-    dir_lights: D,
-    ambient_color: [f32; 4],
-}
-
-pub struct PrimeRenderer<'a, R, L, D>
-where
-    R: Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
-    L: IntoIterator<Item = PointLight>,
-    D: IntoIterator<Item = DirectionLight>,
-{
-    pub renderer: &'a mut Renderer,
-    upload_data: UploadData<'a, R, L, D>,
-}
-
-impl<'a, R, L, D> PrimeRenderer<'a, R, L, D>
-where
-    R: Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
-    L: IntoIterator<Item = PointLight>,
-    D: IntoIterator<Item = DirectionLight>,
-{
-    pub fn upload_data(self, image_i: usize) -> &'a mut Renderer {
-        let Self {
-            renderer,
-            upload_data,
-        } = self;
-        renderer.upload_data(
-            image_i,
-            upload_data.global_data,
-            upload_data.render_objects,
-            upload_data.point_lights,
-            upload_data.dir_lights,
-            upload_data.ambient_color,
-        );
-        renderer
     }
 }

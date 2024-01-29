@@ -8,7 +8,7 @@ use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::game_objects::light::PointLightComponent;
 use crate::game_objects::transform::TransformCreateInfo;
-use crate::render::renderer::Renderer;
+use crate::render::renderer::DeferredRenderer;
 use crate::render::RenderObject;
 use crate::shaders::draw::GPUGlobalData;
 use crate::shaders::lighting::DirectionLight;
@@ -45,7 +45,7 @@ struct Keys {
 
 pub struct App {
     render_loop: RenderLoop,
-    renderer: Renderer,
+    renderer: DeferredRenderer,
     camera: Camera,
     keys: Keys,
     world: World,
@@ -63,7 +63,7 @@ impl App {
         let mut world = World::default();
         let mut transforms = TransformSystem::new();
         let render_loop = RenderLoop::new(event_loop);
-        let mut renderer = Renderer::new(&render_loop.context);
+        let mut renderer = DeferredRenderer::new(&render_loop.context);
 
         let suzanne = init_render_objects(
             &mut world,
@@ -179,13 +179,17 @@ impl App {
             direction: direction.extend(1.).into(),
         };
 
-        self.render_loop.update(self.renderer.prime(
-            GPUGlobalData::from_camera(&self.camera, self.render_loop.context.window.inner_size()),
-            ro_query.iter(&self.world),
-            point_lights,
-            [dir],
-            [0.2, 0.2, 0.2, 1.],
-        ));
+        let extends = self.render_loop.context.window.inner_size();
+        self.render_loop.update(&mut self.renderer, |r, image_i| {
+            r.upload_data(
+                image_i,
+                GPUGlobalData::from_camera(&self.camera, extends),
+                ro_query.iter(&self.world),
+                point_lights,
+                [dir],
+                [0.2, 0.2, 0.2, 1.],
+            )
+        });
     }
 
     fn update_movement(&mut self, seconds_passed: f32) {
@@ -260,99 +264,6 @@ impl App {
         self.render_loop.handle_window_resize()
     }
     pub fn handle_window_wait(&self) {
-        self.render_loop.handle_window_wait();
+        self.render_loop.context.window.request_redraw();
     }
 }
-
-// use crate::render::RenderUpload;
-// use crate::shaders::lighting::PointLight;
-// use cgmath::Transform;
-// use winit::dpi::PhysicalSize;
-
-// type ROIter<'a, 'b> = std::iter::Flatten<
-//     query::ChunkIter<
-//         'b,
-//         'a,
-//         legion::Read<Arc<RenderObject<Matrix4<f32>>>>,
-//         query::EntityFilterTuple<
-//             query::ComponentFilter<Arc<RenderObject<Matrix4<f32>>>>,
-//             query::Passthrough,
-//         >,
-//     >,
-// >;
-
-// struct Test<T, I> {
-//     query: T,
-//     iter: I,
-// }
-
-// impl<'a> Iterator for Test<Query<&'a Arc<RenderObject<Matrix4<f32>>>>, ROIter<'_, 'a>> {
-//     type Item = &'a Arc<RenderObject<Matrix4<f32>>>;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         self.iter.next()
-//     }
-// }
-
-// impl<'a>
-//     RenderUpload<
-//         'a,
-//         Test<Query<&'a Arc<RenderObject<Matrix4<f32>>>>, ROIter<'a, 'a>>,
-//         [DirectionLight; 1],
-//     > for App
-// {
-//     fn get_scene_data(&self, extends: &PhysicalSize<u32>) -> crate::shaders::draw::GPUGlobalData {
-//         let aspect = extends.width as f32 / extends.height as f32;
-//         let proj = self.camera.projection_matrix(aspect);
-//         let view = self.camera.view_matrix();
-//         let view_proj = proj * view;
-//         let inv_view_proj = view_proj.inverse_transform().unwrap();
-//         crate::shaders::draw::GPUGlobalData {
-//             view: view.into(),
-//             proj: proj.into(),
-//             view_proj: view_proj.into(),
-//             inv_view_proj: inv_view_proj.into(),
-//         }
-//     }
-
-//     fn get_render_objects(
-//         &'a self,
-//     ) -> Test<Query<&'a Arc<RenderObject<Matrix4<f32>>>>, ROIter<'a, 'a>> {
-//         let mut ro_query = <&Arc<RenderObject<Matrix4<f32>>>>::query();
-//         let test = ro_query.iter(&self.world);
-//         Test {
-//             query: ro_query,
-//             iter: test,
-//         }
-//     }
-
-//     fn get_point_lights(&'a self) -> Box<dyn Iterator<Item = PointLight> + '_> {
-//         Box::new(
-//             <(&TransformID, &PointLightComponent)>::query()
-//                 .iter(&self.world)
-//                 .map(|(t, pl): (_, &PointLightComponent)| {
-//                     pl.clone().into_light(
-//                         self.transforms
-//                             .get_transform(t)
-//                             .unwrap()
-//                             .get_transform()
-//                             .translation
-//                             .clone(),
-//                     )
-//                 }),
-//         )
-//     }
-
-//     fn get_direction_lights(&self) -> [DirectionLight; 1] {
-//         let angle = self.total_seconds / 4.;
-//         let direction = cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
-//         [DirectionLight {
-//             color: [1., 1., 0., 1.],
-//             direction: direction.extend(1.).into(),
-//         }]
-//     }
-
-//     fn get_ambient_color(&self) -> [f32; 4] {
-//         [0.2, 0.2, 0.2, 1.]
-//     }
-// }
