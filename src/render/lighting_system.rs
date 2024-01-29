@@ -62,26 +62,6 @@ impl LightingSystem {
         render_pass: &Arc<RenderPass>,
         attachments: &FramebufferAttachments,
     ) -> Self {
-        // let pipeline = {
-        //     let vs = lighting::vs::load(context.device.clone())
-        //         .expect("failed to create lighting shader module")
-        //         .entry_point("main")
-        //         .unwrap();
-        //     let fs = lighting::fs::load(context.device.clone())
-        //         .expect("failed to create lighting shader module")
-        //         .entry_point("main")
-        //         .unwrap();
-        //     PipelineHandler::new(
-        //         context.device.clone(),
-        //         vs,
-        //         fs,
-        //         context.viewport.clone(),
-        //         context.render_pass.clone(),
-        //         [(1, 0)],
-        //         crate::vulkano_objects::pipeline::PipelineType::Lighting,
-        //     )
-        // };
-
         // create pipelines
         let vs = lighting::load_point_vs(context.device.clone())
             .expect("failed to create point shader module");
