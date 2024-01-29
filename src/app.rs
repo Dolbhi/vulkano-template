@@ -155,41 +155,53 @@ impl App {
                 }
             }
         }
-        // query render objects
-        let mut ro_query = <&Arc<RenderObject<Matrix4<f32>>>>::query();
-        let point_lights: Vec<_> = <(&TransformID, &PointLightComponent)>::query()
-            .iter(&self.world)
-            .map(|(t, pl)| {
-                pl.clone().into_light(
-                    self.transforms
-                        .get_transform(t)
-                        .unwrap()
-                        .get_transform()
-                        .translation
-                        .clone(),
-                )
-            })
-            .collect();
-        // let mut dl_query = <(&TransformID, &DirectionalLightComponent)>::query();
 
-        let angle = self.total_seconds / 4.;
-        let direction = cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
-        let dir = DirectionLight {
-            color: [1., 1., 0., 1.],
-            direction: direction.extend(1.).into(),
-        };
-
+        // do render loop
         let extends = self.render_loop.context.window.inner_size();
-        self.render_loop.update(&mut self.renderer, |r, image_i| {
-            r.upload_data(
-                image_i,
-                GPUGlobalData::from_camera(&self.camera, extends),
-                ro_query.iter(&self.world),
-                point_lights,
-                [dir],
-                [0.2, 0.2, 0.2, 1.],
-            )
-        });
+        self.render_loop
+            .update(&mut self.renderer, |renderer, image_i| {
+                // camera data
+                let global_data = GPUGlobalData::from_camera(&self.camera, extends);
+
+                // upload draw data
+                renderer.draw_system.upload_draw_data(
+                    image_i,
+                    <&Arc<RenderObject<Matrix4<f32>>>>::query().iter(&self.world),
+                    global_data,
+                );
+
+                // point lights
+                let mut point_query = <(&TransformID, &PointLightComponent)>::query();
+                let point_lights = point_query.iter(&self.world).map(|(t, pl)| {
+                    pl.clone().into_light(
+                        self.transforms
+                            .get_transform(t)
+                            .unwrap()
+                            .get_transform()
+                            .translation
+                            .clone(),
+                    )
+                });
+
+                // directional lights
+                // let mut dl_query = <(&TransformID, &DirectionalLightComponent)>::query();
+                let angle = self.total_seconds / 4.;
+                let direction =
+                    cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
+                let dir = DirectionLight {
+                    color: [1., 1., 0., 1.],
+                    direction: direction.extend(1.).into(),
+                };
+
+                // upload lighting data
+                renderer.lighting_system.upload_lights(
+                    point_lights,
+                    [dir],
+                    [0.2, 0.2, 0.2, 1.],
+                    global_data,
+                    image_i,
+                );
+            });
     }
 
     fn update_movement(&mut self, seconds_passed: f32) {

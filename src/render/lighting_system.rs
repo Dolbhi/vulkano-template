@@ -419,12 +419,10 @@ impl FrameData {
         }
 
         // global
-        let mut contents = self.global_buffer.write().unwrap_or_else(|e| {
-            panic!(
-                "Failed to write to directional lights storage buffer\n{}",
-                e
-            )
-        });
+        let mut contents = self
+            .global_buffer
+            .write()
+            .unwrap_or_else(|e| panic!("Failed to write to lighting global buffer\n{}", e));
 
         *contents = global_data.into();
     }

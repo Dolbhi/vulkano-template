@@ -2,11 +2,8 @@ use std::sync::Arc;
 
 use super::Renderer;
 use crate::{
-    render::{lighting_system::LightingSystem, Context, DrawSystem, RenderObject},
-    shaders::{
-        draw::{self, GPUGlobalData, GPUObjectData},
-        lighting::{DirectionLight, PointLight},
-    },
+    render::{lighting_system::LightingSystem, Context, DrawSystem},
+    shaders::draw::{self, GPUObjectData},
     vulkano_objects::{self, render_pass::FramebufferAttachments},
 };
 
@@ -73,33 +70,6 @@ impl DeferredRenderer {
             draw_system,
             lighting_system,
         }
-    }
-
-    pub fn upload_data<'a>(
-        &mut self,
-        image_i: usize,
-        global_data: GPUGlobalData,
-        render_objects: impl Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
-        point_lights: impl IntoIterator<Item = PointLight>,
-        dir_lights: impl IntoIterator<Item = DirectionLight>,
-        ambient_color: impl Into<[f32; 4]>,
-    ) {
-        self.draw_system
-            .upload_draw_data(image_i, render_objects, global_data);
-
-        // println!("Projection view:");
-        // let matrix: [[f32; 4]; 4] = proj_view.clone().into();
-        // for x in matrix {
-        //     println!("{:11}, {:11}, {:11}, {:11},", x[0], x[1], x[2], x[3]);
-        // }
-
-        self.lighting_system.upload_lights(
-            point_lights,
-            dir_lights,
-            ambient_color,
-            global_data,
-            image_i,
-        );
     }
 }
 impl Renderer for DeferredRenderer {
