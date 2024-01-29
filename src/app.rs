@@ -8,7 +8,9 @@ use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::game_objects::light::PointLightComponent;
 use crate::game_objects::transform::TransformCreateInfo;
+use crate::render::renderer::Renderer;
 use crate::render::RenderObject;
+use crate::shaders::draw::GPUGlobalData;
 use crate::shaders::lighting::DirectionLight;
 use crate::{
     game_objects::{
@@ -43,6 +45,7 @@ struct Keys {
 
 pub struct App {
     render_loop: RenderLoop,
+    renderer: Renderer,
     camera: Camera,
     keys: Keys,
     world: World,
@@ -59,13 +62,14 @@ impl App {
 
         let mut world = World::default();
         let mut transforms = TransformSystem::new();
-        let mut render_loop = RenderLoop::new(event_loop);
+        let render_loop = RenderLoop::new(event_loop);
+        let mut renderer = Renderer::new(&render_loop.context);
 
         let suzanne = init_render_objects(
             &mut world,
             &mut transforms,
             &render_loop.context,
-            &mut render_loop.draw_system,
+            &mut renderer.draw_system,
         );
 
         let camera_transform = {
@@ -101,6 +105,7 @@ impl App {
 
         Self {
             render_loop,
+            renderer,
             camera: Default::default(),
             keys: Keys::default(),
             world,
@@ -174,13 +179,13 @@ impl App {
             direction: direction.extend(1.).into(),
         };
 
-        self.render_loop.update(
-            &self.camera,
+        self.render_loop.update(self.renderer.prime(
+            GPUGlobalData::from_camera(&self.camera, self.render_loop.context.window.inner_size()),
             ro_query.iter(&self.world),
             point_lights,
             [dir],
             [0.2, 0.2, 0.2, 1.],
-        );
+        ));
     }
 
     fn update_movement(&mut self, seconds_passed: f32) {
@@ -259,25 +264,42 @@ impl App {
     }
 }
 
-// impl<'a, P>
+// use crate::render::RenderUpload;
+// use crate::shaders::lighting::PointLight;
+// use cgmath::Transform;
+// use winit::dpi::PhysicalSize;
+
+// type ROIter<'a, 'b> = std::iter::Flatten<
+//     query::ChunkIter<
+//         'b,
+//         'a,
+//         legion::Read<Arc<RenderObject<Matrix4<f32>>>>,
+//         query::EntityFilterTuple<
+//             query::ComponentFilter<Arc<RenderObject<Matrix4<f32>>>>,
+//             query::Passthrough,
+//         >,
+//     >,
+// >;
+
+// struct Test<T, I> {
+//     query: T,
+//     iter: I,
+// }
+
+// impl<'a> Iterator for Test<Query<&'a Arc<RenderObject<Matrix4<f32>>>>, ROIter<'_, 'a>> {
+//     type Item = &'a Arc<RenderObject<Matrix4<f32>>>;
+
+//     fn next(&mut self) -> Option<Self::Item> {
+//         self.iter.next()
+//     }
+// }
+
+// impl<'a>
 //     RenderUpload<
 //         'a,
-//         std::iter::Flatten<
-//             query::ChunkIter<
-//                 'a,
-//                 'a,
-//                 legion::Read<Arc<RenderObject<Matrix4<f32>>>>,
-//                 query::EntityFilterTuple<
-//                     query::ComponentFilter<Arc<RenderObject<Matrix4<f32>>>>,
-//                     query::Passthrough,
-//                 >,
-//             >,
-//         >,
-//         P,
+//         Test<Query<&'a Arc<RenderObject<Matrix4<f32>>>>, ROIter<'a, 'a>>,
 //         [DirectionLight; 1],
 //     > for App
-// where
-//     P: IntoIterator<Item = PointLight>,
 // {
 //     fn get_scene_data(&self, extends: &PhysicalSize<u32>) -> crate::shaders::draw::GPUGlobalData {
 //         let aspect = extends.width as f32 / extends.height as f32;
@@ -295,61 +317,30 @@ impl App {
 
 //     fn get_render_objects(
 //         &'a self,
-//     ) -> std::iter::Flatten<
-//         query::ChunkIter<
-//             '_,
-//             'a,
-//             legion::Read<Arc<RenderObject<Matrix4<f32>>>>,
-//             query::EntityFilterTuple<
-//                 query::ComponentFilter<Arc<RenderObject<Matrix4<f32>>>>,
-//                 query::Passthrough,
-//             >,
-//         >,
-//     > {
+//     ) -> Test<Query<&'a Arc<RenderObject<Matrix4<f32>>>>, ROIter<'a, 'a>> {
 //         let mut ro_query = <&Arc<RenderObject<Matrix4<f32>>>>::query();
 //         let test = ro_query.iter(&self.world);
-//         test
+//         Test {
+//             query: ro_query,
+//             iter: test,
+//         }
 //     }
 
-//     fn get_point_lights<T>(
-//         &self,
-//     ) -> std::iter::Map<
-//         std::iter::Flatten<
-//             query::ChunkIter<
-//                 '_,
-//                 '_,
-//                 (legion::Read<TransformID>, legion::Read<PointLightComponent>),
-//                 query::EntityFilterTuple<
-//                     legion::query::And<(
-//                         query::ComponentFilter<TransformID>,
-//                         query::ComponentFilter<PointLightComponent>,
-//                     )>,
-//                     legion::query::And<(query::Passthrough, query::Passthrough)>,
-//                 >,
-//             >,
-//         >,
-//         T,
-//     >
-//     where
-//         T: FnMut(
-//             // (
-//             //     &crate::game_objects::transform::TransformID,
-//             //     &crate::game_objects::light::PointLightComponent,
-//             // ),
-//         ) -> (),
-//     {
-//         <(&TransformID, &PointLightComponent)>::query()
-//             .iter(&self.world)
-//             .map(|(t, pl): (_, &PointLightComponent)| {
-//                 pl.clone().into_light(
-//                     self.transforms
-//                         .get_transform(t)
-//                         .unwrap()
-//                         .get_transform()
-//                         .translation
-//                         .clone(),
-//                 )
-//             })
+//     fn get_point_lights(&'a self) -> Box<dyn Iterator<Item = PointLight> + '_> {
+//         Box::new(
+//             <(&TransformID, &PointLightComponent)>::query()
+//                 .iter(&self.world)
+//                 .map(|(t, pl): (_, &PointLightComponent)| {
+//                     pl.clone().into_light(
+//                         self.transforms
+//                             .get_transform(t)
+//                             .unwrap()
+//                             .get_transform()
+//                             .translation
+//                             .clone(),
+//                     )
+//                 }),
+//         )
 //     }
 
 //     fn get_direction_lights(&self) -> [DirectionLight; 1] {

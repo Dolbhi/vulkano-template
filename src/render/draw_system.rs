@@ -129,7 +129,7 @@ where
     /// write gpu data to respective buffers (currently auto rotates sunlight)
     pub fn upload_draw_data(
         &mut self,
-        image_i: u32,
+        image_i: usize,
         objects: impl Iterator<Item = &'a Arc<RenderObject<T>>>,
         global_data: impl Into<GPUGlobalData>,
         // proj: impl Into<[[f32; 4]; 4]>,
@@ -149,7 +149,7 @@ where
                 .material_iter()
                 .flat_map(|mat_id| self.pending_objects[mat_id].iter())
         });
-        let buffers = &mut self.frame_data[image_i as usize];
+        let buffers = &mut self.frame_data[image_i];
         buffers.update_objects_data(obj_iter);
 
         // update camera
