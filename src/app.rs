@@ -3,23 +3,19 @@ use std::time::Duration;
 
 use cgmath::{Euler, Matrix4, Rad, Vector3, Vector4};
 use legion::{IntoQuery, *};
-use winit::event_loop::EventLoop;
-use winit::{event::ElementState, keyboard::KeyCode};
+use winit::{event::ElementState, event_loop::EventLoop, keyboard::KeyCode};
 
-use crate::game_objects::light::PointLightComponent;
-use crate::game_objects::transform::TransformCreateInfo;
-use crate::render::renderer::DeferredRenderer;
-use crate::render::RenderObject;
-use crate::shaders::draw::GPUGlobalData;
-use crate::shaders::lighting::DirectionLight;
 use crate::{
     game_objects::{
-        transform::{TransformID, TransformSystem},
+        light::PointLightComponent,
+        transform::{TransformCreateInfo, TransformID, TransformSystem},
         Camera,
     },
-    render::RenderLoop,
+    init_render_objects,
+    render::{renderer::DeferredRenderer, RenderLoop, RenderObject},
+    shaders::{draw::GPUGlobalData, lighting::DirectionLight},
+    MaterialSwapper,
 };
-use crate::{init_render_objects, MaterialSwapper};
 
 // TO flush_next_future METHOD ADD PARAMS FOR PASSING CAMERA DESCRIPTOR SET
 
