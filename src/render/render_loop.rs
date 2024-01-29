@@ -81,7 +81,7 @@ impl RenderLoop {
         // do recreation if necessary
         if self.window_resized {
             self.window_resized = false;
-            self.recreate_swapchain();
+            self.handle_window_resize();
             renderer.renderer.recreate_framebuffers(&self.context);
             renderer.renderer.recreate_pipelines(&self.context);
         } else if self.recreate_swapchain {

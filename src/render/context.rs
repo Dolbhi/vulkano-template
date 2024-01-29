@@ -149,6 +149,10 @@ impl Context {
         self.swapchain = new_swapchain;
         self.images = new_images;
     }
+    pub fn handle_window_resize(&mut self) {
+        self.recreate_swapchain();
+        self.viewport.extent = self.window.inner_size().into();
+    }
 
     /// Gets future where next image in swapchain is ready
     pub fn acquire_swapchain_image(
