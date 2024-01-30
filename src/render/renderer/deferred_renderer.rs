@@ -1,12 +1,18 @@
-use std::{iter::zip, sync::Arc};
+use std::sync::Arc;
 
 use super::Renderer;
 use crate::{
     render::{lighting_system::LightingSystem, Context, DrawSystem, RenderObject},
-    shaders::draw::{self, GPUGlobalData, GPUObjectData},
+    shaders::{
+        draw::{self, GPUGlobalData, GPUObjectData},
+        lighting::{DirectionLight, PointLight},
+    },
     vulkano_objects::{
         self,
-        buffers::{create_dynamic_buffers, create_storage_buffers, write_to_buffer},
+        buffers::{
+            create_dynamic_buffers, create_storage_buffers, write_to_buffer,
+            write_to_storage_buffer,
+        },
         render_pass::FramebufferAttachments,
     },
 };
@@ -15,7 +21,7 @@ use cgmath::Matrix4;
 use vulkano::{
     buffer::Subbuffer,
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
-    descriptor_set::DescriptorSetWithOffsets,
+    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
     render_pass::{Framebuffer, RenderPass},
 };
 
@@ -68,30 +74,68 @@ impl DeferredRenderer {
                 }),
             )
         };
-        let lighting_system = LightingSystem::new(&context, &render_pass, &attachments);
+        let (lighting_system, [global_light_layout, point_layout, dir_layout]) =
+            LightingSystem::new(&context, &render_pass, &attachments);
 
         // create buffers and descriptor sets
         let image_count = context.get_image_count();
-        let global_data = create_dynamic_buffers::<GPUGlobalData>(
+        let mut global_data = create_dynamic_buffers::<GPUGlobalData>(
             &context.allocators,
             &context.device,
             global_layout,
             image_count,
         );
-        let object_data =
+        let mut object_data =
             create_storage_buffers(&context.allocators, objects_layout, image_count, 10000);
 
         // create frame data
-        let frame_data = zip(global_data, object_data)
-            .map(
-                |((global_buffer, global_set), (objects_buffer, objects_set))| FrameData {
-                    global_buffer,
-                    objects_buffer,
-                    global_set,
-                    objects_set: objects_set.into(),
-                },
+        let mut point_data = create_storage_buffers::<PointLight>(
+            &context.allocators,
+            point_layout,
+            image_count,
+            1000,
+        );
+        let mut dir_data = create_storage_buffers::<DirectionLight>(
+            &context.allocators,
+            dir_layout,
+            image_count,
+            1000,
+        );
+
+        // pack into frames
+        let mut frame_data = vec![];
+        for _ in 0..image_count {
+            let (global_buffer, global_draw_set) = global_data.pop().unwrap();
+            let (objects_buffer, objects_set) = object_data.pop().unwrap();
+
+            let global_light_set = PersistentDescriptorSet::new(
+                &context.allocators.descriptor_set,
+                global_light_layout.clone(),
+                [WriteDescriptorSet::buffer(0, global_buffer.clone())],
+                [],
             )
-            .collect();
+            .unwrap()
+            .into();
+            let (point_buffer, point_set) = point_data.pop().unwrap();
+            let (dir_buffer, dir_set) = dir_data.pop().unwrap();
+
+            // println!("Creation layout: {:?}", global_set.as_ref().0.layout());
+
+            frame_data.push(FrameData {
+                global_buffer,
+                objects_buffer,
+                point_buffer,
+                dir_buffer,
+
+                global_draw_set,
+                objects_set: objects_set.into(),
+                point_set: point_set.into(),
+                global_light_set,
+                dir_set: dir_set.into(),
+                last_point_index: None,
+                last_dir_index: None,
+            });
+        }
 
         Self {
             render_pass,
@@ -134,7 +178,7 @@ impl Renderer for DeferredRenderer {
 
         // draw pass
         self.draw_system.render(
-            frame.global_set.clone(),
+            frame.global_draw_set.clone(),
             frame.objects_set.clone(),
             command_builder,
         );
@@ -143,7 +187,14 @@ impl Renderer for DeferredRenderer {
             .next_subpass(Default::default(), Default::default())
             .unwrap();
         // lighting pass
-        self.lighting_system.render(index, command_builder);
+        self.lighting_system.render(
+            frame.global_light_set.clone(),
+            frame.point_set.clone(),
+            frame.dir_set.clone(),
+            frame.last_point_index,
+            frame.last_point_index,
+            command_builder,
+        );
         // end render pass
         command_builder.end_render_pass(Default::default()).unwrap();
     }
@@ -169,9 +220,16 @@ impl Renderer for DeferredRenderer {
 pub struct FrameData {
     global_buffer: Subbuffer<GPUGlobalData>,
     objects_buffer: Subbuffer<[GPUObjectData]>,
+    point_buffer: Subbuffer<[PointLight]>,
+    dir_buffer: Subbuffer<[DirectionLight]>,
 
-    global_set: DescriptorSetWithOffsets,
+    global_draw_set: DescriptorSetWithOffsets,
     objects_set: DescriptorSetWithOffsets,
+    global_light_set: DescriptorSetWithOffsets,
+    point_set: DescriptorSetWithOffsets,
+    dir_set: DescriptorSetWithOffsets,
+    last_point_index: Option<usize>,
+    last_dir_index: Option<usize>,
 }
 
 impl FrameData {
@@ -185,5 +243,12 @@ impl FrameData {
         draw_system: &mut DrawSystem<Matrix4<f32>>,
     ) {
         draw_system.upload_object_data(render_objects, &self.objects_buffer)
+    }
+
+    pub fn update_point_lights(&mut self, point_lights: impl Iterator<Item = PointLight>) {
+        self.last_point_index = write_to_storage_buffer(&self.point_buffer, point_lights);
+    }
+    pub fn update_directional_lights(&mut self, dir_lights: impl Iterator<Item = DirectionLight>) {
+        self.last_dir_index = write_to_storage_buffer(&self.dir_buffer, dir_lights);
     }
 }

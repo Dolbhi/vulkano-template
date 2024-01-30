@@ -3,7 +3,10 @@ use std::sync::Arc;
 use vulkano::{
     buffer::{BufferUsage, Subbuffer},
     command_buffer::AutoCommandBufferBuilder,
-    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
+    descriptor_set::{
+        layout::DescriptorSetLayout, DescriptorSetWithOffsets, PersistentDescriptorSet,
+        WriteDescriptorSet,
+    },
     pipeline::PipelineBindPoint,
     render_pass::RenderPass,
     shader::ShaderModule,
@@ -11,19 +14,9 @@ use vulkano::{
 };
 
 use crate::{
-    shaders::lighting::{
-        self,
-        DirectionLight,
-        GPUGlobalData,
-        // fs::{DirectionLight, GPULightingData, PointLight},
-        PointLight,
-    },
+    shaders::lighting,
     vulkano_objects::{
-        buffers::{
-            create_device_local_buffer, create_dynamic_buffers, create_storage_buffers,
-            write_to_buffer, write_to_storage_buffer,
-        },
-        pipeline::PipelineHandler,
+        buffers::create_device_local_buffer, pipeline::PipelineHandler,
         render_pass::FramebufferAttachments,
     },
     Vertex2d,
@@ -35,7 +28,7 @@ pub struct LightingSystem {
     point_pipeline: PipelineHandler<Vertex2d>,
     direction_pipeline: PipelineHandler<Vertex2d>,
     ambient_pipeline: PipelineHandler<Vertex2d>,
-    frame_data: Vec<FrameData>,
+    // frame_data: Vec<FrameData>,
     screen_vertices: Subbuffer<[Vertex2d]>,
     point_vertices: Subbuffer<[Vertex2d]>,
     attachments_set: Arc<PersistentDescriptorSet>,
@@ -64,14 +57,14 @@ impl LightingSystem {
         context: &Context,
         render_pass: &Arc<RenderPass>,
         attachments: &FramebufferAttachments,
-    ) -> Self {
+    ) -> (Self, [Arc<DescriptorSetLayout>; 3]) {
         // create pipelines
         let vs = lighting::load_point_vs(context.device.clone())
             .expect("failed to create point shader module");
         let fs = lighting::load_point_fs(context.device.clone())
             .expect("failed to create point shader module");
         let point_pipeline =
-            Self::create_lighting_pipeline(&context, render_pass.clone(), vs, fs, [(1, 0)]); // global data is dynamic
+            Self::create_lighting_pipeline(&context, render_pass.clone(), vs, fs, []); //[(1, 0)]); // global data is dynamic
 
         let vs = lighting::load_direction_vs(context.device.clone())
             .expect("failed to create directional shader module");
@@ -85,66 +78,10 @@ impl LightingSystem {
         let ambient_pipeline =
             Self::create_lighting_pipeline(&context, render_pass.clone(), vs.clone(), fs, []);
 
-        let image_count = context.get_image_count();
+        // let image_count = context.get_image_count();
 
         // create buffers and descriptor sets
         let attachments_set = Self::create_attachment_set(&point_pipeline, context, attachments);
-
-        let mut global_data = create_dynamic_buffers::<GPUGlobalData>(
-            &context.allocators,
-            &context.device,
-            point_pipeline
-                .layout()
-                .set_layouts()
-                .get(1)
-                .unwrap()
-                .clone(),
-            image_count,
-        );
-        let mut point_data = create_storage_buffers::<PointLight>(
-            &context.allocators,
-            point_pipeline
-                .layout()
-                .set_layouts()
-                .get(2)
-                .unwrap()
-                .clone(),
-            image_count,
-            1000,
-        );
-        let mut dir_data = create_storage_buffers::<DirectionLight>(
-            &context.allocators,
-            direction_pipeline
-                .layout()
-                .set_layouts()
-                .get(1)
-                .unwrap()
-                .clone(),
-            image_count,
-            1000,
-        );
-
-        // pack into frames
-        let mut frame_data = vec![];
-        for _ in 0..image_count {
-            let (global_buffer, global_set) = global_data.pop().unwrap();
-            let (point_buffer, point_set) = point_data.pop().unwrap();
-            let (dir_buffer, dir_set) = dir_data.pop().unwrap();
-
-            // println!("Creation layout: {:?}", global_set.as_ref().0.layout());
-
-            frame_data.push(FrameData {
-                global_buffer,
-                point_buffer,
-                dir_buffer,
-
-                global_set,
-                point_set: point_set.into(),
-                dir_set: dir_set.into(),
-                last_point_index: None,
-                last_dir_index: None,
-            });
-        }
 
         let (screen_vertices, vertex_future) = create_device_local_buffer(
             &context.allocators,
@@ -194,16 +131,40 @@ impl LightingSystem {
             .unwrap();
         fence.wait(None).unwrap();
 
-        LightingSystem {
-            point_pipeline,
-            direction_pipeline,
-            ambient_pipeline,
-            frame_data,
-            screen_vertices,
-            point_vertices,
-            attachments_set,
-            ambient_color: [0., 0., 0., 0.],
-        }
+        let layouts = [
+            point_pipeline
+                .layout()
+                .set_layouts()
+                .get(1)
+                .unwrap()
+                .clone(),
+            point_pipeline
+                .layout()
+                .set_layouts()
+                .get(2)
+                .unwrap()
+                .clone(),
+            direction_pipeline
+                .layout()
+                .set_layouts()
+                .get(1)
+                .unwrap()
+                .clone(),
+        ];
+
+        (
+            LightingSystem {
+                point_pipeline,
+                direction_pipeline,
+                ambient_pipeline,
+                // frame_data,
+                screen_vertices,
+                point_vertices,
+                attachments_set,
+                ambient_color: [0., 0., 0., 0.],
+            },
+            layouts,
+        )
     }
 
     pub fn recreate_pipeline(&mut self, context: &Context, render_pass: &Arc<RenderPass>) {
@@ -246,29 +207,25 @@ impl LightingSystem {
         .unwrap()
     }
 
-    pub fn upload_lights(
-        &mut self,
-        point_lights: impl IntoIterator<Item = PointLight>,
-        dir_lights: impl IntoIterator<Item = DirectionLight>,
-        ambient_color: impl Into<[f32; 4]>,
-        global_data: impl Into<GPUGlobalData>,
-        image_i: usize,
-    ) {
-        self.frame_data[image_i].update(
-            point_lights.into_iter(),
-            dir_lights.into_iter(),
-            global_data,
-        );
+    pub fn set_ambient_color(&mut self, ambient_color: impl Into<[f32; 4]>) {
+        // self.frame_data[image_i].update(
+        //     point_lights.into_iter(),
+        //     dir_lights.into_iter(),
+        //     global_data,
+        // );
         self.ambient_color = ambient_color.into();
     }
 
     pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &mut self,
-        image_i: usize,
+        // image_i: usize,
+        global_set: DescriptorSetWithOffsets,
+        point_set: DescriptorSetWithOffsets,
+        dir_set: DescriptorSetWithOffsets,
+        last_point_index: Option<usize>,
+        last_dir_index: Option<usize>,
         command_builder: &mut AutoCommandBufferBuilder<P, A>,
     ) {
-        let frame = &self.frame_data[image_i];
-
         // println!(
         //     "Pipeline layout: {:?}",
         //     self.pipeline.layout().set_layouts()[1]
@@ -280,7 +237,7 @@ impl LightingSystem {
 
         // bind commands
         // point lights
-        if let Some(last_index) = frame.last_point_index {
+        if let Some(last_index) = last_point_index {
             let pipeline = &self.point_pipeline.pipeline;
             let layout = self.point_pipeline.layout();
             command_builder
@@ -290,11 +247,7 @@ impl LightingSystem {
                     PipelineBindPoint::Graphics,
                     layout.clone(),
                     0,
-                    vec![
-                        self.attachments_set.clone().into(),
-                        frame.global_set.clone(),
-                        frame.point_set.clone(),
-                    ],
+                    vec![self.attachments_set.clone().into(), global_set, point_set],
                 )
                 .unwrap()
                 .bind_vertex_buffers(0, self.point_vertices.clone())
@@ -306,7 +259,7 @@ impl LightingSystem {
             }
         }
         // directional lights
-        if let Some(last_index) = frame.last_dir_index {
+        if let Some(last_index) = last_dir_index {
             let pipeline = &self.direction_pipeline.pipeline;
             let layout = self.direction_pipeline.layout();
             command_builder
@@ -316,7 +269,7 @@ impl LightingSystem {
                     PipelineBindPoint::Graphics,
                     layout.clone(),
                     0,
-                    vec![self.attachments_set.clone().into(), frame.dir_set.clone()],
+                    vec![self.attachments_set.clone().into(), dir_set],
                 )
                 .unwrap()
                 .bind_vertex_buffers(0, self.screen_vertices.clone())
@@ -355,28 +308,28 @@ impl LightingSystem {
     }
 }
 
-struct FrameData {
-    global_buffer: Subbuffer<GPUGlobalData>,
-    point_buffer: Subbuffer<[PointLight]>,
-    dir_buffer: Subbuffer<[DirectionLight]>,
+// struct FrameData {
+//     global_buffer: Subbuffer<GPUGlobalData>,
+//     point_buffer: Subbuffer<[PointLight]>,
+//     dir_buffer: Subbuffer<[DirectionLight]>,
 
-    global_set: DescriptorSetWithOffsets,
-    point_set: DescriptorSetWithOffsets,
-    dir_set: DescriptorSetWithOffsets,
-    last_point_index: Option<usize>,
-    last_dir_index: Option<usize>,
-}
+//     global_set: DescriptorSetWithOffsets,
+//     point_set: DescriptorSetWithOffsets,
+//     dir_set: DescriptorSetWithOffsets,
+//     last_point_index: Option<usize>,
+//     last_dir_index: Option<usize>,
+// }
 
-impl FrameData {
-    fn update(
-        &mut self,
-        point_lights: impl Iterator<Item = PointLight>,
-        dir_lights: impl Iterator<Item = DirectionLight>,
-        global_data: impl Into<GPUGlobalData>,
-        // ambient_color: [f32; 4],
-    ) {
-        self.last_point_index = write_to_storage_buffer(&self.point_buffer, point_lights);
-        self.last_dir_index = write_to_storage_buffer(&self.dir_buffer, dir_lights);
-        write_to_buffer(&self.global_buffer, global_data);
-    }
-}
+// impl FrameData {
+//     fn update(
+//         &mut self,
+//         point_lights: impl Iterator<Item = PointLight>,
+//         dir_lights: impl Iterator<Item = DirectionLight>,
+//         global_data: impl Into<GPUGlobalData>,
+//         // ambient_color: [f32; 4],
+//     ) {
+//         self.last_point_index = write_to_storage_buffer(&self.point_buffer, point_lights);
+//         self.last_dir_index = write_to_storage_buffer(&self.dir_buffer, dir_lights);
+//         write_to_buffer(&self.global_buffer, global_data);
+//     }
+// }

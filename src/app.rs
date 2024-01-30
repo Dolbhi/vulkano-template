@@ -160,17 +160,17 @@ impl App {
                 let global_data = GPUGlobalData::from_camera(&self.camera, extends);
 
                 // upload draw data
-                {
-                    let frame = renderer
-                        .frame_data
-                        .get_mut(image_i)
-                        .expect("Renderer should have a frame for every swapchain image");
-                    frame.update_global_data(global_data);
-                    frame.update_objects_data(
-                        <&Arc<RenderObject<Matrix4<f32>>>>::query().iter(&self.world),
-                        &mut renderer.draw_system,
-                    );
-                }
+                let frame = renderer
+                    .frame_data
+                    .get_mut(image_i)
+                    .expect("Renderer should have a frame for every swapchain image");
+
+                frame.update_global_data(global_data);
+
+                frame.update_objects_data(
+                    <&Arc<RenderObject<Matrix4<f32>>>>::query().iter(&self.world),
+                    &mut renderer.draw_system,
+                );
 
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();
@@ -184,6 +184,7 @@ impl App {
                             .clone(),
                     )
                 });
+                frame.update_point_lights(point_lights);
 
                 // directional lights
                 // let mut dl_query = <(&TransformID, &DirectionalLightComponent)>::query();
@@ -194,15 +195,12 @@ impl App {
                     color: [1., 1., 0., 1.],
                     direction: direction.extend(1.).into(),
                 };
+                frame.update_directional_lights([dir].into_iter());
 
-                // upload lighting data
-                renderer.lighting_system.upload_lights(
-                    point_lights,
-                    [dir],
-                    [0.2, 0.2, 0.2, 1.],
-                    global_data,
-                    image_i,
-                );
+                // ambient light
+                renderer
+                    .lighting_system
+                    .set_ambient_color([0.2, 0.2, 0.2, 1.]);
             });
     }
 

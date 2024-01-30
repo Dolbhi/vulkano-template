@@ -15,7 +15,6 @@ use cgmath::Matrix4;
 use game_objects::transform::{TransformID, TransformSystem};
 use legion::World;
 use render::{Context, DrawSystem, MaterialID};
-use shaders::draw::GPUObjectData;
 use std::{iter::zip, path::Path, sync::Arc};
 
 #[cfg(test)]
