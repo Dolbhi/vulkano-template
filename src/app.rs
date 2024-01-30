@@ -160,11 +160,17 @@ impl App {
                 let global_data = GPUGlobalData::from_camera(&self.camera, extends);
 
                 // upload draw data
-                renderer.draw_system.upload_draw_data(
-                    image_i,
-                    <&Arc<RenderObject<Matrix4<f32>>>>::query().iter(&self.world),
-                    global_data,
-                );
+                {
+                    let frame = renderer
+                        .frame_data
+                        .get_mut(image_i)
+                        .expect("Renderer should have a frame for every swapchain image");
+                    frame.update_global_data(global_data);
+                    frame.update_objects_data(
+                        <&Arc<RenderObject<Matrix4<f32>>>>::query().iter(&self.world),
+                        &mut renderer.draw_system,
+                    );
+                }
 
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();

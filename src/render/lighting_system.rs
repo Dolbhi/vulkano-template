@@ -137,6 +137,7 @@ impl LightingSystem {
                 global_buffer,
                 point_buffer,
                 dir_buffer,
+
                 global_set,
                 point_set: point_set.into(),
                 dir_set: dir_set.into(),
@@ -358,6 +359,7 @@ struct FrameData {
     global_buffer: Subbuffer<GPUGlobalData>,
     point_buffer: Subbuffer<[PointLight]>,
     dir_buffer: Subbuffer<[DirectionLight]>,
+
     global_set: DescriptorSetWithOffsets,
     point_set: DescriptorSetWithOffsets,
     dir_set: DescriptorSetWithOffsets,

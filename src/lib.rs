@@ -31,7 +31,7 @@ fn init_render_objects(
     world: &mut World,
     transform_sys: &mut TransformSystem,
     renderer: &Context,
-    draw_system: &mut DrawSystem<GPUObjectData, Matrix4<f32>>,
+    draw_system: &mut DrawSystem<Matrix4<f32>>,
 ) -> TransformID {
     let resource_loader = renderer.get_resource_loader();
     let basic_id = 0;
