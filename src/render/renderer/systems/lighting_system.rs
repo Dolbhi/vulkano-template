@@ -14,6 +14,7 @@ use vulkano::{
 };
 
 use crate::{
+    render::Context,
     shaders::lighting,
     vulkano_objects::{
         buffers::create_device_local_buffer, pipeline::PipelineHandler,
@@ -21,8 +22,6 @@ use crate::{
     },
     Vertex2d,
 };
-
-use super::Context;
 
 pub struct LightingSystem {
     point_pipeline: PipelineHandler<Vertex2d>,
@@ -307,29 +306,3 @@ impl LightingSystem {
             .unwrap();
     }
 }
-
-// struct FrameData {
-//     global_buffer: Subbuffer<GPUGlobalData>,
-//     point_buffer: Subbuffer<[PointLight]>,
-//     dir_buffer: Subbuffer<[DirectionLight]>,
-
-//     global_set: DescriptorSetWithOffsets,
-//     point_set: DescriptorSetWithOffsets,
-//     dir_set: DescriptorSetWithOffsets,
-//     last_point_index: Option<usize>,
-//     last_dir_index: Option<usize>,
-// }
-
-// impl FrameData {
-//     fn update(
-//         &mut self,
-//         point_lights: impl Iterator<Item = PointLight>,
-//         dir_lights: impl Iterator<Item = DirectionLight>,
-//         global_data: impl Into<GPUGlobalData>,
-//         // ambient_color: [f32; 4],
-//     ) {
-//         self.last_point_index = write_to_storage_buffer(&self.point_buffer, point_lights);
-//         self.last_dir_index = write_to_storage_buffer(&self.dir_buffer, dir_lights);
-//         write_to_buffer(&self.global_buffer, global_data);
-//     }
-// }

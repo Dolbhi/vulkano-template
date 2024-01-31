@@ -1,6 +1,14 @@
 mod deferred_renderer;
+mod systems {
+    mod draw_system;
+    mod lighting_system;
+
+    pub use draw_system::DrawSystem;
+    pub use lighting_system::LightingSystem;
+}
 
 pub use deferred_renderer::DeferredRenderer;
+pub use systems::{DrawSystem, LightingSystem};
 
 use crate::render::Context;
 use vulkano::command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer};

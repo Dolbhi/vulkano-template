@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use super::Renderer;
+use super::{DrawSystem, LightingSystem, Renderer};
 use crate::{
-    render::{lighting_system::LightingSystem, Context, DrawSystem, RenderObject},
+    render::{Context, RenderObject},
     shaders::{
         draw::{self, GPUGlobalData, GPUObjectData},
         lighting::{DirectionLight, PointLight},

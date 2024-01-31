@@ -13,14 +13,15 @@ use vulkano::{
     shader::EntryPoint,
 };
 
-use crate::vulkano_objects::{buffers::write_to_storage_buffer, pipeline::PipelineHandler};
-
-use super::{
-    context::Context,
-    render_data::{
-        material::{MaterialID, PipelineGroup},
-        render_object::RenderObject,
+use crate::{
+    render::{
+        context::Context,
+        render_data::{
+            material::{MaterialID, PipelineGroup},
+            render_object::RenderObject,
+        },
     },
+    vulkano_objects::{buffers::write_to_storage_buffer, pipeline::PipelineHandler},
 };
 
 /// Collection of pipelines and associated rendering data
@@ -184,24 +185,3 @@ where
     //     }
     // }
 }
-
-// pub struct FrameData<O: BufferContents> {
-//     global_buffer: Subbuffer<GPUGlobalData>,
-//     objects_buffer: Subbuffer<[O]>,
-//     descriptor_sets: Vec<DescriptorSetWithOffsets>,
-// }
-
-// impl<O: BufferContents> FrameData<O> {
-//     pub fn update_global_data(&mut self, data: impl Into<GPUGlobalData>) {
-//         write_to_buffer(&self.global_buffer, data);
-//     }
-
-//     pub fn update_objects_data<'a, T>(
-//         &self,
-//         render_objects: impl Iterator<Item = &'a Arc<RenderObject<T>>>,
-//     ) where
-//         T: Into<O> + Clone + 'a,
-//     {
-//         write_to_storage_buffer(&self.objects_buffer, render_objects.map(|ro| ro.get_data()));
-//     }
-// }
