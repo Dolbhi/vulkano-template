@@ -7,7 +7,6 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 
 ## To Do
 ### Misc.
-- [ ] Combine render_loop and renderer
 
 ### Features
 - [ ] Asset loader

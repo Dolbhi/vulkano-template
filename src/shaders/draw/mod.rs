@@ -45,3 +45,13 @@ impl GPUGlobalData {
         }
     }
 }
+impl Default for GPUGlobalData {
+    fn default() -> Self {
+        Self {
+            view: Default::default(),
+            proj: Default::default(),
+            view_proj: Default::default(),
+            inv_view_proj: Default::default(),
+        }
+    }
+}

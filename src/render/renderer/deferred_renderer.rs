@@ -9,19 +9,17 @@ use crate::{
     },
     vulkano_objects::{
         self,
-        buffers::{
-            create_dynamic_buffers, create_storage_buffers, write_to_buffer,
-            write_to_storage_buffer,
-        },
+        buffers::{create_storage_buffers, write_to_buffer, write_to_storage_buffer},
         render_pass::FramebufferAttachments,
     },
 };
 
 use cgmath::Matrix4;
 use vulkano::{
-    buffer::Subbuffer,
+    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
     descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
+    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     render_pass::{Framebuffer, RenderPass},
 };
 
@@ -47,7 +45,7 @@ impl DeferredRenderer {
                 &context.allocators,
             );
 
-        let (draw_system, [global_layout, objects_layout]) = {
+        let (draw_system, [global_draw_layout, objects_layout]) = {
             let shaders = [
                 (
                     draw::load_basic_vs(context.device.clone())
@@ -79,12 +77,12 @@ impl DeferredRenderer {
 
         // create buffers and descriptor sets
         let image_count = context.get_image_count();
-        let mut global_data = create_dynamic_buffers::<GPUGlobalData>(
-            &context.allocators,
-            &context.device,
-            global_layout,
-            image_count,
-        );
+        // let mut global_data = create_dynamic_buffers::<GPUGlobalData>(
+        //     &context.allocators,
+        //     &context.device,
+        //     global_layout,
+        //     image_count,
+        // );
         let mut object_data =
             create_storage_buffers(&context.allocators, objects_layout, image_count, 10000);
 
@@ -105,7 +103,30 @@ impl DeferredRenderer {
         // pack into frames
         let mut frame_data = vec![];
         for _ in 0..image_count {
-            let (global_buffer, global_draw_set) = global_data.pop().unwrap();
+            let global_buffer = Buffer::from_data(
+                context.allocators.memory.clone(),
+                BufferCreateInfo {
+                    usage: BufferUsage::UNIFORM_BUFFER,
+                    ..Default::default()
+                },
+                AllocationCreateInfo {
+                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                    ..Default::default()
+                },
+                Default::default(),
+            )
+            .unwrap();
+            // let (global_buffer, global_draw_set) = global_data.pop().unwrap();
+
+            let global_draw_set = PersistentDescriptorSet::new(
+                &context.allocators.descriptor_set,
+                global_draw_layout.clone(),
+                [WriteDescriptorSet::buffer(0, global_buffer.clone())],
+                [],
+            )
+            .unwrap()
+            .into();
             let (objects_buffer, objects_set) = object_data.pop().unwrap();
 
             let global_light_set = PersistentDescriptorSet::new(
