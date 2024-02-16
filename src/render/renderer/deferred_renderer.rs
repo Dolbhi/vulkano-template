@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use super::{DrawSystem, LightingSystem, Renderer};
+use super::{
+    systems::{DrawSystem, LightingSystem},
+    Renderer,
+};
 use crate::{
     render::{Context, RenderObject},
     shaders::{
@@ -199,8 +202,7 @@ impl Renderer for DeferredRenderer {
 
         // draw pass
         self.draw_system.render(
-            frame.global_draw_set.clone(),
-            frame.objects_set.clone(),
+            vec![frame.global_draw_set.clone(), frame.objects_set.clone()],
             command_builder,
         );
         // end subpass

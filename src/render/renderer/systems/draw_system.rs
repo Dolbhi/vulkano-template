@@ -7,7 +7,7 @@ use vulkano::{
     buffer::{BufferContents, Subbuffer},
     command_buffer::AutoCommandBufferBuilder,
     descriptor_set::{
-        layout::DescriptorSetLayout, DescriptorSetWithOffsets, PersistentDescriptorSet,
+        layout::DescriptorSetLayout, DescriptorSetsCollection, PersistentDescriptorSet,
     },
     render_pass::RenderPass,
     shader::EntryPoint,
@@ -161,12 +161,10 @@ where
     pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &mut self,
         // image_i: usize,
-        global_set: DescriptorSetWithOffsets,
-        object_set: DescriptorSetWithOffsets,
+        sets: impl DescriptorSetsCollection + Clone,
         command_builder: &mut AutoCommandBufferBuilder<P, A>,
     ) {
         let mut object_index = 0;
-        let sets = vec![global_set, object_set];
         for pipeline_group in self.pipelines.iter() {
             pipeline_group.draw_objects(
                 &mut object_index,
