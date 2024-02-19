@@ -1,8 +1,10 @@
-use std::sync::Arc;
 use std::time::Duration;
+use std::{path::Path, sync::Arc};
 
 use cgmath::{Euler, Matrix4, Rad, Vector3, Vector4};
 use legion::{IntoQuery, *};
+use vulkano::buffer::BufferUsage;
+use vulkano::descriptor_set::WriteDescriptorSet;
 use winit::{event::ElementState, event_loop::EventLoop, keyboard::KeyCode};
 
 use crate::{
@@ -12,8 +14,11 @@ use crate::{
         Camera,
     },
     init_render_objects,
-    render::{renderer::DeferredRenderer, RenderLoop, RenderObject},
-    shaders::{draw::GPUGlobalData, lighting::DirectionLight},
+    render::{mesh::from_obj, renderer::DeferredRenderer, RenderLoop, RenderObject},
+    shaders::{
+        draw::{self, GPUGlobalData},
+        lighting::DirectionLight,
+    },
     MaterialSwapper,
 };
 
@@ -49,6 +54,7 @@ pub struct App {
     total_seconds: f32,
     suzanne: TransformID,
     camera_transform: TransformID,
+    test_light: Arc<RenderObject<Matrix4<f32>>>,
 }
 
 impl App {
@@ -61,34 +67,72 @@ impl App {
         let render_loop = RenderLoop::new(event_loop);
         let mut renderer = DeferredRenderer::new(&render_loop.context);
 
+        // draw objects
         let suzanne = init_render_objects(
             &mut world,
             &mut transforms,
             &render_loop.context,
-            &mut renderer.draw_system,
+            &mut renderer.lit_draw_system,
         );
+        // BIG RED TEST LIGHT
+        let test_light = {
+            let resource_loader = render_loop.context.get_resource_loader();
+            let system = &mut renderer.unlit_draw_system;
+            let solid_id = 0;
+
+            // mesh
+            let (vertices, indices) = from_obj(Path::new("models/default_cube.obj"))
+                .pop()
+                .expect("Failed to load cube mesh");
+            let mesh = resource_loader.load_mesh(vertices, indices);
+
+            // material
+            let buffer = resource_loader.create_material_buffer(
+                draw::SolidData {
+                    color: [1., 0., 0., 1.],
+                },
+                BufferUsage::empty(),
+            );
+            let material_id = system.add_material(
+                solid_id,
+                "red",
+                Some(system.get_pipeline(solid_id).create_material_set(
+                    &render_loop.context.allocators,
+                    2,
+                    [WriteDescriptorSet::buffer(0, buffer)],
+                )),
+            );
+
+            let mut ro = RenderObject::new(mesh, material_id);
+            ro.set_matrix(
+                Matrix4::from_translation([0., 5., -1.].into()) * Matrix4::from_scale(0.2),
+            );
+            Arc::new(ro)
+        };
+
+        // lights
+        world.push((
+            transforms.add_transform(TransformCreateInfo {
+                scale: Vector3::new(0.1, 0.1, 0.1),
+                translation: Vector3::new(0., 5., -1.),
+                ..Default::default()
+            }),
+            PointLightComponent {
+                color: Vector4::new(1., 0., 0., 1.),
+            },
+        ));
+        world.push((
+            transforms.add_transform(TransformCreateInfo {
+                scale: Vector3::new(0.1, 0.1, 0.1),
+                translation: Vector3::new(0.0, 6.0, -1.0),
+                ..Default::default()
+            }),
+            PointLightComponent {
+                color: Vector4::new(0., 0., 1., 1.),
+            },
+        ));
 
         let camera_transform = {
-            world.push((
-                transforms.add_transform(TransformCreateInfo {
-                    scale: Vector3::new(0.1, 0.1, 0.1),
-                    translation: Vector3::new(0., 5., -1.),
-                    ..Default::default()
-                }),
-                PointLightComponent {
-                    color: Vector4::new(1., 0., 0., 1.),
-                },
-            ));
-            world.push((
-                transforms.add_transform(TransformCreateInfo {
-                    scale: Vector3::new(0.1, 0.1, 0.1),
-                    translation: Vector3::new(0.0, 6.0, -1.0),
-                    ..Default::default()
-                }),
-                PointLightComponent {
-                    color: Vector4::new(0., 0., 1., 1.),
-                },
-            ));
             let cam_transform = transforms.next().unwrap();
             world.push((
                 cam_transform,
@@ -109,6 +153,7 @@ impl App {
             total_seconds: 0.,
             suzanne,
             camera_transform,
+            test_light,
         }
     }
 
@@ -169,7 +214,12 @@ impl App {
 
                 frame.update_objects_data(
                     <&Arc<RenderObject<Matrix4<f32>>>>::query().iter(&self.world),
-                    &mut renderer.draw_system,
+                    &mut renderer.lit_draw_system,
+                );
+
+                frame.update_unlit_data(
+                    [self.test_light.clone()].iter(),
+                    &mut renderer.unlit_draw_system,
                 );
 
                 // point lights

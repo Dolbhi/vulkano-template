@@ -130,6 +130,7 @@ pub fn create_deferred_render_pass(
     .unwrap()
 }
 
+// create framebuffers with given images as final output
 pub fn create_deferred_framebuffers_from_images(
     images: &[Arc<Image>],
     render_pass: Arc<RenderPass>,
@@ -211,4 +212,7 @@ pub fn create_deferred_framebuffers_from_images(
     )
 }
 
+/// 0: diffuse
+/// 1: normals
+/// 2: depth
 pub type FramebufferAttachments = (Arc<ImageView>, Arc<ImageView>, Arc<ImageView>);

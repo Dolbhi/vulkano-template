@@ -22,8 +22,11 @@ use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
     descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
+    device::Device,
+    format::Format,
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
-    render_pass::{Framebuffer, RenderPass},
+    render_pass::{Framebuffer, RenderPass, Subpass},
+    swapchain::Swapchain,
 };
 
 pub struct DeferredRenderer {
@@ -31,16 +34,16 @@ pub struct DeferredRenderer {
     framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
     attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
     pub frame_data: Vec<FrameData>,
-    pub draw_system: DrawSystem<Matrix4<f32>>,
+    pub lit_draw_system: DrawSystem<Matrix4<f32>>,
     pub lighting_system: LightingSystem,
+    pub unlit_draw_system: DrawSystem<Matrix4<f32>>,
 }
 
 impl DeferredRenderer {
     pub fn new(context: &Context) -> Self {
-        let render_pass = vulkano_objects::render_pass::create_deferred_render_pass(
-            context.device.clone(),
-            context.swapchain.clone(),
-        );
+        // let render_pass = deferred_render_pass(context.device.clone(), context.swapchain.clone());
+        let render_pass =
+            deferred_forward_render_pass(context.device.clone(), context.swapchain.clone());
         let (attachments, framebuffers) =
             vulkano_objects::render_pass::create_deferred_framebuffers_from_images(
                 &context.images,
@@ -48,7 +51,7 @@ impl DeferredRenderer {
                 &context.allocators,
             );
 
-        let (draw_system, [global_draw_layout, objects_layout]) = {
+        let (lit_draw_system, [global_draw_layout, objects_layout]) = {
             let shaders = [
                 (
                     draw::load_basic_vs(context.device.clone())
@@ -66,7 +69,7 @@ impl DeferredRenderer {
 
             DrawSystem::new(
                 &context,
-                &render_pass,
+                &Subpass::from(render_pass.clone(), 0).unwrap(),
                 shaders.map(|(v, f)| {
                     (
                         v.entry_point("main").unwrap(),
@@ -76,7 +79,38 @@ impl DeferredRenderer {
             )
         };
         let (lighting_system, [global_light_layout, point_layout, dir_layout]) =
-            LightingSystem::new(&context, &render_pass, &attachments);
+            LightingSystem::new(
+                &context,
+                &Subpass::from(render_pass.clone(), 1).unwrap(),
+                &attachments,
+            );
+        let (unlit_draw_system, [global_unlit_layout, unlit_objects_layout]) = {
+            let shaders = [
+                (
+                    draw::load_basic_vs(context.device.clone())
+                        .expect("failed to create basic shader module"),
+                    draw::load_solid_fs(context.device.clone())
+                        .expect("failed to create basic shader module"),
+                ),
+                (
+                    draw::load_basic_vs(context.device.clone())
+                        .expect("failed to create uv shader module"),
+                    draw::load_uv_fs(context.device.clone())
+                        .expect("failed to create uv shader module"),
+                ),
+            ];
+
+            DrawSystem::new(
+                &context,
+                &Subpass::from(render_pass.clone(), 2).unwrap(),
+                shaders.map(|(v, f)| {
+                    (
+                        v.entry_point("main").unwrap(),
+                        f.entry_point("main").unwrap(),
+                    )
+                }),
+            )
+        };
 
         // create buffers and descriptor sets
         let image_count = context.get_image_count();
@@ -88,6 +122,12 @@ impl DeferredRenderer {
         // );
         let mut object_data =
             create_storage_buffers(&context.allocators, objects_layout, image_count, 10000);
+        let mut unlit_data = create_storage_buffers(
+            &context.allocators,
+            unlit_objects_layout,
+            image_count,
+            10000,
+        );
 
         // create frame data
         let mut point_data = create_storage_buffers::<PointLight>(
@@ -131,6 +171,7 @@ impl DeferredRenderer {
             .unwrap()
             .into();
             let (objects_buffer, objects_set) = object_data.pop().unwrap();
+            let (unlit_buffer, unlit_set) = unlit_data.pop().unwrap();
 
             let global_light_set = PersistentDescriptorSet::new(
                 &context.allocators.descriptor_set,
@@ -148,11 +189,13 @@ impl DeferredRenderer {
             frame_data.push(FrameData {
                 global_buffer,
                 objects_buffer,
+                unlit_buffer,
                 point_buffer,
                 dir_buffer,
 
                 global_draw_set,
                 objects_set: objects_set.into(),
+                unlit_set: unlit_set.into(),
                 point_set: point_set.into(),
                 global_light_set,
                 dir_set: dir_set.into(),
@@ -166,7 +209,8 @@ impl DeferredRenderer {
             framebuffers,
             attachments,
             frame_data,
-            draw_system,
+            lit_draw_system,
+            unlit_draw_system,
             lighting_system,
         }
     }
@@ -200,8 +244,8 @@ impl Renderer for DeferredRenderer {
         // get frame data
         let frame = &self.frame_data[index];
 
-        // draw pass
-        self.draw_system.render(
+        // draw subpass
+        self.lit_draw_system.render(
             vec![frame.global_draw_set.clone(), frame.objects_set.clone()],
             command_builder,
         );
@@ -209,7 +253,8 @@ impl Renderer for DeferredRenderer {
         command_builder
             .next_subpass(Default::default(), Default::default())
             .unwrap();
-        // lighting pass
+
+        // lighting subpass
         self.lighting_system.render(
             frame.global_light_set.clone(),
             frame.point_set.clone(),
@@ -218,15 +263,31 @@ impl Renderer for DeferredRenderer {
             frame.last_point_index,
             command_builder,
         );
+        // end subpass
+        command_builder
+            .next_subpass(Default::default(), Default::default())
+            .unwrap();
+
+        // unlit subpass
+        self.unlit_draw_system.render(
+            vec![frame.global_draw_set.clone(), frame.unlit_set.clone()],
+            command_builder,
+        );
         // end render pass
         command_builder.end_render_pass(Default::default()).unwrap();
     }
 
     fn recreate_pipelines(&mut self, context: &Context) {
-        self.draw_system
-            .recreate_pipelines(context, &self.render_pass);
+        self.lit_draw_system.recreate_pipelines(
+            context,
+            &Subpass::from(self.render_pass.clone(), 0).unwrap(),
+        );
         self.lighting_system
-            .recreate_pipeline(context, &self.render_pass);
+            .recreate_pipeline(context, Subpass::from(self.render_pass.clone(), 1).unwrap());
+        self.unlit_draw_system.recreate_pipelines(
+            context,
+            &Subpass::from(self.render_pass.clone(), 2).unwrap(),
+        );
     }
     fn recreate_framebuffers(&mut self, context: &Context) {
         (self.attachments, self.framebuffers) =
@@ -243,11 +304,13 @@ impl Renderer for DeferredRenderer {
 pub struct FrameData {
     global_buffer: Subbuffer<GPUGlobalData>,
     objects_buffer: Subbuffer<[GPUObjectData]>,
+    unlit_buffer: Subbuffer<[GPUObjectData]>,
     point_buffer: Subbuffer<[PointLight]>,
     dir_buffer: Subbuffer<[DirectionLight]>,
 
     global_draw_set: DescriptorSetWithOffsets,
     objects_set: DescriptorSetWithOffsets,
+    unlit_set: DescriptorSetWithOffsets,
     global_light_set: DescriptorSetWithOffsets,
     point_set: DescriptorSetWithOffsets,
     dir_set: DescriptorSetWithOffsets,
@@ -265,7 +328,14 @@ impl FrameData {
         render_objects: impl Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
         draw_system: &mut DrawSystem<Matrix4<f32>>,
     ) {
-        draw_system.upload_object_data(render_objects, &self.objects_buffer)
+        draw_system.upload_object_data(render_objects, &self.objects_buffer);
+    }
+    pub fn update_unlit_data<'a>(
+        &self,
+        render_objects: impl Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
+        draw_system: &mut DrawSystem<Matrix4<f32>>,
+    ) {
+        draw_system.upload_object_data(render_objects, &self.unlit_buffer);
     }
 
     pub fn update_point_lights(&mut self, point_lights: impl Iterator<Item = PointLight>) {
@@ -274,4 +344,114 @@ impl FrameData {
     pub fn update_directional_lights(&mut self, dir_lights: impl Iterator<Item = DirectionLight>) {
         self.last_dir_index = write_to_storage_buffer(&self.dir_buffer, dir_lights);
     }
+}
+
+fn deferred_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<RenderPass> {
+    vulkano::ordered_passes_renderpass!(
+        device,
+    attachments: {
+            // The image that will contain the final rendering (in this example the swapchain
+            // image, but it could be another image).
+            final_color: {
+                format: swapchain.image_format(),
+                samples: 1,
+                load_op: Clear,
+                store_op: Store,
+            },
+            // Diffuse buffer (unlit color)
+            diffuse: {
+                format: Format::A2B10G10R10_UNORM_PACK32,
+                samples: 1,
+                load_op: Clear,
+                store_op: DontCare,
+            },
+            // Normal buffer
+            normals: {
+                format: Format::R16G16B16A16_SFLOAT,
+                samples: 1,
+                load_op: Clear,
+                store_op: DontCare,
+            },
+            // Depth buffer
+            depth_stencil: {
+                format: Format::D32_SFLOAT,
+                samples: 1,
+                load_op: Clear,
+                store_op: DontCare,
+            },
+        },
+        passes: [
+            // Write to the diffuse, normals and depth attachments.
+            {
+                color: [diffuse, normals],
+                depth_stencil: {depth_stencil},
+                input: [],
+            },
+            // Apply lighting by reading these three attachments and writing to `final_color`.
+            {
+                color: [final_color],
+                depth_stencil: {},
+                input: [diffuse, normals, depth_stencil],
+            },
+        ],
+    )
+    .unwrap()
+}
+
+fn deferred_forward_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<RenderPass> {
+    vulkano::ordered_passes_renderpass!(
+        device,
+    attachments: {
+            // The image that will contain the final rendering (in this example the swapchain
+            // image, but it could be another image).
+            final_color: {
+                format: swapchain.image_format(),
+                samples: 1,
+                load_op: Clear,
+                store_op: Store,
+            },
+            // Diffuse buffer (unlit color)
+            diffuse: {
+                format: Format::A2B10G10R10_UNORM_PACK32,
+                samples: 1,
+                load_op: Clear,
+                store_op: DontCare,
+            },
+            // Normal buffer
+            normals: {
+                format: Format::R16G16B16A16_SFLOAT,
+                samples: 1,
+                load_op: Clear,
+                store_op: DontCare,
+            },
+            // Depth buffer
+            depth_stencil: {
+                format: Format::D32_SFLOAT,
+                samples: 1,
+                load_op: Clear,
+                store_op: DontCare,
+            },
+        },
+        passes: [
+            // Write to the diffuse, normals and depth attachments.
+            {
+                color: [diffuse, normals],
+                depth_stencil: {depth_stencil},
+                input: [],
+            },
+            // Apply lighting by reading these three attachments and writing to `final_color`.
+            {
+                color: [final_color],
+                depth_stencil: {},
+                input: [diffuse, normals, depth_stencil],
+            },
+            // forward renderpass
+            {
+                color: [final_color, normals],
+                depth_stencil: {depth_stencil},
+                input: [],
+            },
+        ],
+    )
+    .unwrap()
 }

@@ -1,12 +1,17 @@
 use std::{path::Path, sync::Arc};
 
 use crate::{
-    vulkano_objects::{self, allocators::Allocators, buffers::Buffers},
+    vulkano_objects::{
+        self,
+        allocators::Allocators,
+        buffers::{self, Buffers},
+    },
     VertexFull,
 };
 use vulkano::{
+    buffer::{BufferContents, BufferUsage, Subbuffer},
     command_buffer::{self, AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
-    descriptor_set::PersistentDescriptorSet,
+    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
     image::{sampler::Sampler, view::ImageView, Image},
     instance::Instance,
@@ -237,8 +242,19 @@ impl<'a> ResourceLoader<'a> {
         texture: Arc<ImageView>,
         sampler: Arc<Sampler>,
     ) -> Arc<PersistentDescriptorSet> {
-        pipeline_group.create_material_set(&self.context.allocators, 2, texture, sampler)
+        pipeline_group.create_material_set(
+            &self.context.allocators,
+            2,
+            [WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
+        )
     }
     // pub fn build_material
     // pub fn
+    pub fn create_material_buffer<T: BufferContents>(
+        &self,
+        data: T,
+        usage: BufferUsage,
+    ) -> Subbuffer<T> {
+        buffers::create_material_buffer(&self.context.allocators, data, usage)
+    }
 }

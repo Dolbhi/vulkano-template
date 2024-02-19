@@ -8,7 +8,7 @@ use vulkano::{
         WriteDescriptorSet,
     },
     pipeline::PipelineBindPoint,
-    render_pass::RenderPass,
+    render_pass::Subpass,
     shader::ShaderModule,
     sync::GpuFuture,
 };
@@ -37,7 +37,7 @@ pub struct LightingSystem {
 impl LightingSystem {
     fn create_lighting_pipeline(
         context: &Context,
-        render_pass: Arc<RenderPass>,
+        subpass: Subpass,
         vs: Arc<ShaderModule>,
         fs: Arc<ShaderModule>,
         dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
@@ -47,14 +47,14 @@ impl LightingSystem {
             vs.entry_point("main").unwrap(),
             fs.entry_point("main").unwrap(),
             context.viewport.clone(),
-            render_pass,
+            subpass,
             dynamic_bindings,
             crate::vulkano_objects::pipeline::PipelineType::Lighting,
         )
     }
     pub fn new(
         context: &Context,
-        render_pass: &Arc<RenderPass>,
+        subpass: &Subpass,
         attachments: &FramebufferAttachments,
     ) -> (Self, [Arc<DescriptorSetLayout>; 3]) {
         // create pipelines
@@ -62,20 +62,19 @@ impl LightingSystem {
             .expect("failed to create point shader module");
         let fs = lighting::load_point_fs(context.device.clone())
             .expect("failed to create point shader module");
-        let point_pipeline =
-            Self::create_lighting_pipeline(&context, render_pass.clone(), vs, fs, []); //[(1, 0)]); // global data is dynamic
+        let point_pipeline = Self::create_lighting_pipeline(&context, subpass.clone(), vs, fs, []); //[(1, 0)]); // global data is dynamic
 
         let vs = lighting::load_direction_vs(context.device.clone())
             .expect("failed to create directional shader module");
         let fs = lighting::load_direction_fs(context.device.clone())
             .expect("failed to create directional shader module");
         let direction_pipeline =
-            Self::create_lighting_pipeline(&context, render_pass.clone(), vs.clone(), fs, []);
+            Self::create_lighting_pipeline(&context, subpass.clone(), vs.clone(), fs, []);
 
         let fs = lighting::load_ambient_fs(context.device.clone())
             .expect("failed to create ambient shader module");
         let ambient_pipeline =
-            Self::create_lighting_pipeline(&context, render_pass.clone(), vs.clone(), fs, []);
+            Self::create_lighting_pipeline(&context, subpass.clone(), vs.clone(), fs, []);
 
         // let image_count = context.get_image_count();
 
@@ -166,20 +165,20 @@ impl LightingSystem {
         )
     }
 
-    pub fn recreate_pipeline(&mut self, context: &Context, render_pass: &Arc<RenderPass>) {
+    pub fn recreate_pipeline(&mut self, context: &Context, subpass: Subpass) {
         self.point_pipeline.recreate_pipeline(
             context.device.clone(),
-            render_pass.clone(),
+            subpass.clone(),
             context.viewport.clone(),
         );
         self.direction_pipeline.recreate_pipeline(
             context.device.clone(),
-            render_pass.clone(),
+            subpass.clone(),
             context.viewport.clone(),
         );
         self.ambient_pipeline.recreate_pipeline(
             context.device.clone(),
-            render_pass.clone(),
+            subpass.clone(),
             context.viewport.clone(),
         );
     }

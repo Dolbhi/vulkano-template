@@ -7,6 +7,8 @@ use crate::{vulkano_objects::buffers::Buffers, VertexFull};
 use super::material::MaterialID;
 
 #[derive(Debug)]
+/// Data for standard rendering of a mesh
+/// Type T is the additional data type of the object (usually a transform matrix)
 pub struct RenderObject<T: Clone> {
     pub mesh: Arc<Buffers<VertexFull>>,
     pub material_id: MaterialID,

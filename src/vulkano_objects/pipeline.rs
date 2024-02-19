@@ -21,7 +21,7 @@ use vulkano::{
         layout::PipelineDescriptorSetLayoutCreateInfo,
         GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
     },
-    render_pass::{RenderPass, Subpass},
+    render_pass::Subpass,
     shader::EntryPoint,
 };
 
@@ -41,7 +41,7 @@ impl<V: Vertex> PipelineHandler<V> {
         vs: EntryPoint,
         fs: EntryPoint,
         viewport: Viewport,
-        render_pass: Arc<RenderPass>,
+        subpass: Subpass,
         dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
         pipeline_type: PipelineType,
     ) -> Self {
@@ -50,7 +50,7 @@ impl<V: Vertex> PipelineHandler<V> {
             vs.clone(),
             fs.clone(),
             viewport,
-            render_pass,
+            subpass,
             dynamic_bindings.clone(),
             pipeline_type,
         );
@@ -68,18 +68,13 @@ impl<V: Vertex> PipelineHandler<V> {
         self.pipeline.layout()
     }
 
-    pub fn recreate_pipeline(
-        &mut self,
-        device: Arc<Device>,
-        render_pass: Arc<RenderPass>,
-        viewport: Viewport,
-    ) {
+    pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = window_size_dependent_pipeline::<V>(
             device,
             self.vs.clone(),
             self.fs.clone(),
             viewport,
-            render_pass,
+            subpass,
             self.dynamic_bindings.clone(),
             self.pipeline_type,
         );
@@ -98,15 +93,15 @@ impl PipelineType {
     /// - depth_stencil_state
     /// - multisample_state
     /// - color_blend_state
-    /// - subpass
+    /// - subpass (Not anymore)
     fn apply_to_create_info(
         self,
         create_info: GraphicsPipelineCreateInfo,
-        render_pass: Arc<RenderPass>,
+        subpass: Subpass,
     ) -> GraphicsPipelineCreateInfo {
         match self {
             Self::Drawing => {
-                let subpass = Subpass::from(render_pass, 0).unwrap();
+                // let subpass = Subpass::from(render_pass, 0).unwrap();
                 GraphicsPipelineCreateInfo {
                     rasterization_state: Some(RasterizationState {
                         cull_mode: CullMode::Back,
@@ -126,7 +121,7 @@ impl PipelineType {
                 }
             }
             Self::Lighting => {
-                let subpass = Subpass::from(render_pass, 1).unwrap();
+                // let subpass = Subpass::from(render_pass, 1).unwrap();
                 GraphicsPipelineCreateInfo {
                     rasterization_state: Some(Default::default()),
                     depth_stencil_state: None,
@@ -165,7 +160,7 @@ fn window_size_dependent_pipeline<V: Vertex>(
     fs: EntryPoint,
     viewport: Viewport,
     // images: &[Arc<Image>],
-    render_pass: Arc<RenderPass>,
+    subpass: Subpass,
     dynamic_bindings: impl IntoIterator<Item = (usize, u32)>,
     pipeline_type: PipelineType,
 ) -> Arc<GraphicsPipeline> {
@@ -216,7 +211,7 @@ fn window_size_dependent_pipeline<V: Vertex>(
                 }),
                 ..GraphicsPipelineCreateInfo::layout(layout)
             },
-            render_pass,
+            subpass,
         ),
     )
     .unwrap()

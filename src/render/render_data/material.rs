@@ -3,7 +3,6 @@ use std::{collections::HashMap, sync::Arc};
 use vulkano::{
     command_buffer::{allocator::CommandBufferAllocator, AutoCommandBufferBuilder},
     descriptor_set::{DescriptorSetsCollection, PersistentDescriptorSet, WriteDescriptorSet},
-    image::{sampler::Sampler, view::ImageView},
     pipeline::{PipelineBindPoint, PipelineLayout},
 };
 
@@ -100,8 +99,7 @@ impl PipelineGroup {
         &self,
         allocators: &Allocators,
         index: usize,
-        texture: Arc<ImageView>,
-        sampler: Arc<Sampler>,
+        descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
     ) -> Arc<PersistentDescriptorSet> {
         PersistentDescriptorSet::new(
             &allocators.descriptor_set,
@@ -111,7 +109,7 @@ impl PipelineGroup {
                 .get(index)
                 .unwrap()
                 .clone(),
-            [WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
+            descriptor_writes,
             [],
         )
         .unwrap()

@@ -22,7 +22,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 	- [x] Point light range and volumes
 	- [ ] Specular lighting
 	- [ ] Ambient occlusion
-	- [ ] Unlit shaders
+	- [x] Unlit shaders
 	- [ ] Shadows
 	- [x] Multiple lighting materials
 - [x] Light data streaming

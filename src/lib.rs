@@ -29,10 +29,10 @@ mod tests {
 fn init_render_objects(
     world: &mut World,
     transform_sys: &mut TransformSystem,
-    renderer: &Context,
+    context: &Context,
     draw_system: &mut DrawSystem<Matrix4<f32>>,
 ) -> TransformID {
-    let resource_loader = renderer.get_resource_loader();
+    let resource_loader = context.get_resource_loader();
     let basic_id = 0;
     let uv_id = 1;
 

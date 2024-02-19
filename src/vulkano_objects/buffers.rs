@@ -71,6 +71,28 @@ impl<V: Vertex + BufferContents> Buffers<V> {
     }
 }
 
+// creates a uniform device local buffer
+pub fn create_material_buffer<T: BufferContents>(
+    allocators: &Allocators,
+    data: T,
+    usage: BufferUsage,
+) -> Subbuffer<T> {
+    Buffer::from_data(
+        allocators.memory.clone(),
+        BufferCreateInfo {
+            usage: usage | BufferUsage::UNIFORM_BUFFER,
+            ..Default::default()
+        },
+        AllocationCreateInfo {
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+            ..Default::default()
+        },
+        data,
+    )
+    .unwrap()
+}
+
 /// returns a device only buffer and a future that copies data to it
 pub fn create_device_local_buffer<T: BufferContents>(
     allocators: &Allocators,

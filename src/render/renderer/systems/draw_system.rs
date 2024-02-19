@@ -9,7 +9,7 @@ use vulkano::{
     descriptor_set::{
         layout::DescriptorSetLayout, DescriptorSetsCollection, PersistentDescriptorSet,
     },
-    render_pass::RenderPass,
+    render_pass::Subpass,
     shader::EntryPoint,
 };
 
@@ -29,6 +29,8 @@ use crate::{
 /// All pipelines share sets 1 and 2, describing scene data and an array of object data (storage buffer) respectively
 ///
 /// Materials can optionally add more sets
+///
+/// T is type of renderobject
 pub struct DrawSystem<T>
 where
     // O: BufferContents + From<T>,
@@ -46,7 +48,7 @@ where
     /// creates from a collection of shader entry points
     pub fn new(
         context: &Context,
-        render_pass: &Arc<RenderPass>,
+        subpass: &Subpass,
         shaders: impl IntoIterator<Item = (EntryPoint, EntryPoint)>,
     ) -> (Self, [Arc<DescriptorSetLayout>; 2]) {
         let pipelines: Vec<PipelineGroup> = shaders
@@ -57,7 +59,7 @@ where
                     vs,
                     fs,
                     context.viewport.clone(),
-                    render_pass.clone(),
+                    subpass.clone(),
                     [], // [(0, 0)],
                     crate::vulkano_objects::pipeline::PipelineType::Drawing,
                 )
@@ -106,11 +108,11 @@ where
     pub fn get_pipeline(&self, pipeline_index: usize) -> &PipelineGroup {
         &self.pipelines[pipeline_index]
     }
-    pub fn recreate_pipelines(&mut self, context: &Context, render_pass: &Arc<RenderPass>) {
+    pub fn recreate_pipelines(&mut self, context: &Context, subpass: &Subpass) {
         for pipeline in self.pipelines.iter_mut() {
             pipeline.pipeline.recreate_pipeline(
                 context.device.clone(),
-                render_pass.clone(),
+                subpass.clone(),
                 context.viewport.clone(),
             );
         }
