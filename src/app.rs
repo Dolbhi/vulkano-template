@@ -121,19 +121,10 @@ impl App {
         let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query();
         // println!("==== RENDER OBJECT DATA ====");
         for (transform_id, render_object) in query.iter_mut(&mut self.world) {
-            // update object data
-            // match Arc::get_mut(render_object) {
-            //     Some(obj) => {
             let transfrom_matrix = self.transforms.get_global_model(transform_id);
             // println!("Obj {:?}: {:?}", transform_id, obj);
             render_object.set_matrix(transfrom_matrix);
             render_object.upload();
-            // obj.update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));
-            //     }
-            //     None => {
-            //         panic!("Unable to update render object");
-            //     }
-            // }
         }
 
         // do render loop
