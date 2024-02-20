@@ -93,10 +93,10 @@ impl App {
                 },
                 BufferUsage::empty(),
             );
-            let material_id = system.add_material(
-                solid_id,
+            let solid_pipeline = &mut system.pipelines[solid_id];
+            let material_id = solid_pipeline.add_material(
                 "red",
-                Some(system.get_pipeline(solid_id).create_material_set(
+                Some(solid_pipeline.create_material_set(
                     &render_loop.context.allocators,
                     2,
                     [WriteDescriptorSet::buffer(0, buffer)],
@@ -181,22 +181,26 @@ impl App {
             });
 
         // update render objects
-        let mut query = <(&TransformID, &mut Arc<RenderObject<Matrix4<f32>>>)>::query();
+        let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query();
         // println!("==== RENDER OBJECT DATA ====");
         for (transform_id, render_object) in query.iter_mut(&mut self.world) {
             // update object data
-            match Arc::get_mut(render_object) {
-                Some(obj) => {
-                    let transfrom_matrix = self.transforms.get_global_model(transform_id);
-                    // println!("Obj {:?}: {:?}", transform_id, obj);
-                    obj.set_matrix(transfrom_matrix)
-                    // obj.update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));
-                }
-                None => {
-                    panic!("Unable to update render object");
-                }
-            }
+            // match Arc::get_mut(render_object) {
+            //     Some(obj) => {
+            let transfrom_matrix = self.transforms.get_global_model(transform_id);
+            // println!("Obj {:?}: {:?}", transform_id, obj);
+            render_object.set_matrix(transfrom_matrix);
+            render_object.upload();
+            // obj.update_transform([0., 0., 0.], cgmath::Rad(self.total_seconds));
+            //     }
+            //     None => {
+            //         panic!("Unable to update render object");
+            //     }
+            // }
         }
+
+        // upload test light
+        self.test_light.upload();
 
         // do render loop
         let extends = self.render_loop.context.window.inner_size();
@@ -213,15 +217,9 @@ impl App {
 
                 frame.update_global_data(global_data);
 
-                frame.update_objects_data(
-                    <&Arc<RenderObject<Matrix4<f32>>>>::query().iter(&self.world),
-                    &mut renderer.lit_draw_system,
-                );
+                frame.update_objects_data(&mut renderer.lit_draw_system);
 
-                frame.update_unlit_data(
-                    [self.test_light.clone()].iter(),
-                    &mut renderer.unlit_draw_system,
-                );
+                frame.update_unlit_data(&mut renderer.unlit_draw_system);
 
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();
@@ -303,7 +301,7 @@ impl App {
                         // println!("Swapped mat: {:?}", next_mat);
                         match Arc::get_mut(render_object) {
                             Some(obj) => {
-                                obj.material_id = next_mat;
+                                obj.material = next_mat;
                             }
                             None => {
                                 panic!("Unable to swap material on render object");

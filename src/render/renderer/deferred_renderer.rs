@@ -34,9 +34,9 @@ pub struct DeferredRenderer {
     framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
     attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
     pub frame_data: Vec<FrameData>,
-    pub lit_draw_system: DrawSystem<Matrix4<f32>>,
+    pub lit_draw_system: DrawSystem,
     pub lighting_system: LightingSystem,
-    pub unlit_draw_system: DrawSystem<Matrix4<f32>>,
+    pub unlit_draw_system: DrawSystem,
 }
 
 impl DeferredRenderer {
@@ -316,19 +316,11 @@ impl FrameData {
         write_to_buffer(&self.global_buffer, data);
     }
 
-    pub fn update_objects_data<'a>(
-        &self,
-        render_objects: impl Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
-        draw_system: &mut DrawSystem<Matrix4<f32>>,
-    ) {
-        draw_system.upload_object_data(render_objects, &self.objects_buffer);
+    pub fn update_objects_data<'a>(&self, draw_system: &mut DrawSystem) {
+        draw_system.update_object_buffer(&self.objects_buffer);
     }
-    pub fn update_unlit_data<'a>(
-        &self,
-        render_objects: impl Iterator<Item = &'a Arc<RenderObject<Matrix4<f32>>>>,
-        draw_system: &mut DrawSystem<Matrix4<f32>>,
-    ) {
-        draw_system.upload_object_data(render_objects, &self.unlit_buffer);
+    pub fn update_unlit_data<'a>(&self, draw_system: &mut DrawSystem) {
+        draw_system.update_object_buffer(&self.unlit_buffer);
     }
 
     pub fn update_point_lights(&mut self, point_lights: impl Iterator<Item = PointLight>) {

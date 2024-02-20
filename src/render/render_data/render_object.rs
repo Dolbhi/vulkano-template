@@ -4,28 +4,28 @@ use cgmath::{Matrix4, Rad, SquareMatrix};
 
 use crate::{vulkano_objects::buffers::Buffers, VertexFull};
 
-use super::material::MaterialID;
+use super::material::{MaterialID, RenderSubmit};
 
 #[derive(Debug)]
 /// Data for standard rendering of a mesh
 /// Type T is the additional data type of the object (usually a transform matrix)
 pub struct RenderObject<T: Clone> {
     pub mesh: Arc<Buffers<VertexFull>>,
-    pub material_id: MaterialID,
+    pub material: RenderSubmit,
     pub data: T,
 }
 
-impl<T: Clone> RenderObject<T> {
-    pub fn get_data(&self) -> T {
-        self.data.clone()
-    }
-}
+// impl<T: Clone> RenderObject<T> {
+//     pub fn get_data(&self) -> T {
+//         self.data.clone()
+//     }
+// }
 
 impl RenderObject<Matrix4<f32>> {
-    pub fn new(mesh: Arc<Buffers<VertexFull>>, material_id: MaterialID) -> Self {
+    pub fn new(mesh: Arc<Buffers<VertexFull>>, material: RenderSubmit) -> Self {
         Self {
             mesh,
-            material_id,
+            material,
             // uniforms,
             data: Matrix4::identity(),
         }
@@ -40,6 +40,14 @@ impl RenderObject<Matrix4<f32>> {
         let translation = Matrix4::from_translation(position.into());
 
         self.data = translation * rotation;
+    }
+
+    /// Adds the render object's mesh and data to its material's render queue
+    pub fn upload(&self) {
+        self.material
+            .lock()
+            .unwrap()
+            .push((self.mesh.clone(), self.data.clone()));
     }
 
     // pub fn update_transform_axis(

@@ -14,7 +14,7 @@ use crate::{
 use cgmath::Matrix4;
 use game_objects::transform::{TransformID, TransformSystem};
 use legion::World;
-use render::{Context, DrawSystem, MaterialID};
+use render::{Context, DrawSystem, MaterialID, RenderSubmit};
 use std::{iter::zip, path::Path, sync::Arc};
 
 #[cfg(test)]
@@ -30,11 +30,11 @@ fn init_render_objects(
     world: &mut World,
     transform_sys: &mut TransformSystem,
     context: &Context,
-    draw_system: &mut DrawSystem<Matrix4<f32>>,
+    draw_system: &mut DrawSystem,
 ) -> TransformID {
     let resource_loader = context.get_resource_loader();
-    let basic_id = 0;
-    let uv_id = 1;
+    // let basic_id = 0;
+    // let uv_id = 1;
 
     // Texture
     let le_texture = resource_loader.load_texture(Path::new("models/lost_empire-RGBA.png"));
@@ -51,25 +51,28 @@ fn init_render_objects(
 
     // materials
     //  lost empire
-    let le_mat_id = draw_system.add_material(
-        basic_id,
+    let (basic_pipeline, uv_pipeline) = if let [a, b] = &mut draw_system.pipelines[0..2] {
+        (a, b)
+    } else {
+        panic!("Draw system somehow does not have 2 pipelines")
+    };
+    let le_mat_id = basic_pipeline.add_material(
         "lost_empire",
         Some(resource_loader.load_material_set(
-            draw_system.get_pipeline(basic_id),
+            basic_pipeline,
             le_texture.clone(),
             linear_sampler.clone(),
         )),
     );
-    let le_uv_mat_id = draw_system.add_material(uv_id, "lost_empire_uv", None);
+    let le_uv_mat_id = uv_pipeline.add_material("lost_empire_uv", None);
 
     //  ina
     let ina_ids: Vec<_> = zip(["hair", "cloth", "body", "head"], ina_textures)
         .map(|(id, tex)| {
-            draw_system.add_material(
-                basic_id,
+            basic_pipeline.add_material(
                 id,
                 Some(resource_loader.load_material_set(
-                    draw_system.get_pipeline(basic_id),
+                    basic_pipeline,
                     tex,
                     linear_sampler.clone(),
                 )),
@@ -78,7 +81,7 @@ fn init_render_objects(
         .collect();
 
     //  uv
-    let uv_mat_id = draw_system.add_material(uv_id, "uv", None);
+    let uv_mat_id = uv_pipeline.add_material("uv", None);
 
     // meshes
     //      suzanne
@@ -134,13 +137,13 @@ fn init_render_objects(
 
     // objects
     //  Suzanne
-    let suzanne_obj = Arc::new(RenderObject::new(suzanne_mesh, uv_mat_id.clone()));
+    let suzanne_obj = RenderObject::new(suzanne_mesh, uv_mat_id.clone());
     let suzanne = transform_sys.next().unwrap();
     world.push((suzanne, suzanne_obj));
 
     //  Squares
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
-        let square_obj = Arc::new(RenderObject::new(square.clone(), uv_mat_id.clone()));
+        let square_obj = RenderObject::new(square.clone(), uv_mat_id.clone());
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
             translation: [x, y, z].into(),
             ..Default::default()
@@ -156,7 +159,7 @@ fn init_render_objects(
     });
     // world.push((ina_transform));
     for (mesh, mat_id) in zip(ina_meshes, ina_ids.clone()) {
-        let obj = Arc::new(RenderObject::new(mesh, mat_id));
+        let obj = RenderObject::new(mesh, mat_id);
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
             parent: Some(ina_transform),
             ..Default::default()
@@ -168,14 +171,14 @@ fn init_render_objects(
     //  lost empires
     let le_transform = transform_sys.add_transform(TransformCreateInfo::default());
     for mesh in le_meshes {
-        let le_obj = Arc::new(RenderObject::new(mesh, le_mat_id.clone()));
+        let le_obj = RenderObject::new(mesh, le_mat_id.clone());
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
             parent: Some(le_transform),
             ..Default::default()
         });
 
         let mat_swapper =
-            MaterialSwapper::new([le_mat_id.clone(), le_uv_mat_id.clone(), "cloth".into()]);
+            MaterialSwapper::new([le_mat_id.clone(), le_uv_mat_id.clone(), ina_ids[1].clone()]);
 
         world.push((transform_id, le_obj, mat_swapper));
     }
@@ -184,11 +187,11 @@ fn init_render_objects(
 }
 
 pub struct MaterialSwapper {
-    materials: Vec<MaterialID>,
+    materials: Vec<RenderSubmit>,
     curent_index: usize,
 }
 impl MaterialSwapper {
-    fn new(materials: impl IntoIterator<Item = impl Into<MaterialID>>) -> Self {
+    fn new(materials: impl IntoIterator<Item = RenderSubmit>) -> Self {
         let materials = materials.into_iter().map(|m| m.into()).collect();
         Self {
             materials,
@@ -196,7 +199,7 @@ impl MaterialSwapper {
         }
     }
 
-    pub fn swap_material(&mut self) -> MaterialID {
+    pub fn swap_material(&mut self) -> RenderSubmit {
         self.curent_index = (self.curent_index + 1) % self.materials.len();
         self.materials[self.curent_index].clone()
     }

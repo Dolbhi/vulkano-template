@@ -1,5 +1,10 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    vec,
+};
 
+use cgmath::Matrix4;
 use vulkano::{
     command_buffer::{allocator::CommandBufferAllocator, AutoCommandBufferBuilder},
     descriptor_set::{DescriptorSetsCollection, PersistentDescriptorSet, WriteDescriptorSet},
@@ -7,7 +12,7 @@ use vulkano::{
 };
 
 use crate::{
-    vulkano_objects::{allocators::Allocators, pipeline::PipelineHandler},
+    vulkano_objects::{allocators::Allocators, buffers::Buffers, pipeline::PipelineHandler},
     VertexFull,
 };
 
@@ -31,12 +36,12 @@ impl PipelineGroup {
     /// NOTE: clears object vecs
     ///
     /// *  `objects` - Hashmap of object vecs with their material as the key
-    pub fn draw_objects<T: Clone, C, A: CommandBufferAllocator>(
-        &self,
+    pub fn draw_objects<C, A: CommandBufferAllocator>(
+        &mut self,
         object_index: &mut u32,
         descriptor_sets: impl DescriptorSetsCollection,
         command_builder: &mut AutoCommandBufferBuilder<C, A>,
-        objects: &mut HashMap<MaterialID, Vec<Arc<RenderObject<T>>>>,
+        // objects: &mut HashMap<MaterialID, Vec<Arc<RenderObject<T>>>>,
     ) {
         // bind pipeline
         command_builder
@@ -50,13 +55,14 @@ impl PipelineGroup {
             )
             .unwrap();
 
-        for material in &self.materials {
+        for material in &mut self.materials {
             // bind material sets
             material.bind_sets(&self.pipeline.layout(), command_builder);
 
             let mut last_mesh = None;
             let mut last_buffer_len = 0;
-            for mesh in objects[&material.id].iter().map(|ro| &ro.mesh) {
+            // let mut object_data = material.pending_objects.lock().unwrap();
+            for mesh in material.pending_meshes.iter() {
                 match last_mesh {
                     Some(old_mesh) if Arc::ptr_eq(old_mesh, &mesh) => {
                         // println!("Same mesh, skipping...");
@@ -85,18 +91,25 @@ impl PipelineGroup {
             }
 
             // clear render objects
-            objects.get_mut(&material.id).unwrap().clear();
+            material.pending_meshes.clear();
         }
     }
 
-    pub fn add_material(&mut self, id: MaterialID, set: Option<Arc<PersistentDescriptorSet>>) {
+    /// creates a material and returns a mutex vec for submitting render objects
+    pub fn add_material(
+        &mut self,
+        id: impl Into<MaterialID>,
+        set: Option<Arc<PersistentDescriptorSet>>,
+    ) -> RenderSubmit {
+        let pending_objects = Arc::new(Mutex::new(vec![]));
         let material = Material {
-            id,
+            id: id.into(),
             descriptor_set: set,
+            pending_objects: pending_objects.clone(),
+            pending_meshes: vec![],
         };
         self.materials.push(material);
-        // self.objects.insert(material.id, vec![]);
-        // material
+        pending_objects
     }
     pub fn create_material_set(
         &self,
@@ -117,8 +130,18 @@ impl PipelineGroup {
         )
         .unwrap()
     }
-    pub fn material_iter(&self) -> impl Iterator<Item = &MaterialID> {
-        self.materials.iter().map(|mat| &mat.id)
+    /// returns all pending object data in an iterator and queue meshes for rendering
+    pub fn upload_pending_objects(&mut self) -> impl Iterator<Item = Matrix4<f32>> + '_ {
+        self.materials.iter_mut().flat_map(|mat| {
+            let mut objs = mat.pending_objects.lock().unwrap();
+            std::mem::replace(&mut *objs, vec![])
+                .into_iter()
+                .map(|(mesh, data)| {
+                    mat.pending_meshes.push(mesh);
+                    data
+                })
+                .collect::<Vec<Matrix4<f32>>>()
+        })
     }
 }
 
@@ -135,9 +158,13 @@ impl From<&str> for MaterialID {
     }
 }
 
+pub type RenderSubmit = Arc<Mutex<Vec<(Arc<Buffers<VertexFull>>, Matrix4<f32>)>>>;
+
 struct Material {
     pub id: MaterialID,
     pub descriptor_set: Option<Arc<PersistentDescriptorSet>>,
+    pending_objects: RenderSubmit,
+    pending_meshes: Vec<Arc<Buffers<VertexFull>>>,
 }
 impl Material {
     fn bind_sets<T, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(

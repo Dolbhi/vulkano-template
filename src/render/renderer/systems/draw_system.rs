@@ -3,6 +3,7 @@
 
 use std::{collections::HashMap, sync::Arc, vec};
 
+use cgmath::Matrix4;
 use vulkano::{
     buffer::{BufferContents, Subbuffer},
     command_buffer::AutoCommandBufferBuilder,
@@ -17,11 +18,15 @@ use crate::{
     render::{
         context::Context,
         render_data::{
-            material::{MaterialID, PipelineGroup},
+            material::{MaterialID, PipelineGroup, RenderSubmit},
             render_object::RenderObject,
         },
     },
-    vulkano_objects::{buffers::write_to_storage_buffer, pipeline::PipelineHandler},
+    vulkano_objects::{
+        buffers::{write_to_storage_buffer, Buffers},
+        pipeline::PipelineHandler,
+    },
+    VertexFull,
 };
 
 /// Collection of pipelines and associated rendering data
@@ -29,20 +34,12 @@ use crate::{
 /// All pipelines share sets 0 and 1, describing scene data and an array of object data (storage buffer) respectively
 ///
 /// Materials can optionally add more sets, starting from set 2
-///
-/// T is type of renderobject
-pub struct DrawSystem<T>
-where
-    T: Clone,
-{
-    pipelines: Vec<PipelineGroup>,
-    pending_objects: HashMap<MaterialID, Vec<Arc<RenderObject<T>>>>,
+pub struct DrawSystem {
+    pub pipelines: Vec<PipelineGroup>,
+    pending_objects: Vec<Arc<Buffers<VertexFull>>>,
 }
 
-impl<'a, T> DrawSystem<T>
-where
-    T: Clone + 'a,
-{
+impl<'a> DrawSystem {
     /// creates from a collection of shader entry points
     pub fn new(
         context: &Context,
@@ -71,15 +68,15 @@ where
         (
             DrawSystem {
                 pipelines,
-                pending_objects: HashMap::new(),
+                pending_objects: vec![],
             },
             layouts,
         )
     }
 
-    pub fn get_pipeline(&self, pipeline_index: usize) -> &PipelineGroup {
-        &self.pipelines[pipeline_index]
-    }
+    // pub fn get_pipeline(&self, pipeline_index: usize) -> &PipelineGroup {
+    //     &self.pipelines[pipeline_index]
+    // }
     /// Recreate all pipelines with any changes in viewport
     ///
     /// See also: [recreate_pipeline](PipelineHandler::recreate_pipeline)
@@ -91,38 +88,35 @@ where
         }
     }
 
-    pub fn add_material(
-        &mut self,
-        pipeline_index: usize,
-        mat_id: impl Into<MaterialID>,
-        set: Option<Arc<PersistentDescriptorSet>>,
-    ) -> MaterialID {
-        let id: MaterialID = mat_id.into();
-        self.pipelines[pipeline_index].add_material(id.clone(), set);
-        self.pending_objects.insert(id.clone(), vec![]);
-        id
-    }
+    // pub fn add_material(
+    //     &mut self,
+    //     pipeline_index: usize,
+    //     mat_id: impl Into<MaterialID>,
+    //     set: Option<Arc<PersistentDescriptorSet>>,
+    // ) -> RenderSubmit {
+    //     let id: MaterialID = mat_id.into();
+    //     self.pipelines[pipeline_index].add_material(id.clone(), set)
+    //     // self.pending_objects.insert(id.clone(), vec![]);
+    //     // id
+    // }
 
-    /// sort and write object data to given storage buffer
-    pub fn upload_object_data<O: BufferContents + From<T>>(
+    /// sort and write object data to given storage buffer (must be called before rendering)
+    pub fn update_object_buffer<O: BufferContents + From<Matrix4<f32>>>(
         &mut self,
-        objects: impl Iterator<Item = &'a Arc<RenderObject<T>>>,
         buffer: &Subbuffer<[O]>,
     ) {
-        // sort renderobjects
-        for object in objects {
-            self.pending_objects
-                .get_mut(&object.material_id)
-                .unwrap()
-                .push(object.clone());
-        }
+        // // sort renderobjects
+        // for object in objects {
+        //     self.pending_objects
+        //         .get_mut(&object.material_id)
+        //         .unwrap()
+        //         .push(object.clone());
+        // }
         // update renderobjects
-        let obj_iter = self.pipelines.iter().flat_map(|pipeline| {
-            pipeline
-                .material_iter()
-                .flat_map(|mat_id| self.pending_objects[mat_id].iter())
-                .map(|ro| ro.get_data())
-        });
+        let obj_iter = self
+            .pipelines
+            .iter_mut()
+            .flat_map(|pipeline| pipeline.upload_pending_objects());
         write_to_storage_buffer(buffer, obj_iter);
     }
     /// bind draw calls to the given command buffer builder, be sure to call `upload_draw_data()` before hand
@@ -133,12 +127,12 @@ where
         command_builder: &mut AutoCommandBufferBuilder<P, A>,
     ) {
         let mut object_index = 0;
-        for pipeline_group in self.pipelines.iter() {
+        for pipeline_group in self.pipelines.iter_mut() {
             pipeline_group.draw_objects(
                 &mut object_index,
                 sets.clone(), //self.frame_data[image_i].descriptor_sets.clone(),
                 command_builder,
-                &mut self.pending_objects,
+                // &mut self.pending_objects,
             );
         }
     }
