@@ -127,6 +127,7 @@ impl TransformSystem {
             .get_transform(id)
             .unwrap_or_else(|| panic!("transform system missing given ID"));
 
+        // collect ids of parents in order
         let mut ids = vec![*id];
         while let Some(parent_id) = current.parent {
             ids.push(parent_id);
@@ -135,6 +136,7 @@ impl TransformSystem {
                 .unwrap_or_else(|| panic!("transform system missing parent ID"));
         }
 
+        // apply local model transforms
         let mut model = Matrix4::identity();
         for id in ids {
             model = self.get_transform_mut(&id).unwrap().get_local_model() * model

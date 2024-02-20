@@ -106,9 +106,7 @@ where
     /// sort and write object data to given storage buffer
     pub fn upload_object_data<O: BufferContents + From<T>>(
         &mut self,
-        // image_i: usize,
         objects: impl Iterator<Item = &'a Arc<RenderObject<T>>>,
-        // global_data: impl Into<GPUGlobalData>,
         buffer: &Subbuffer<[O]>,
     ) {
         // sort renderobjects
