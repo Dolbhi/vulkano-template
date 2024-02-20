@@ -1,24 +1,19 @@
 use std::time::Duration;
-use std::{path::Path, sync::Arc};
 
 use cgmath::{Euler, Matrix4, Rad, Vector3, Vector4};
 use legion::{IntoQuery, *};
-use vulkano::buffer::BufferUsage;
-use vulkano::descriptor_set::WriteDescriptorSet;
+
 use winit::{event::ElementState, event_loop::EventLoop, keyboard::KeyCode};
 
 use crate::{
     game_objects::{
         light::PointLightComponent,
-        transform::{TransformCreateInfo, TransformID, TransformSystem},
+        transform::{TransformID, TransformSystem},
         Camera,
     },
     init_render_objects,
-    render::{mesh::from_obj, renderer::DeferredRenderer, RenderLoop, RenderObject},
-    shaders::{
-        draw::{self, GPUGlobalData},
-        lighting::DirectionLight,
-    },
+    render::{renderer::DeferredRenderer, RenderLoop, RenderObject},
+    shaders::{draw::GPUGlobalData, lighting::DirectionLight},
     MaterialSwapper,
 };
 
