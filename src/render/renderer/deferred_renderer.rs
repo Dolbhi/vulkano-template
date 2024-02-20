@@ -5,7 +5,7 @@ use super::{
     Renderer,
 };
 use crate::{
-    render::{Context},
+    render::Context,
     shaders::{
         draw::{self, GPUGlobalData, GPUObjectData},
         lighting::{DirectionLight, PointLight},
@@ -16,7 +16,6 @@ use crate::{
         render_pass::FramebufferAttachments,
     },
 };
-
 
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
@@ -114,12 +113,6 @@ impl DeferredRenderer {
 
         // create buffers and descriptor sets
         let image_count = context.get_image_count();
-        // let mut global_data = create_dynamic_buffers::<GPUGlobalData>(
-        //     &context.allocators,
-        //     &context.device,
-        //     global_layout,
-        //     image_count,
-        // );
         let mut object_data =
             create_storage_buffers(&context.allocators, objects_layout, image_count, 10000);
         let mut unlit_data = create_storage_buffers(

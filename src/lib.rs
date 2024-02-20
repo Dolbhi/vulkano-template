@@ -5,11 +5,14 @@ pub mod shaders;
 mod vertex_data;
 pub mod vulkano_objects;
 
+use cgmath::{Vector3, Vector4};
 pub use vertex_data::{Vertex2d, Vertex3d, VertexFull};
+use vulkano::{buffer::BufferUsage, descriptor_set::WriteDescriptorSet};
 
 use crate::{
-    game_objects::transform::TransformCreateInfo,
+    game_objects::{light::PointLightComponent, transform::TransformCreateInfo},
     render::{mesh::from_obj, RenderObject},
+    shaders::draw,
 };
 
 use game_objects::transform::{TransformID, TransformSystem};
@@ -30,7 +33,8 @@ fn init_render_objects(
     world: &mut World,
     transform_sys: &mut TransformSystem,
     context: &Context,
-    draw_system: &mut DrawSystem,
+    lit_system: &mut DrawSystem,
+    unlit_system: &mut DrawSystem,
 ) -> TransformID {
     let resource_loader = context.get_resource_loader();
 
@@ -49,11 +53,17 @@ fn init_render_objects(
 
     // materials
     //  lost empire
-    let (basic_pipeline, uv_pipeline) = if let [a, b] = &mut draw_system.pipelines[0..2] {
+    let (basic_pipeline, uv_pipeline) = if let [a, b] = &mut lit_system.pipelines[0..2] {
         (a, b)
     } else {
-        panic!("Draw system somehow does not have 2 pipelines")
+        panic!("Lit draw system somehow does not have 2 pipelines")
     };
+    let (solid_pipeline, uv_pipeline2) = if let [a, b] = &mut unlit_system.pipelines[0..2] {
+        (a, b)
+    } else {
+        panic!("Unlit draw system somehow does not have 2 pipelines")
+    };
+
     let le_mat = basic_pipeline.add_material(Some(resource_loader.load_material_set(
         basic_pipeline,
         le_texture.clone(),
@@ -74,6 +84,29 @@ fn init_render_objects(
 
     //  uv
     let uv_mat = uv_pipeline.add_material(None);
+
+    let red_mat_buffer = resource_loader.create_material_buffer(
+        draw::SolidData {
+            color: [1., 0., 0., 1.],
+        },
+        BufferUsage::empty(),
+    );
+    let red_material = solid_pipeline.add_material(Some(solid_pipeline.create_material_set(
+        &context.allocators,
+        2,
+        [WriteDescriptorSet::buffer(0, red_mat_buffer)],
+    )));
+    let blue_mat_buffer = resource_loader.create_material_buffer(
+        draw::SolidData {
+            color: [0., 0., 1., 1.],
+        },
+        BufferUsage::empty(),
+    );
+    let blue_material = solid_pipeline.add_material(Some(solid_pipeline.create_material_set(
+        &context.allocators,
+        2,
+        [WriteDescriptorSet::buffer(0, blue_mat_buffer)],
+    )));
 
     // meshes
     //      suzanne
@@ -110,6 +143,12 @@ fn init_render_objects(
     let indices = vec![0, 1, 2, 2, 1, 3];
     let square = resource_loader.load_mesh(vertices, indices);
 
+    //      cube
+    let (vertices, indices) = from_obj(Path::new("models/default_cube.obj"))
+        .pop()
+        .expect("Failed to load cube mesh");
+    let cube_mesh = resource_loader.load_mesh(vertices, indices);
+
     //      lost empire
     let le_meshes: Vec<_> = from_obj(Path::new("models/lost_empire.obj"))
         .into_iter()
@@ -128,12 +167,12 @@ fn init_render_objects(
     println!("Ina mesh count: {}", ina_meshes.len());
 
     // objects
-    //  Suzanne
+    //      Suzanne
     let suzanne_obj = RenderObject::new(suzanne_mesh, uv_mat.clone());
     let suzanne = transform_sys.next().unwrap();
     world.push((suzanne, suzanne_obj));
 
-    //  Squares
+    //      Squares
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
         let square_obj = RenderObject::new(square.clone(), uv_mat.clone());
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
@@ -144,7 +183,7 @@ fn init_render_objects(
         world.push((transform_id, square_obj));
     }
 
-    //  Ina
+    //      Ina
     let ina_transform = transform_sys.add_transform(TransformCreateInfo {
         translation: [0.0, 5.0, -1.0].into(),
         ..Default::default()
@@ -160,7 +199,7 @@ fn init_render_objects(
         world.push((transform_id, obj));
     }
 
-    //  lost empires
+    //      lost empires
     let le_transform = transform_sys.add_transform(TransformCreateInfo::default());
     for mesh in le_meshes {
         let le_obj = RenderObject::new(mesh, le_mat.clone());
@@ -174,6 +213,30 @@ fn init_render_objects(
 
         world.push((transform_id, le_obj, mat_swapper));
     }
+
+    // lights
+    world.push((
+        transform_sys.add_transform(TransformCreateInfo {
+            scale: Vector3::new(0.1, 0.1, 0.1),
+            translation: Vector3::new(0., 5., -1.),
+            ..Default::default()
+        }),
+        PointLightComponent {
+            color: Vector4::new(1., 0., 0., 1.),
+        },
+        RenderObject::new(cube_mesh.clone(), red_material),
+    ));
+    world.push((
+        transform_sys.add_transform(TransformCreateInfo {
+            scale: Vector3::new(0.1, 0.1, 0.1),
+            translation: Vector3::new(0.0, 6.0, -1.0),
+            ..Default::default()
+        }),
+        PointLightComponent {
+            color: Vector4::new(0., 0., 1., 1.),
+        },
+        RenderObject::new(cube_mesh.clone(), blue_material),
+    ));
 
     suzanne
 }

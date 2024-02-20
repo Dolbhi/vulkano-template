@@ -1,7 +1,7 @@
 // mod frame_data;
 // use frame_data::FrameData;
 
-use std::{sync::Arc, vec};
+use std::sync::Arc;
 
 use cgmath::Matrix4;
 use vulkano::{
@@ -14,11 +14,7 @@ use vulkano::{
 
 use crate::{
     render::{context::Context, render_data::material::PipelineGroup},
-    vulkano_objects::{
-        buffers::{write_to_storage_buffer, Buffers},
-        pipeline::PipelineHandler,
-    },
-    VertexFull,
+    vulkano_objects::{buffers::write_to_storage_buffer, pipeline::PipelineHandler},
 };
 
 /// Collection of pipelines and associated rendering data
@@ -59,9 +55,6 @@ impl<'a> DrawSystem {
         (DrawSystem { pipelines }, layouts)
     }
 
-    // pub fn get_pipeline(&self, pipeline_index: usize) -> &PipelineGroup {
-    //     &self.pipelines[pipeline_index]
-    // }
     /// Recreate all pipelines with any changes in viewport
     ///
     /// See also: [recreate_pipeline](PipelineHandler::recreate_pipeline)
@@ -73,31 +66,11 @@ impl<'a> DrawSystem {
         }
     }
 
-    // pub fn add_material(
-    //     &mut self,
-    //     pipeline_index: usize,
-    //     mat_id: impl Into<MaterialID>,
-    //     set: Option<Arc<PersistentDescriptorSet>>,
-    // ) -> RenderSubmit {
-    //     let id: MaterialID = mat_id.into();
-    //     self.pipelines[pipeline_index].add_material(id.clone(), set)
-    //     // self.pending_objects.insert(id.clone(), vec![]);
-    //     // id
-    // }
-
     /// sort and write object data to given storage buffer (must be called before rendering)
     pub fn update_object_buffer<O: BufferContents + From<Matrix4<f32>>>(
         &mut self,
         buffer: &Subbuffer<[O]>,
     ) {
-        // // sort renderobjects
-        // for object in objects {
-        //     self.pending_objects
-        //         .get_mut(&object.material_id)
-        //         .unwrap()
-        //         .push(object.clone());
-        // }
-        // update renderobjects
         let obj_iter = self
             .pipelines
             .iter_mut()
