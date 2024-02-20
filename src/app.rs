@@ -94,16 +94,14 @@ impl App {
                 BufferUsage::empty(),
             );
             let solid_pipeline = &mut system.pipelines[solid_id];
-            let material_id = solid_pipeline.add_material(
-                "red",
-                Some(solid_pipeline.create_material_set(
+            let red_material =
+                solid_pipeline.add_material(Some(solid_pipeline.create_material_set(
                     &render_loop.context.allocators,
                     2,
                     [WriteDescriptorSet::buffer(0, buffer)],
-                )),
-            );
+                )));
 
-            let mut ro = RenderObject::new(mesh, material_id);
+            let mut ro = RenderObject::new(mesh, red_material);
             ro.set_matrix(
                 Matrix4::from_translation([0., 5., -1.].into()) * Matrix4::from_scale(0.2),
             );
@@ -294,19 +292,12 @@ impl App {
             KeyCode::KeyQ => {
                 if state == Pressed && self.keys.q == Released {
                     let mut query =
-                        <(&mut MaterialSwapper, &mut Arc<RenderObject<Matrix4<f32>>>)>::query();
+                        <(&mut MaterialSwapper, &mut RenderObject<Matrix4<f32>>)>::query();
 
                     query.for_each_mut(&mut self.world, |(swapper, render_object)| {
                         let next_mat = swapper.swap_material();
                         // println!("Swapped mat: {:?}", next_mat);
-                        match Arc::get_mut(render_object) {
-                            Some(obj) => {
-                                obj.material = next_mat;
-                            }
-                            None => {
-                                panic!("Unable to swap material on render object");
-                            }
-                        }
+                        render_object.material = next_mat;
                     });
                 }
                 self.keys.q = state;

@@ -1,27 +1,19 @@
 // mod frame_data;
 // use frame_data::FrameData;
 
-use std::{collections::HashMap, sync::Arc, vec};
+use std::{sync::Arc, vec};
 
 use cgmath::Matrix4;
 use vulkano::{
     buffer::{BufferContents, Subbuffer},
     command_buffer::AutoCommandBufferBuilder,
-    descriptor_set::{
-        layout::DescriptorSetLayout, DescriptorSetsCollection, PersistentDescriptorSet,
-    },
+    descriptor_set::{layout::DescriptorSetLayout, DescriptorSetsCollection},
     render_pass::Subpass,
     shader::EntryPoint,
 };
 
 use crate::{
-    render::{
-        context::Context,
-        render_data::{
-            material::{MaterialID, PipelineGroup, RenderSubmit},
-            render_object::RenderObject,
-        },
-    },
+    render::{context::Context, render_data::material::PipelineGroup},
     vulkano_objects::{
         buffers::{write_to_storage_buffer, Buffers},
         pipeline::PipelineHandler,
@@ -36,7 +28,6 @@ use crate::{
 /// Materials can optionally add more sets, starting from set 2
 pub struct DrawSystem {
     pub pipelines: Vec<PipelineGroup>,
-    pending_objects: Vec<Arc<Buffers<VertexFull>>>,
 }
 
 impl<'a> DrawSystem {
@@ -65,13 +56,7 @@ impl<'a> DrawSystem {
         let layouts = pipelines[0].pipeline.layout().set_layouts();
         let layouts = [layouts[0].clone(), layouts[1].clone()];
 
-        (
-            DrawSystem {
-                pipelines,
-                pending_objects: vec![],
-            },
-            layouts,
-        )
+        (DrawSystem { pipelines }, layouts)
     }
 
     // pub fn get_pipeline(&self, pipeline_index: usize) -> &PipelineGroup {

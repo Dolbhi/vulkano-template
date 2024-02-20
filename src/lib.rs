@@ -11,11 +11,11 @@ use crate::{
     game_objects::transform::TransformCreateInfo,
     render::{mesh::from_obj, RenderObject},
 };
-use cgmath::Matrix4;
+
 use game_objects::transform::{TransformID, TransformSystem};
 use legion::World;
-use render::{Context, DrawSystem, MaterialID, RenderSubmit};
-use std::{iter::zip, path::Path, sync::Arc};
+use render::{Context, DrawSystem, RenderSubmit};
+use std::{iter::zip, path::Path};
 
 #[cfg(test)]
 mod tests {
@@ -33,8 +33,6 @@ fn init_render_objects(
     draw_system: &mut DrawSystem,
 ) -> TransformID {
     let resource_loader = context.get_resource_loader();
-    // let basic_id = 0;
-    // let uv_id = 1;
 
     // Texture
     let le_texture = resource_loader.load_texture(Path::new("models/lost_empire-RGBA.png"));
@@ -56,32 +54,26 @@ fn init_render_objects(
     } else {
         panic!("Draw system somehow does not have 2 pipelines")
     };
-    let le_mat_id = basic_pipeline.add_material(
-        "lost_empire",
-        Some(resource_loader.load_material_set(
-            basic_pipeline,
-            le_texture.clone(),
-            linear_sampler.clone(),
-        )),
-    );
-    let le_uv_mat_id = uv_pipeline.add_material("lost_empire_uv", None);
+    let le_mat = basic_pipeline.add_material(Some(resource_loader.load_material_set(
+        basic_pipeline,
+        le_texture.clone(),
+        linear_sampler.clone(),
+    )));
+    let le_uv_mat = uv_pipeline.add_material(None);
 
     //  ina
-    let ina_ids: Vec<_> = zip(["hair", "cloth", "body", "head"], ina_textures)
-        .map(|(id, tex)| {
-            basic_pipeline.add_material(
-                id,
-                Some(resource_loader.load_material_set(
-                    basic_pipeline,
-                    tex,
-                    linear_sampler.clone(),
-                )),
-            )
+    let ina_mats: Vec<_> = zip(["hair", "cloth", "body", "head"], ina_textures)
+        .map(|(_, tex)| {
+            basic_pipeline.add_material(Some(resource_loader.load_material_set(
+                basic_pipeline,
+                tex,
+                linear_sampler.clone(),
+            )))
         })
         .collect();
 
     //  uv
-    let uv_mat_id = uv_pipeline.add_material("uv", None);
+    let uv_mat = uv_pipeline.add_material(None);
 
     // meshes
     //      suzanne
@@ -137,13 +129,13 @@ fn init_render_objects(
 
     // objects
     //  Suzanne
-    let suzanne_obj = RenderObject::new(suzanne_mesh, uv_mat_id.clone());
+    let suzanne_obj = RenderObject::new(suzanne_mesh, uv_mat.clone());
     let suzanne = transform_sys.next().unwrap();
     world.push((suzanne, suzanne_obj));
 
     //  Squares
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
-        let square_obj = RenderObject::new(square.clone(), uv_mat_id.clone());
+        let square_obj = RenderObject::new(square.clone(), uv_mat.clone());
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
             translation: [x, y, z].into(),
             ..Default::default()
@@ -158,8 +150,8 @@ fn init_render_objects(
         ..Default::default()
     });
     // world.push((ina_transform));
-    for (mesh, mat_id) in zip(ina_meshes, ina_ids.clone()) {
-        let obj = RenderObject::new(mesh, mat_id);
+    for (mesh, mat) in zip(ina_meshes, ina_mats.clone()) {
+        let obj = RenderObject::new(mesh, mat);
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
             parent: Some(ina_transform),
             ..Default::default()
@@ -171,14 +163,14 @@ fn init_render_objects(
     //  lost empires
     let le_transform = transform_sys.add_transform(TransformCreateInfo::default());
     for mesh in le_meshes {
-        let le_obj = RenderObject::new(mesh, le_mat_id.clone());
+        let le_obj = RenderObject::new(mesh, le_mat.clone());
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
             parent: Some(le_transform),
             ..Default::default()
         });
 
         let mat_swapper =
-            MaterialSwapper::new([le_mat_id.clone(), le_uv_mat_id.clone(), ina_ids[1].clone()]);
+            MaterialSwapper::new([le_mat.clone(), le_uv_mat.clone(), ina_mats[1].clone()]);
 
         world.push((transform_id, le_obj, mat_swapper));
     }

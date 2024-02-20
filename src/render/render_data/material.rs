@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     sync::{Arc, Mutex},
     vec,
 };
@@ -15,8 +14,6 @@ use crate::{
     vulkano_objects::{allocators::Allocators, buffers::Buffers, pipeline::PipelineHandler},
     VertexFull,
 };
-
-use super::render_object::RenderObject;
 
 pub struct PipelineGroup {
     pub pipeline: PipelineHandler<VertexFull>,
@@ -96,14 +93,9 @@ impl PipelineGroup {
     }
 
     /// creates a material and returns a mutex vec for submitting render objects
-    pub fn add_material(
-        &mut self,
-        id: impl Into<MaterialID>,
-        set: Option<Arc<PersistentDescriptorSet>>,
-    ) -> RenderSubmit {
+    pub fn add_material(&mut self, set: Option<Arc<PersistentDescriptorSet>>) -> RenderSubmit {
         let pending_objects = Arc::new(Mutex::new(vec![]));
         let material = Material {
-            id: id.into(),
             descriptor_set: set,
             pending_objects: pending_objects.clone(),
             pending_meshes: vec![],
@@ -145,23 +137,9 @@ impl PipelineGroup {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct MaterialID(pub String);
-impl From<String> for MaterialID {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
-impl From<&str> for MaterialID {
-    fn from(value: &str) -> Self {
-        Self(value.to_string())
-    }
-}
-
 pub type RenderSubmit = Arc<Mutex<Vec<(Arc<Buffers<VertexFull>>, Matrix4<f32>)>>>;
 
 struct Material {
-    pub id: MaterialID,
     pub descriptor_set: Option<Arc<PersistentDescriptorSet>>,
     pending_objects: RenderSubmit,
     pending_meshes: Vec<Arc<Buffers<VertexFull>>>,

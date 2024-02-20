@@ -5,7 +5,7 @@ use super::{
     Renderer,
 };
 use crate::{
-    render::{Context, RenderObject},
+    render::{Context},
     shaders::{
         draw::{self, GPUGlobalData, GPUObjectData},
         lighting::{DirectionLight, PointLight},
@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-use cgmath::Matrix4;
+
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
