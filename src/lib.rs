@@ -85,69 +85,79 @@ fn init_render_objects(
     //  uv
     let uv_mat = uv_pipeline.add_material(None);
 
-    let red_mat_buffer = resource_loader.create_material_buffer(
-        draw::SolidData {
-            color: [1., 0., 0., 1.],
-        },
-        BufferUsage::empty(),
-    );
-    let red_material = solid_pipeline.add_material(Some(solid_pipeline.create_material_set(
-        &context.allocators,
-        2,
-        [WriteDescriptorSet::buffer(0, red_mat_buffer)],
-    )));
-    let blue_mat_buffer = resource_loader.create_material_buffer(
-        draw::SolidData {
-            color: [0., 0., 1., 1.],
-        },
-        BufferUsage::empty(),
-    );
-    let blue_material = solid_pipeline.add_material(Some(solid_pipeline.create_material_set(
-        &context.allocators,
-        2,
-        [WriteDescriptorSet::buffer(0, blue_mat_buffer)],
-    )));
+    let red_material = {
+        let red_mat_buffer = resource_loader.create_material_buffer(
+            draw::SolidData {
+                color: [1., 0., 0., 1.],
+            },
+            BufferUsage::empty(),
+        );
+        solid_pipeline.add_material(Some(solid_pipeline.create_material_set(
+            &context.allocators,
+            2,
+            [WriteDescriptorSet::buffer(0, red_mat_buffer)],
+        )))
+    };
+    let blue_material = {
+        let blue_mat_buffer = resource_loader.create_material_buffer(
+            draw::SolidData {
+                color: [0., 0., 1., 1.],
+            },
+            BufferUsage::empty(),
+        );
+        solid_pipeline.add_material(Some(solid_pipeline.create_material_set(
+            &context.allocators,
+            2,
+            [WriteDescriptorSet::buffer(0, blue_mat_buffer)],
+        )))
+    };
 
     // meshes
     //      suzanne
-    let (vertices, indices) = from_obj(Path::new("models/suzanne.obj")).pop().unwrap();
-    let suzanne_mesh = resource_loader.load_mesh(vertices, indices);
+    let suzanne_mesh = {
+        let (vertices, indices) = from_obj(Path::new("models/suzanne.obj")).pop().unwrap();
+        resource_loader.load_mesh(vertices, indices)
+    };
 
     //      square
-    let vertices = vec![
-        VertexFull {
-            position: [-0.25, -0.25, 0.0],
-            normal: [0.0, 0.0, 1.0],
-            colour: [0.0, 1.0, 0.0],
-            uv: [0.0, 0.0],
-        },
-        VertexFull {
-            position: [0.25, -0.25, 0.0],
-            normal: [0.0, 0.0, 1.0],
-            colour: [0.0, 1.0, 0.0],
-            uv: [1.0, 0.0],
-        },
-        VertexFull {
-            position: [-0.25, 0.25, 0.0],
-            normal: [0.0, 0.0, 1.0],
-            colour: [0.0, 1.0, 0.0],
-            uv: [0.0, 1.0],
-        },
-        VertexFull {
-            position: [0.25, 0.25, 0.0],
-            normal: [0.0, 0.0, 1.0],
-            colour: [0.0, 1.0, 0.0],
-            uv: [1.0, 1.0],
-        },
-    ];
-    let indices = vec![0, 1, 2, 2, 1, 3];
-    let square = resource_loader.load_mesh(vertices, indices);
+    let square = {
+        let vertices = vec![
+            VertexFull {
+                position: [-0.25, -0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+                uv: [0.0, 0.0],
+            },
+            VertexFull {
+                position: [0.25, -0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+                uv: [1.0, 0.0],
+            },
+            VertexFull {
+                position: [-0.25, 0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+                uv: [0.0, 1.0],
+            },
+            VertexFull {
+                position: [0.25, 0.25, 0.0],
+                normal: [0.0, 0.0, 1.0],
+                colour: [0.0, 1.0, 0.0],
+                uv: [1.0, 1.0],
+            },
+        ];
+        let indices = vec![0, 1, 2, 2, 1, 3];
+        resource_loader.load_mesh(vertices, indices)
+    };
 
     //      cube
-    let (vertices, indices) = from_obj(Path::new("models/default_cube.obj"))
-        .pop()
-        .expect("Failed to load cube mesh");
-    let cube_mesh = resource_loader.load_mesh(vertices, indices);
+    let cube_mesh = {
+        let (vertices, indices) = from_obj(Path::new("models/default_cube.obj"))
+            .pop()
+            .expect("Failed to load cube mesh");
+        resource_loader.load_mesh(vertices, indices)
+    };
 
     //      lost empire
     let le_meshes: Vec<_> = from_obj(Path::new("models/lost_empire.obj"))
