@@ -53,7 +53,7 @@ pub struct App {
     transforms: TransformSystem,
     total_seconds: f32,
     suzanne: TransformID,
-    camera_transform: TransformID,
+    camera_light: TransformID,
     test_light: Arc<RenderObject<Matrix4<f32>>>,
 }
 
@@ -132,15 +132,16 @@ impl App {
             },
         ));
 
-        let camera_transform = {
-            let cam_transform = transforms.next().unwrap();
+        // camera light, will follow camera position on update
+        let camera_light = {
+            let camera_light = transforms.next().unwrap();
             world.push((
-                cam_transform,
+                camera_light,
                 PointLightComponent {
                     color: Vector4::new(1., 1., 1., 1.),
                 },
             ));
-            cam_transform
+            camera_light
         };
 
         Self {
@@ -152,7 +153,7 @@ impl App {
             transforms,
             total_seconds: 0.,
             suzanne,
-            camera_transform,
+            camera_light,
             test_light,
         }
     }
@@ -165,9 +166,9 @@ impl App {
         // move cam
         self.update_movement(seconds_passed);
         self.transforms
-            .get_transform_mut(&self.camera_transform)
+            .get_transform_mut(&self.camera_light)
             .unwrap()
-            .set_translation(self.camera.position + Vector3::new(0., 0., 0.01)); // light pos cannot = cam pos else the light will glitch
+            .set_translation(self.camera.position + Vector3::new(0., 0.01, 0.01)); // light pos cannot = cam pos else the light will glitch
 
         // rotate suzanne
         self.transforms
