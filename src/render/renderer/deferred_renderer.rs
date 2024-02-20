@@ -84,7 +84,7 @@ impl DeferredRenderer {
                 &Subpass::from(render_pass.clone(), 1).unwrap(),
                 &attachments,
             );
-        let (unlit_draw_system, [global_unlit_layout, unlit_objects_layout]) = {
+        let (unlit_draw_system, [_, unlit_objects_layout]) = {
             let shaders = [
                 (
                     draw::load_basic_vs(context.device.clone())
@@ -278,16 +278,9 @@ impl Renderer for DeferredRenderer {
     }
 
     fn recreate_pipelines(&mut self, context: &Context) {
-        self.lit_draw_system.recreate_pipelines(
-            context,
-            &Subpass::from(self.render_pass.clone(), 0).unwrap(),
-        );
-        self.lighting_system
-            .recreate_pipeline(context, Subpass::from(self.render_pass.clone(), 1).unwrap());
-        self.unlit_draw_system.recreate_pipelines(
-            context,
-            &Subpass::from(self.render_pass.clone(), 2).unwrap(),
-        );
+        self.lit_draw_system.recreate_pipelines(context);
+        self.lighting_system.recreate_pipeline(context);
+        self.unlit_draw_system.recreate_pipelines(context);
     }
     fn recreate_framebuffers(&mut self, context: &Context) {
         (self.attachments, self.framebuffers) =
@@ -346,6 +339,7 @@ impl FrameData {
     }
 }
 
+/// Creates render pass with 2 subpasses and diffuse, normal and depth attachments for deferred shading
 fn deferred_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<RenderPass> {
     vulkano::ordered_passes_renderpass!(
         device,
@@ -398,6 +392,7 @@ fn deferred_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<R
     .unwrap()
 }
 
+/// Creates render pass with 2 subpasses and diffuse, normal and depth attachments for deferred shading and an additional subpass for forward rendering
 fn deferred_forward_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<RenderPass> {
     vulkano::ordered_passes_renderpass!(
         device,

@@ -30,6 +30,7 @@ pub struct PipelineHandler<V: Vertex> {
     vs: EntryPoint,
     fs: EntryPoint,
     pub pipeline: Arc<GraphicsPipeline>,
+    subpass: Subpass,
     vertex_type: PhantomData<V>,
     dynamic_bindings: Vec<(usize, u32)>,
     pipeline_type: PipelineType,
@@ -50,7 +51,7 @@ impl<V: Vertex> PipelineHandler<V> {
             vs.clone(),
             fs.clone(),
             viewport,
-            subpass,
+            subpass.clone(),
             dynamic_bindings.clone(),
             pipeline_type,
         );
@@ -58,6 +59,7 @@ impl<V: Vertex> PipelineHandler<V> {
             vs,
             fs,
             pipeline,
+            subpass,
             vertex_type: PhantomData,
             dynamic_bindings: dynamic_bindings.into_iter().collect(),
             pipeline_type,
@@ -68,13 +70,14 @@ impl<V: Vertex> PipelineHandler<V> {
         self.pipeline.layout()
     }
 
-    pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
+    /// recreate pipeline with cached shader entry points, subpass, dynamic bindings and pipeline type
+    pub fn recreate_pipeline(&mut self, device: Arc<Device>, viewport: Viewport) {
         self.pipeline = window_size_dependent_pipeline::<V>(
             device,
             self.vs.clone(),
             self.fs.clone(),
             viewport,
-            subpass,
+            self.subpass.clone(),
             self.dynamic_bindings.clone(),
             self.pipeline_type,
         );

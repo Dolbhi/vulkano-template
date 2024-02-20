@@ -165,22 +165,13 @@ impl LightingSystem {
         )
     }
 
-    pub fn recreate_pipeline(&mut self, context: &Context, subpass: Subpass) {
-        self.point_pipeline.recreate_pipeline(
-            context.device.clone(),
-            subpass.clone(),
-            context.viewport.clone(),
-        );
-        self.direction_pipeline.recreate_pipeline(
-            context.device.clone(),
-            subpass.clone(),
-            context.viewport.clone(),
-        );
-        self.ambient_pipeline.recreate_pipeline(
-            context.device.clone(),
-            subpass.clone(),
-            context.viewport.clone(),
-        );
+    pub fn recreate_pipeline(&mut self, context: &Context) {
+        self.point_pipeline
+            .recreate_pipeline(context.device.clone(), context.viewport.clone());
+        self.direction_pipeline
+            .recreate_pipeline(context.device.clone(), context.viewport.clone());
+        self.ambient_pipeline
+            .recreate_pipeline(context.device.clone(), context.viewport.clone());
     }
     /// recreate the descriptor set describing the framebuffer attachments, must be done after recreating framebuffer (see `DrawSystem::recreate_pipelines`)
     pub fn recreate_descriptor(&mut self, context: &Context, attachments: &FramebufferAttachments) {

@@ -26,7 +26,11 @@ impl PipelineGroup {
         }
     }
 
+    /// Add draw calls of each object in each material of this pipeline
+    ///
     /// NOTE: clears object vecs
+    ///
+    /// *  `objects` - Hashmap of object vecs with their material as the key
     pub fn draw_objects<T: Clone, C, A: CommandBufferAllocator>(
         &self,
         object_index: &mut u32,
@@ -34,7 +38,6 @@ impl PipelineGroup {
         command_builder: &mut AutoCommandBufferBuilder<C, A>,
         objects: &mut HashMap<MaterialID, Vec<Arc<RenderObject<T>>>>,
     ) {
-        // let mut index = 0;
         // bind pipeline
         command_builder
             .bind_pipeline_graphics(self.pipeline.pipeline.clone())

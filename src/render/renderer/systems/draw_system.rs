@@ -26,18 +26,16 @@ use crate::{
 
 /// Collection of pipelines and associated rendering data
 ///
-/// All pipelines share sets 1 and 2, describing scene data and an array of object data (storage buffer) respectively
+/// All pipelines share sets 0 and 1, describing scene data and an array of object data (storage buffer) respectively
 ///
-/// Materials can optionally add more sets
+/// Materials can optionally add more sets, starting from set 2
 ///
 /// T is type of renderobject
 pub struct DrawSystem<T>
 where
-    // O: BufferContents + From<T>,
     T: Clone,
 {
     pipelines: Vec<PipelineGroup>,
-    // frame_data: Vec<FrameData<O>>,
     pending_objects: HashMap<MaterialID, Vec<Arc<RenderObject<T>>>>,
 }
 
@@ -70,35 +68,9 @@ where
         let layouts = pipelines[0].pipeline.layout().set_layouts();
         let layouts = [layouts[0].clone(), layouts[1].clone()];
 
-        // // create buffers and descriptors
-        // let global_data = create_dynamic_buffers::<GPUGlobalData>(
-        //     &context.allocators,
-        //     &context.device,
-        //     layout.set_layouts().get(0).unwrap().clone(),
-        //     image_count,
-        // );
-        // let object_data = create_storage_buffers(
-        //     &context.allocators,
-        //     layout.set_layouts().get(1).unwrap().clone(),
-        //     image_count,
-        //     10000,
-        // );
-
-        // // create frame data
-        // let frame_data = zip(global_data, object_data)
-        //     .map(
-        //         |((global_buffer, global_set), (objects_buffer, object_descriptor))| FrameData {
-        //             global_buffer,
-        //             objects_buffer,
-        //             descriptor_sets: vec![global_set, object_descriptor.into()],
-        //         },
-        //     )
-        //     .collect();
-
         (
             DrawSystem {
                 pipelines,
-                // frame_data,
                 pending_objects: HashMap::new(),
             },
             layouts,
@@ -108,13 +80,14 @@ where
     pub fn get_pipeline(&self, pipeline_index: usize) -> &PipelineGroup {
         &self.pipelines[pipeline_index]
     }
-    pub fn recreate_pipelines(&mut self, context: &Context, subpass: &Subpass) {
+    /// Recreate all pipelines with any changes in viewport
+    ///
+    /// See also: [recreate_pipeline](PipelineHandler::recreate_pipeline)
+    pub fn recreate_pipelines(&mut self, context: &Context) {
         for pipeline in self.pipelines.iter_mut() {
-            pipeline.pipeline.recreate_pipeline(
-                context.device.clone(),
-                subpass.clone(),
-                context.viewport.clone(),
-            );
+            pipeline
+                .pipeline
+                .recreate_pipeline(context.device.clone(), context.viewport.clone());
         }
     }
 
@@ -153,11 +126,6 @@ where
                 .map(|ro| ro.get_data())
         });
         write_to_storage_buffer(buffer, obj_iter);
-        // let buffers = &mut self.frame_data[image_i];
-        // buffers.update_objects_data(obj_iter);
-
-        // // update camera
-        // buffers.update_global_data(global_data);
     }
     /// bind draw calls to the given command buffer builder, be sure to call `upload_draw_data()` before hand
     pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
