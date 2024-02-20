@@ -53,12 +53,8 @@ fn init_render_objects(
 
     // materials
     //  lost empire
-    let (basic_pipeline, uv_pipeline) = if let [a, b] = &mut lit_system.pipelines[0..2] {
-        (a, b)
-    } else {
-        panic!("Lit draw system somehow does not have 2 pipelines")
-    };
-    let (solid_pipeline, _uv_pipeline2) = if let [a, b] = &mut unlit_system.pipelines[0..2] {
+    let basic_pipeline = &mut lit_system.pipelines[0];
+    let (solid_pipeline, uv_pipeline) = if let [a, b] = &mut unlit_system.pipelines[0..2] {
         (a, b)
     } else {
         panic!("Unlit draw system somehow does not have 2 pipelines")

@@ -58,12 +58,12 @@ impl DeferredRenderer {
                     draw::load_basic_fs(context.device.clone())
                         .expect("failed to create basic shader module"),
                 ),
-                (
-                    draw::load_basic_vs(context.device.clone())
-                        .expect("failed to create uv shader module"),
-                    draw::load_uv_fs(context.device.clone())
-                        .expect("failed to create uv shader module"),
-                ),
+                // (
+                //     draw::load_basic_vs(context.device.clone())
+                //         .expect("failed to create uv shader module"),
+                //     draw::load_uv_fs(context.device.clone())
+                //         .expect("failed to create uv shader module"),
+                // ),
             ];
 
             DrawSystem::new(
