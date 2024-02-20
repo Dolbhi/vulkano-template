@@ -74,39 +74,6 @@ impl App {
             &mut renderer.lit_draw_system,
             &mut renderer.unlit_draw_system,
         );
-        // // BIG RED TEST LIGHT
-        // let test_light = {
-        //     let resource_loader = render_loop.context.get_resource_loader();
-        //     let system = &mut renderer.unlit_draw_system;
-        //     let solid_id = 0;
-
-        //     // mesh
-        //     let (vertices, indices) = from_obj(Path::new("models/default_cube.obj"))
-        //         .pop()
-        //         .expect("Failed to load cube mesh");
-        //     let mesh = resource_loader.load_mesh(vertices, indices);
-
-        //     // material
-        //     let buffer = resource_loader.create_material_buffer(
-        //         draw::SolidData {
-        //             color: [1., 0., 0., 1.],
-        //         },
-        //         BufferUsage::empty(),
-        //     );
-        //     let solid_pipeline = &mut system.pipelines[solid_id];
-        //     let red_material =
-        //         solid_pipeline.add_material(Some(solid_pipeline.create_material_set(
-        //             &render_loop.context.allocators,
-        //             2,
-        //             [WriteDescriptorSet::buffer(0, buffer)],
-        //         )));
-
-        //     let mut ro = RenderObject::new(mesh, red_material);
-        //     ro.set_matrix(
-        //         Matrix4::from_translation([0., 5., -1.].into()) * Matrix4::from_scale(0.2),
-        //     );
-        //     Arc::new(ro)
-        // };
 
         // camera light, will follow camera position on update
         let camera_light = {
