@@ -54,11 +54,12 @@ fn init_render_objects(
     // materials
     //  lost empire
     let basic_pipeline = &mut lit_system.pipelines[0];
-    let (solid_pipeline, uv_pipeline) = if let [a, b] = &mut unlit_system.pipelines[0..2] {
-        (a, b)
-    } else {
-        panic!("Unlit draw system somehow does not have 2 pipelines")
-    };
+    let (solid_pipeline, uv_pipeline, grad_pipeline) =
+        if let [a, b, c] = &mut unlit_system.pipelines[0..3] {
+            (a, b, c)
+        } else {
+            panic!("Unlit draw system somehow does not have 2 pipelines")
+        };
 
     let le_mat = basic_pipeline.add_material(Some(resource_loader.load_material_set(
         basic_pipeline,
@@ -81,6 +82,10 @@ fn init_render_objects(
     //  uv
     let uv_mat = uv_pipeline.add_material(None);
 
+    //  grad
+    let grad_mat = grad_pipeline.add_material(None);
+
+    //  unlit solids
     let red_material = {
         let red_mat_buffer = resource_loader.create_material_buffer(
             draw::SolidData {
@@ -193,7 +198,7 @@ fn init_render_objects(
 
     //      Squares
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
-        let square_obj = RenderObject::new(square.clone(), uv_mat.clone());
+        let square_obj = RenderObject::new(square.clone(), grad_mat.clone()); //uv_mat.clone());
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
             translation: [x, y, z].into(),
             ..Default::default()

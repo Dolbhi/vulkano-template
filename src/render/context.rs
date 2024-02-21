@@ -114,13 +114,10 @@ impl Context {
             vulkano_objects::swapchain::create_swapchain(&physical_device, device.clone(), surface);
 
         println!(
-            "[Renderer info]\nswapchain image count: {}\nQueue family: {}\nrgba format properties: {:?}",
+            "[Renderer info]\nswapchain image count: {}\nQueue family: {}\nSwapchain format: {:?}",
             images.len(),
             queue_family_index,
-            physical_device
-                .format_properties(vulkano::format::Format::R8G8B8A8_SRGB)
-                .unwrap()
-                .optimal_tiling_features,
+            swapchain.image_format(),
         );
 
         Self {

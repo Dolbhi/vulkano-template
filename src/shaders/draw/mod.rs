@@ -18,6 +18,10 @@ vulkano_shaders::shader! {
             ty: "fragment",
             path: "src/shaders/draw/solid/fragment.frag",
         },
+        grad_fs: {
+            ty: "fragment",
+            path: "src/shaders/draw/gradient/fragment.frag",
+        },
     }
 }
 
