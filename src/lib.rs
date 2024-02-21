@@ -263,7 +263,7 @@ fn init_render_objects(
             world.push((
                 transform_sys.add_transform(TransformCreateInfo {
                     scale: Vector3::new(0.1, 0.1, 0.1),
-                    translation: Vector3::new(x as f32, 6., z as f32),
+                    translation: Vector3::new(x as f32, 6.1, z as f32),
                     ..Default::default()
                 }),
                 PointLightComponent {

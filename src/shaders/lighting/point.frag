@@ -53,7 +53,11 @@ void main() {
 
     // Further decrease light_percent based on the distance with the light position.
     float light_distance = dot(light_displacement, light_displacement);
-    light_percent *= 1.0 / (light_distance + 1.0);
+    light_percent *= (1.0 / (light_distance + 0.7)) - 0.4;
+
+    if (light_percent < 0) {
+        discard;
+    }
 
     // if (light_distance < 0.1) {
     //     f_color = vec4(1.0);

@@ -325,6 +325,7 @@ impl FrameData {
 }
 
 /// Creates render pass with 2 subpasses and diffuse, normal and depth attachments for deferred shading
+#[allow(dead_code)]
 fn deferred_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<RenderPass> {
     vulkano::ordered_passes_renderpass!(
         device,
