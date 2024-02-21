@@ -174,9 +174,22 @@ fn init_render_objects(
 
     // objects
     //      Suzanne
-    let suzanne_obj = RenderObject::new(suzanne_mesh, uv_mat.clone());
+    let suzanne_obj = RenderObject::new(suzanne_mesh.clone(), uv_mat.clone());
     let suzanne = transform_sys.next().unwrap();
     world.push((suzanne, suzanne_obj));
+
+    //      Spam Suzanne
+    for x in 0..20 {
+        for z in 0..20 {
+            let square_obj = RenderObject::new(suzanne_mesh.clone(), ina_mats[1].clone());
+            let transform_id = transform_sys.add_transform(TransformCreateInfo {
+                translation: [x as f32, 7f32, z as f32].into(),
+                ..Default::default()
+            });
+
+            world.push((transform_id, square_obj));
+        }
+    }
 
     //      Squares
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
@@ -230,7 +243,7 @@ fn init_render_objects(
         PointLightComponent {
             color: Vector4::new(1., 0., 0., 1.),
         },
-        RenderObject::new(cube_mesh.clone(), red_material),
+        RenderObject::new(cube_mesh.clone(), red_material.clone()),
     ));
     world.push((
         transform_sys.add_transform(TransformCreateInfo {
@@ -243,6 +256,23 @@ fn init_render_objects(
         },
         RenderObject::new(cube_mesh.clone(), blue_material),
     ));
+
+    // spam lights
+    for x in 0..20 {
+        for z in -10..10 {
+            world.push((
+                transform_sys.add_transform(TransformCreateInfo {
+                    scale: Vector3::new(0.1, 0.1, 0.1),
+                    translation: Vector3::new(x as f32, 6., z as f32),
+                    ..Default::default()
+                }),
+                PointLightComponent {
+                    color: Vector4::new(1., 0., 0., 1.),
+                },
+                RenderObject::new(cube_mesh.clone(), red_material.clone()),
+            ));
+        }
+    }
 
     suzanne
 }
