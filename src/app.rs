@@ -179,7 +179,7 @@ impl App {
                 let direction =
                     cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
                 let dir = DirectionLight {
-                    color: [1., 1., 0., 1.],
+                    color: [0.5, 0.5, 0., 1.],
                     direction: direction.extend(1.).into(),
                 };
                 frame.update_directional_lights([dir].into_iter());
@@ -187,7 +187,7 @@ impl App {
                 // ambient light
                 renderer
                     .lighting_system
-                    .set_ambient_color([0.2, 0.2, 0.2, 1.]);
+                    .set_ambient_color([0.1, 0.1, 0.1, 1.]);
             });
     }
 

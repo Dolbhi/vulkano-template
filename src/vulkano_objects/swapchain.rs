@@ -19,16 +19,18 @@ pub fn create_swapchain(
         .expect("failed to get surface capabilities");
 
     let composite_alpha = caps.supported_composite_alpha.into_iter().next().unwrap();
-    let image_format = physical_device
-        .surface_formats(&surface, Default::default())
-        .unwrap()[0]
-        .0;
+    // let image_format = physical_device
+    //     .surface_formats(&surface, Default::default())
+    //     .unwrap()[0]
+    //     .0;
 
     // println!("Surface formats: {:?}", {
     //     physical_device
     //         .surface_formats(&surface, Default::default())
     //         .unwrap()
     // });
+
+    let image_format = vulkano::format::Format::B8G8R8A8_SRGB;
 
     Swapchain::new(
         device,

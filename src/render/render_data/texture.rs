@@ -41,7 +41,7 @@ pub fn load_texture(allocators: &Allocators, queue: &Arc<Queue>, path: &Path) ->
         allocators.memory.clone(),
         ImageCreateInfo {
             image_type: ImageType::Dim2d,
-            format: Format::R8G8B8A8_UNORM,
+            format: Format::R8G8B8A8_SRGB,
             extent,
             usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
             ..Default::default()

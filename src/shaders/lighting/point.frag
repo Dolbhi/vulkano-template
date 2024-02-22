@@ -55,7 +55,7 @@ void main() {
     float light_distance = dot(light_displacement, light_displacement);
     light_distance /= light.position.w * light.position.w;
     // light_percent *= (1.0 / (light_distance + 0.7)) - 0.4;
-    light_percent *= (1.0 / (1000 * light_distance + 1));
+    light_percent *= (1.0 / (40 * light_distance + 1));
 
     if (light_percent < 0.001) {
         discard;
@@ -65,7 +65,7 @@ void main() {
     //     f_color = vec4(1.0);
     // } else {
     vec3 in_diffuse = subpassLoad(u_diffuse).rgb;
-    f_color = vec4(light.color.rgb * sqrt(light_percent) * in_diffuse, 1.0);
+    f_color = vec4(light.color.rgb * light_percent * in_diffuse, 1.0);
     
     // f_color = vec4(1.0,0.0,0.0,1.0);
 }
