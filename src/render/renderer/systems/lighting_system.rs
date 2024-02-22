@@ -240,12 +240,14 @@ impl LightingSystem {
                 )
                 .unwrap()
                 .bind_vertex_buffers(0, self.point_vertices.clone())
+                .unwrap()
+                .draw(
+                    self.point_vertices.len() as u32,
+                    last_index as u32 + 1,
+                    0,
+                    0,
+                )
                 .unwrap();
-            for i in 0..=last_index as u32 {
-                command_builder
-                    .draw(self.point_vertices.len() as u32, 1, 0, i)
-                    .unwrap();
-            }
         }
         // directional lights
         if let Some(last_index) = last_dir_index {
@@ -262,12 +264,14 @@ impl LightingSystem {
                 )
                 .unwrap()
                 .bind_vertex_buffers(0, self.screen_vertices.clone())
+                .unwrap()
+                .draw(
+                    self.screen_vertices.len() as u32,
+                    last_index as u32 + 1,
+                    0,
+                    0,
+                )
                 .unwrap();
-            for i in 0..=last_index as u32 {
-                command_builder
-                    .draw(self.screen_vertices.len() as u32, 1, 0, i)
-                    .unwrap();
-            }
         }
         // ambient light
         let pipeline = &self.ambient_pipeline.pipeline;

@@ -29,7 +29,7 @@ void main() {
     vec3 offset_up = position.y * vec3(scene_data.view[0][1],scene_data.view[1][1],scene_data.view[2][1]);
 
     float light_radius = 2.0;
-    vec4 world_pos = vec4(point_buffer.lights[gl_BaseInstance].position.xyz + light_radius * (offset_right + offset_up), 1.0);
+    vec4 world_pos = vec4(point_buffer.lights[gl_InstanceIndex].position.xyz + light_radius * (offset_right + offset_up), 1.0);
     float view_pos_z = dot(-world_pos, vec4(scene_data.view[0][2],scene_data.view[1][2],scene_data.view[2][2],scene_data.view[3][2]));
 
     vec4 screen_pos = scene_data.view_proj * world_pos;
@@ -38,5 +38,5 @@ void main() {
 
     gl_Position = screen_pos;
     v_screen_coords = gl_Position.xy;
-    v_light_index = gl_BaseInstance;
+    v_light_index = gl_InstanceIndex;
 }

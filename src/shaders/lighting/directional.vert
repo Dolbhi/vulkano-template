@@ -16,5 +16,5 @@ layout(location = 1) out uint v_light_index;
 void main() {
     v_screen_coords = position;
     gl_Position = vec4(position, 0.0, 1.0);
-    v_light_index = gl_BaseInstance;
+    v_light_index = gl_InstanceIndex;
 }
