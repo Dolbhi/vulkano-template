@@ -6,12 +6,12 @@ use std::{
 use cgmath::Matrix4;
 use vulkano::{
     command_buffer::{allocator::CommandBufferAllocator, AutoCommandBufferBuilder},
-    descriptor_set::{DescriptorSetsCollection, PersistentDescriptorSet, WriteDescriptorSet},
+    descriptor_set::{DescriptorSetsCollection, PersistentDescriptorSet},
     pipeline::{PipelineBindPoint, PipelineLayout},
 };
 
 use crate::{
-    vulkano_objects::{allocators::Allocators, buffers::Buffers, pipeline::PipelineHandler},
+    vulkano_objects::{buffers::Buffers, pipeline::PipelineHandler},
     VertexFull,
 };
 
