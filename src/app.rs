@@ -56,10 +56,14 @@ impl App {
         println!("Welcome to THE RUSTY RENDERER!");
         println!("Press WASD, SPACE and LSHIFT to move and Q to swap materials");
 
+        let init_start_time = std::time::Instant::now();
+
         let mut world = World::default();
         let mut transforms = TransformSystem::new();
         let render_loop = RenderLoop::new(event_loop);
         let mut renderer = DeferredRenderer::new(&render_loop.context);
+
+        let render_init_elapse = init_start_time.elapsed().as_millis();
 
         // draw objects
         let suzanne = init_render_objects(
@@ -68,6 +72,14 @@ impl App {
             &render_loop.context,
             &mut renderer.lit_draw_system,
             &mut renderer.unlit_draw_system,
+        );
+
+        let total_elapse = init_start_time.elapsed().as_millis();
+        println!(
+            "[Benchmarking] render init: {} ms, world init: {} ms, total: {} ms",
+            render_init_elapse,
+            total_elapse - render_init_elapse,
+            total_elapse
         );
 
         // camera light, will follow camera position on update

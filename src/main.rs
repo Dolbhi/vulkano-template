@@ -59,7 +59,11 @@ fn main() {
 
                 app.update(&duration_from_last_frame);
                 let elapsed = this_frame_time.elapsed().as_micros();
-                print!("\rUpdate took {}μ ({}fps)   ", elapsed, 1_000_000 / elapsed);
+                print!(
+                    "\rUpdate took {}μs ({}fps)   ",
+                    elapsed,
+                    1_000_000 / elapsed
+                );
 
                 previous_frame_time = this_frame_time;
             }

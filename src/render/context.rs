@@ -120,6 +120,9 @@ impl Context {
             swapchain.image_format(),
         );
 
+        // // auto focus window
+        // window.focus_window();
+
         Self {
             _instance: instance,
             window,
