@@ -17,7 +17,7 @@ layout(input_attachment_index = 2, set = 0, binding = 2) uniform subpassInput u_
 // } scene_data;
 
 struct DirectionLight {
-    // The `color` parameter of the `draw` method.
+    // The `color` parameter of the `draw` method, the w component corresponds to intensity
     vec4 color;
     // The `direction` parameter of the `draw` method.
     vec4 direction;
@@ -48,5 +48,5 @@ void main() {
     float light_percent = max(-dot(light.direction.xyz, in_normal), 0.0);
 
     vec3 in_diffuse = subpassLoad(u_diffuse).rgb;
-    f_color = vec4(light.color.rgb * light_percent * in_diffuse, 1.0);
+    f_color = vec4(light.color.w * light.color.rgb * light_percent * in_diffuse, 1.0);
 }
