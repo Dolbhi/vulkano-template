@@ -48,5 +48,5 @@ void main() {
     float light_percent = max(-dot(light.direction.xyz, in_normal), 0.0);
 
     vec3 in_diffuse = subpassLoad(u_diffuse).rgb;
-    f_color = vec4(light.color.rgb * light_percent * in_diffuse, 1.0);
+    f_color = vec4(light.color.rgb * sqrt(light_percent) * in_diffuse, 1.0);
 }

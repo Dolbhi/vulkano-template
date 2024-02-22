@@ -89,6 +89,7 @@ impl App {
                 camera_light,
                 PointLightComponent {
                     color: Vector4::new(1., 1., 1., 1.),
+                    half_radius: 4.,
                 },
             ));
             camera_light

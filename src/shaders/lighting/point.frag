@@ -19,7 +19,7 @@ layout(set = 1, binding = 0) uniform GPUGlobalData {
 struct PointLight {
     // The `color` parameter of the `draw` method.
     vec4 color;
-    // The `position` parameter of the `draw` method.
+    // The `position` parameter of the `draw` method, w value is the radius
     vec4 position;
 };
 layout(set = 2, binding = 0) readonly buffer PointLights {
@@ -53,10 +53,11 @@ void main() {
 
     // Further decrease light_percent based on the distance with the light position.
     float light_distance = dot(light_displacement, light_displacement);
-    light_percent *= (1.0 / (light_distance + 0.7)) - 0.4;
-    // light_percent *= (1.0 - light_distance / max_distance * max_distance) / (light_distance + light_distance * falloff); max_dist = 1.8, falloff = 1.3
+    light_distance /= light.position.w * light.position.w;
+    // light_percent *= (1.0 / (light_distance + 0.7)) - 0.4;
+    light_percent *= (1.0 / (1000 * light_distance + 1));
 
-    if (light_percent < 0) {
+    if (light_percent < 0.001) {
         discard;
     }
 
@@ -64,7 +65,7 @@ void main() {
     //     f_color = vec4(1.0);
     // } else {
     vec3 in_diffuse = subpassLoad(u_diffuse).rgb;
-    f_color = vec4(light.color.rgb * light_percent * in_diffuse, 1.0);
+    f_color = vec4(light.color.rgb * sqrt(light_percent) * in_diffuse, 1.0);
     
     // f_color = vec4(1.0,0.0,0.0,1.0);
 }

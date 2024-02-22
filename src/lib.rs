@@ -247,6 +247,7 @@ fn init_render_objects(
         }),
         PointLightComponent {
             color: Vector4::new(1., 0., 0., 1.),
+            half_radius: 3.,
         },
         RenderObject::new(cube_mesh.clone(), red_material.clone()),
     ));
@@ -258,6 +259,7 @@ fn init_render_objects(
         }),
         PointLightComponent {
             color: Vector4::new(0., 0., 1., 1.),
+            half_radius: 3.,
         },
         RenderObject::new(cube_mesh.clone(), blue_material),
     ));
@@ -273,6 +275,7 @@ fn init_render_objects(
                 }),
                 PointLightComponent {
                     color: Vector4::new(1., 0., 0., 1.),
+                    half_radius: 1.,
                 },
                 RenderObject::new(cube_mesh.clone(), red_material.clone()),
             ));
