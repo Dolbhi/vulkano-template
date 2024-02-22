@@ -7,7 +7,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 
 ## To Do
 ### Misc.
-- [ ] Smarter transform matrix calculation
+- [x] Smarter transform matrix calculation
 - [x] Refactor renderobjects
 
 ### Features

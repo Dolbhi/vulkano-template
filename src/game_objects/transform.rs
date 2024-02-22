@@ -9,6 +9,7 @@ pub struct TransformID(u32);
 pub struct Transform {
     parent: Option<TransformID>,
     local_model: Option<Matrix4<f32>>,
+    global_model: Option<Matrix4<f32>>,
     translation: Vector3<f32>,
     rotation: Quaternion<f32>,
     scale: Vector3<f32>,
@@ -24,6 +25,7 @@ impl Transform {
 
         Transform {
             local_model: None,
+            global_model: None,
             parent,
             translation,
             rotation,
@@ -35,13 +37,24 @@ impl Transform {
         match self.local_model {
             Some(matrix) => matrix,
             None => {
+                // calc model and update
                 let model = Matrix4::from_translation(self.translation)
                     * Matrix4::from(self.rotation)
                     * Matrix4::from_nonuniform_scale(self.scale.x, self.scale.y, self.scale.z);
+
+                if self.parent == None {
+                    self.global_model = Some(model);
+                }
                 self.local_model = Some(model);
                 model
             }
         }
+    }
+
+    pub fn update_global_model(&mut self, parent_global: &Matrix4<f32>) -> Matrix4<f32> {
+        let new_global = *parent_global * self.get_local_model();
+        self.global_model = Some(new_global);
+        new_global
     }
 
     pub fn get_transform(&self) -> TransformView {
@@ -52,21 +65,25 @@ impl Transform {
         }
     }
     pub fn set_parent(&mut self, parent: TransformID) -> Option<TransformID> {
+        self.global_model = None;
         self.parent.replace(parent)
     }
     pub fn set_translation(&mut self, translation: impl Into<Vector3<f32>>) -> &mut Self {
         self.translation = translation.into();
         self.local_model = None;
+        self.global_model = None;
         self
     }
     pub fn set_rotation(&mut self, rotation: impl Into<Quaternion<f32>>) -> &mut Self {
         self.rotation = rotation.into();
         self.local_model = None;
+        self.global_model = None;
         self
     }
     pub fn set_scale(&mut self, scale: impl Into<Vector3<f32>>) -> &mut Self {
         self.scale = scale.into();
         self.local_model = None;
+        self.global_model = None;
         self
     }
 
@@ -136,14 +153,30 @@ impl TransformSystem {
                 .unwrap_or_else(|| panic!("transform system missing parent ID"));
         }
 
-        // apply local model transforms
-        let mut model = Matrix4::identity();
-        for id in ids {
-            model = self.get_transform_mut(&id).unwrap().get_local_model() * model
+        // skip parents with clean global_models
+        let mut last_model = Matrix4::identity();
+        while let Some(id) = ids.pop() {
+            let transform = self.get_transform_mut(&id).unwrap();
+            match transform.global_model {
+                None => {
+                    last_model = transform.update_global_model(&last_model);
+                    break;
+                }
+                Some(new_model) => last_model = new_model,
+            }
         }
-        model
+
+        // update all models after
+        for id in ids {
+            last_model = self
+                .get_transform_mut(&id)
+                .unwrap()
+                .update_global_model(&last_model);
+        }
+        last_model
     }
 
+    // adds given transform to the system and returns its unique ID
     pub fn add_transform(&mut self, transform: impl Into<Transform>) -> TransformID {
         let id = TransformID(self.next_id);
         self.transforms.insert(id, transform.into());
