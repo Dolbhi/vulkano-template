@@ -56,21 +56,27 @@ fn init_render_objects(
     let basic_pipeline = &mut lit_system.pipelines[0];
     let [solid_pipeline, uv_pipeline, grad_pipeline] = &mut unlit_system.pipelines;
 
-    let le_mat = basic_pipeline.add_material(Some(resource_loader.load_material_set(
+    let le_mat = resource_loader.init_material(
         basic_pipeline,
-        le_texture.clone(),
-        linear_sampler.clone(),
-    )));
+        [WriteDescriptorSet::image_view_sampler(
+            0,
+            le_texture.clone(),
+            linear_sampler.clone(),
+        )],
+    );
     let le_uv_mat = uv_pipeline.add_material(None);
 
     //  ina
     let ina_mats: Vec<_> = zip(["hair", "cloth", "body", "head"], ina_textures)
         .map(|(_, tex)| {
-            basic_pipeline.add_material(Some(resource_loader.load_material_set(
+            resource_loader.init_material(
                 basic_pipeline,
-                tex,
-                linear_sampler.clone(),
-            )))
+                [WriteDescriptorSet::image_view_sampler(
+                    0,
+                    tex,
+                    linear_sampler.clone(),
+                )],
+            )
         })
         .collect();
 
@@ -88,11 +94,14 @@ fn init_render_objects(
             },
             BufferUsage::empty(),
         );
-        solid_pipeline.add_material(Some(solid_pipeline.create_material_set(
-            &context.allocators,
-            2,
+        resource_loader.init_material(
+            solid_pipeline,
             [WriteDescriptorSet::buffer(0, red_mat_buffer)],
-        )))
+        )
+        // solid_pipeline.add_material(Some(resource_loader.load_material_set(
+        //     &solid_pipeline,
+        //     [WriteDescriptorSet::buffer(0, red_mat_buffer)],
+        // )))
     };
     let blue_material = {
         let blue_mat_buffer = resource_loader.create_material_buffer(
@@ -101,11 +110,14 @@ fn init_render_objects(
             },
             BufferUsage::empty(),
         );
-        solid_pipeline.add_material(Some(solid_pipeline.create_material_set(
-            &context.allocators,
-            2,
+        resource_loader.init_material(
+            solid_pipeline,
             [WriteDescriptorSet::buffer(0, blue_mat_buffer)],
-        )))
+        )
+        // solid_pipeline.add_material(Some(resource_loader.load_material_set(
+        //     &solid_pipeline,
+        //     [WriteDescriptorSet::buffer(0, blue_mat_buffer)],
+        // )))
     };
 
     // meshes

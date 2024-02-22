@@ -138,25 +138,21 @@ impl PipelineGroup {
         self.materials.push(material);
         pending_objects
     }
-    pub fn create_material_set(
-        &self,
-        allocators: &Allocators,
-        index: usize,
-        descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
-    ) -> Arc<PersistentDescriptorSet> {
-        PersistentDescriptorSet::new(
-            &allocators.descriptor_set,
-            self.pipeline
-                .layout()
-                .set_layouts()
-                .get(index)
-                .unwrap()
-                .clone(),
-            descriptor_writes,
-            [],
-        )
-        .unwrap()
-    }
+
+    // pub fn create_material_set(
+    //     &self,
+    //     allocators: &Allocators,
+    //     descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
+    // ) -> Arc<PersistentDescriptorSet> {
+    //     PersistentDescriptorSet::new(
+    //         &allocators.descriptor_set,
+    //         self.pipeline.layout().set_layouts().get(2).unwrap().clone(),
+    //         descriptor_writes,
+    //         [],
+    //     )
+    //     .unwrap()
+    // }
+
     /// returns all pending object data in an iterator and queue meshes for rendering
     pub fn upload_pending_objects(&mut self) -> impl Iterator<Item = Matrix4<f32>> + '_ {
         self.materials.iter_mut().flat_map(|mat| {
@@ -180,6 +176,7 @@ struct Material {
     pending_meshes: Vec<Arc<Buffers<VertexFull>>>,
 }
 impl Material {
+    // bind material sets starting from set 2
     fn bind_sets<T, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &self,
         layout: &Arc<PipelineLayout>,

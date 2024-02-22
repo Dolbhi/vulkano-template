@@ -15,17 +15,17 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 	- [ ] Mesh, material and scene loading from files (with universal IDs)
 	- [ ] Conversion into fast loading format
 	- [ ] Loading objects/scenes from file (with auto loading of dependencies)
-- [ ] Transparency
 - [ ] GUI
+- [ ] Transparency
 - [ ] Dynamic meshes
 - [ ] Anti-aliasing (MSAA)
 - [ ] Occlusion culling
 - [ ] Further lighting developments
-	- [x] Point light range and volumes
 	- [ ] Specular lighting
 	- [ ] Ambient occlusion
-	- [x] Unlit shaders
 	- [ ] Shadows
+	- [x] Point light range and volumes
+	- [x] Unlit shaders
 	- [x] Multiple lighting materials
 - [x] Light data streaming
 - [x] Multiple subpasses

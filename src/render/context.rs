@@ -33,9 +33,12 @@ use winit::{
     window::{CursorGrabMode, Window, WindowBuilder},
 };
 
-use super::render_data::{
-    material::PipelineGroup,
-    texture::{create_sampler, load_texture},
+use super::{
+    render_data::{
+        material::PipelineGroup,
+        texture::{create_sampler, load_texture},
+    },
+    RenderSubmit,
 };
 
 pub type Fence = FenceSignalFuture<
@@ -235,21 +238,29 @@ impl<'a> ResourceLoader<'a> {
             indices,
         ))
     }
-    /// creates a texture sampler material set with the 3rd descriptor set layout of given pipeline
-    pub fn load_material_set(
+
+    /// creates a material of the given pipeline with a corresponding descriptor set as set 2
+    pub fn init_material(
         &self,
-        pipeline_group: &PipelineGroup,
-        texture: Arc<ImageView>,
-        sampler: Arc<Sampler>,
-    ) -> Arc<PersistentDescriptorSet> {
-        pipeline_group.create_material_set(
-            &self.context.allocators,
-            2,
-            [WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
-        )
+        pipeline_group: &mut PipelineGroup,
+        descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
+    ) -> RenderSubmit {
+        pipeline_group.add_material(Some(
+            PersistentDescriptorSet::new(
+                &self.context.allocators.descriptor_set,
+                pipeline_group
+                    .pipeline
+                    .layout()
+                    .set_layouts()
+                    .get(2)
+                    .unwrap()
+                    .clone(),
+                descriptor_writes,
+                [],
+            )
+            .unwrap(), // pipeline_group.create_material_set(&self.context.allocators, descriptor_writes),
+        ))
     }
-    // pub fn build_material
-    // pub fn
     pub fn create_material_buffer<T: BufferContents>(
         &self,
         data: T,
@@ -257,4 +268,6 @@ impl<'a> ResourceLoader<'a> {
     ) -> Subbuffer<T> {
         buffers::create_material_buffer(&self.context.allocators, data, usage)
     }
+    // pub fn build_material
+    // pub fn
 }
