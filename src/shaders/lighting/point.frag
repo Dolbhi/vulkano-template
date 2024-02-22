@@ -17,7 +17,7 @@ layout(set = 1, binding = 0) uniform GPUGlobalData {
 } scene_data;
 
 struct PointLight {
-    // The `color` parameter of the `draw` method.
+    // The `color` parameter of the `draw` method, w value is the intensity
     vec4 color;
     // The `position` parameter of the `draw` method, w value is the radius
     vec4 position;
@@ -55,7 +55,7 @@ void main() {
     float light_distance = dot(light_displacement, light_displacement);
     light_distance /= light.position.w * light.position.w;
     // light_percent *= (1.0 / (light_distance + 0.7)) - 0.4;
-    light_percent *= (1.0 / (40 * light_distance + 1));
+    light_percent *= (light.color.w / (40 * light_distance + 1));
 
     if (light_percent < 0.001) {
         discard;

@@ -88,7 +88,7 @@ impl App {
             world.push((
                 camera_light,
                 PointLightComponent {
-                    color: Vector4::new(1., 1., 1., 1.),
+                    color: Vector4::new(1., 1., 1., 2.),
                     half_radius: 4.,
                 },
             ));
