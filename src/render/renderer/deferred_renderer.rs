@@ -33,12 +33,15 @@ pub struct DeferredRenderer {
     framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
     attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
     pub frame_data: Vec<FrameData>,
-    pub lit_draw_system: DrawSystem,
+    pub lit_draw_system: DrawSystem<{ Self::LIT }>,
     pub lighting_system: LightingSystem,
-    pub unlit_draw_system: DrawSystem,
+    pub unlit_draw_system: DrawSystem<{ Self::UNLIT }>,
 }
 
 impl DeferredRenderer {
+    pub const LIT: usize = 1;
+    pub const UNLIT: usize = 3;
+
     pub fn new(context: &Context) -> Self {
         // let render_pass = deferred_render_pass(context.device.clone(), context.swapchain.clone());
         let render_pass =
@@ -307,10 +310,10 @@ impl FrameData {
         write_to_buffer(&self.global_buffer, data);
     }
 
-    pub fn update_objects_data<'a>(&self, draw_system: &mut DrawSystem) {
+    pub fn update_objects_data<'a, const COUNT: usize>(&self, draw_system: &mut DrawSystem<COUNT>) {
         draw_system.update_object_buffer(&self.objects_buffer);
     }
-    pub fn update_unlit_data<'a>(&self, draw_system: &mut DrawSystem) {
+    pub fn update_unlit_data<'a, const COUNT: usize>(&self, draw_system: &mut DrawSystem<COUNT>) {
         draw_system.update_object_buffer(&self.unlit_buffer);
     }
 

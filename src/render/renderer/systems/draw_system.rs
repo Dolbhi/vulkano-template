@@ -22,19 +22,18 @@ use crate::{
 /// All pipelines share sets 0 and 1, describing scene data and an array of object data (storage buffer) respectively
 ///
 /// Materials can optionally add more sets, starting from set 2
-pub struct DrawSystem {
-    pub pipelines: Vec<PipelineGroup>,
+pub struct DrawSystem<const COUNT: usize> {
+    pub pipelines: [PipelineGroup; COUNT],
 }
 
-impl<'a> DrawSystem {
+impl<'a, const COUNT: usize> DrawSystem<COUNT> {
     /// creates from a collection of shader entry points
     pub fn new(
         context: &Context,
         subpass: &Subpass,
-        shaders: impl IntoIterator<Item = (EntryPoint, EntryPoint)>,
+        shaders: [(EntryPoint, EntryPoint); COUNT],
     ) -> (Self, [Arc<DescriptorSetLayout>; 2]) {
-        let pipelines: Vec<PipelineGroup> = shaders
-            .into_iter()
+        let pipelines: [PipelineGroup; COUNT] = shaders
             .map(|(vs, fs)| {
                 PipelineHandler::new(
                     context.device.clone(),
@@ -46,14 +45,42 @@ impl<'a> DrawSystem {
                     crate::vulkano_objects::pipeline::PipelineType::Drawing,
                 )
             })
-            .map(PipelineGroup::new)
-            .collect();
+            .map(PipelineGroup::new);
 
         let layouts = pipelines[0].pipeline.layout().set_layouts();
         let layouts = [layouts[0].clone(), layouts[1].clone()];
 
         (DrawSystem { pipelines }, layouts)
     }
+
+    // requires #![feature(generic_const_exprs)]
+    // pub fn extend<const EXTEND: usize>(
+    //     self,
+    //     context: &Context,
+    //     subpass: &Subpass,
+    //     shaders: [(EntryPoint, EntryPoint); EXTEND],
+    // ) -> DrawSystem<{ COUNT + EXTEND }> {
+    //     let new_pipelines = shaders.map(|(vs, fs)| {
+    //         PipelineGroup::new(PipelineHandler::new(
+    //             context.device.clone(),
+    //             vs,
+    //             fs,
+    //             context.viewport.clone(),
+    //             subpass.clone(),
+    //             [], // [(0, 0)],
+    //             crate::vulkano_objects::pipeline::PipelineType::Drawing,
+    //         ))
+    //     });
+
+    //     let pipelines = [0; COUNT + EXTEND].map(|n| {
+    //         if n < COUNT {
+    //             self.pipelines[n]
+    //         } else {
+    //             new_pipelines[n - COUNT]
+    //         }
+    //     });
+    //     DrawSystem { pipelines }
+    // }
 
     /// Recreate all pipelines with any changes in viewport
     ///

@@ -17,7 +17,7 @@ use crate::{
 
 use game_objects::transform::{TransformID, TransformSystem};
 use legion::World;
-use render::{Context, DrawSystem, RenderSubmit};
+use render::{Context, DeferredRenderer, DrawSystem, RenderSubmit};
 use std::{iter::zip, path::Path};
 
 #[cfg(test)]
@@ -33,8 +33,8 @@ fn init_render_objects(
     world: &mut World,
     transform_sys: &mut TransformSystem,
     context: &Context,
-    lit_system: &mut DrawSystem,
-    unlit_system: &mut DrawSystem,
+    lit_system: &mut DrawSystem<{ DeferredRenderer::LIT }>,
+    unlit_system: &mut DrawSystem<{ DeferredRenderer::UNLIT }>,
 ) -> TransformID {
     let resource_loader = context.get_resource_loader();
 
@@ -54,12 +54,7 @@ fn init_render_objects(
     // materials
     //  lost empire
     let basic_pipeline = &mut lit_system.pipelines[0];
-    let (solid_pipeline, uv_pipeline, grad_pipeline) =
-        if let [a, b, c] = &mut unlit_system.pipelines[0..3] {
-            (a, b, c)
-        } else {
-            panic!("Unlit draw system somehow does not have 2 pipelines")
-        };
+    let [solid_pipeline, uv_pipeline, grad_pipeline] = &mut unlit_system.pipelines;
 
     let le_mat = basic_pipeline.add_material(Some(resource_loader.load_material_set(
         basic_pipeline,
