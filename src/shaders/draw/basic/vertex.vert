@@ -23,7 +23,7 @@ layout(location = 0) out vec2 v_tex_coord;
 layout(location = 1) out vec3 v_normal;
 
 void main() {
-    GPUObjectData objectData = objectBuffer.objects[gl_BaseInstance];
+    GPUObjectData objectData = objectBuffer.objects[gl_InstanceIndex];
     
     gl_Position = global_data.view_proj * objectData.render_matrix * vec4(position, 1.0);
     v_tex_coord = uv;

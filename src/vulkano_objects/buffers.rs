@@ -69,6 +69,10 @@ impl<V: Vertex + BufferContents> Buffers<V> {
     pub fn get_index(&self) -> Subbuffer<[u32]> {
         self.index.clone()
     }
+
+    pub fn index_len(&self) -> u64 {
+        self.index.len()
+    }
 }
 
 // creates a uniform device local buffer

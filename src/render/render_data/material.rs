@@ -56,15 +56,47 @@ impl PipelineGroup {
             // bind material sets
             material.bind_sets(&self.pipeline.layout(), command_builder);
 
+            // Draw objects with the same mesh in a single instanced draw call
             let mut last_mesh = None;
             let mut last_buffer_len = 0;
-            // let mut object_data = material.pending_objects.lock().unwrap();
+            let mut instance_count = 0;
             for mesh in material.pending_meshes.iter() {
                 match last_mesh {
                     Some(old_mesh) if Arc::ptr_eq(old_mesh, &mesh) => {
                         // println!("Same mesh, skipping...");
                     }
+                    Some(_) => {
+                        // New mesh, draw old mesh and bind new one
+
+                        // draw
+                        command_builder
+                            .draw_indexed(
+                                last_buffer_len as u32,
+                                instance_count,
+                                0,
+                                0,
+                                *object_index,
+                            )
+                            .unwrap();
+                        *object_index += instance_count;
+                        instance_count = 0;
+
+                        // bind mesh
+                        let index_buffer = mesh.get_index();
+                        let index_buffer_length = index_buffer.len();
+
+                        command_builder
+                            .bind_vertex_buffers(0, mesh.get_vertex())
+                            .unwrap()
+                            .bind_index_buffer(index_buffer)
+                            .unwrap();
+
+                        last_mesh = Some(&mesh);
+                        last_buffer_len = index_buffer_length;
+                    }
                     _ => {
+                        // First mesh, bind for later drawing
+
                         // bind mesh
                         let index_buffer = mesh.get_index();
                         let index_buffer_length = index_buffer.len();
@@ -79,12 +111,15 @@ impl PipelineGroup {
                         last_buffer_len = index_buffer_length;
                     }
                 }
-
+                instance_count += 1;
+            }
+            // Draw last mesh
+            if instance_count > 0 {
                 // draw
                 command_builder
-                    .draw_indexed(last_buffer_len as u32, 1, 0, 0, *object_index)
+                    .draw_indexed(last_buffer_len as u32, instance_count, 0, 0, *object_index)
                     .unwrap();
-                *object_index += 1;
+                *object_index += instance_count;
             }
 
             // clear render objects
