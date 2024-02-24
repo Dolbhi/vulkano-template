@@ -9,7 +9,7 @@ use vulkano::{
     command_buffer::AutoCommandBufferBuilder,
     descriptor_set::{layout::DescriptorSetLayout, DescriptorSetsCollection},
     render_pass::Subpass,
-    shader::{EntryPoint, ShaderModule},
+    shader::ShaderModule,
 };
 
 use crate::{

@@ -17,7 +17,7 @@ use crate::{
 
 use game_objects::transform::{TransformID, TransformSystem};
 use legion::World;
-use render::{Context, DeferredRenderer, DrawSystem, RenderSubmit};
+use render::{Context, DrawSystem, RenderSubmit};
 use std::{iter::zip, path::Path};
 
 #[cfg(test)]
