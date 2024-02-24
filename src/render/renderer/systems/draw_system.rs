@@ -90,28 +90,23 @@ impl<'a> DrawSystem {
     pub fn update_object_buffer<O: BufferContents + From<Matrix4<f32>>>(
         &mut self,
         buffer: &Subbuffer<[O]>,
-    ) {
+        offset: usize,
+    ) -> Option<usize> {
         let obj_iter = self
             .shaders
             .iter_mut()
             .flat_map(|pipeline| pipeline.upload_pending_objects());
-        write_to_storage_buffer(buffer, obj_iter);
+        write_to_storage_buffer(buffer, obj_iter, offset)
     }
     /// bind draw calls to the given command buffer builder, be sure to call `update_object_buffer()` before hand
     pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &mut self,
-        // image_i: usize,
+        object_index: &mut u32,
         sets: impl DescriptorSetsCollection + Clone,
         command_builder: &mut AutoCommandBufferBuilder<P, A>,
     ) {
-        let mut object_index = 0;
         for pipeline_group in self.shaders.iter_mut() {
-            pipeline_group.draw_objects(
-                &mut object_index,
-                sets.clone(), //self.frame_data[image_i].descriptor_sets.clone(),
-                command_builder,
-                // &mut self.pending_objects,
-            );
+            pipeline_group.draw_objects(object_index, sets.clone(), command_builder);
         }
     }
 

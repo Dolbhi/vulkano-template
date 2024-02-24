@@ -64,7 +64,7 @@ impl DeferredRenderer {
                 &Subpass::from(render_pass.clone(), 1).unwrap(),
                 &attachments,
             );
-        let (unlit_draw_system, [_, unlit_objects_layout]) = DrawSystem::new(
+        let (unlit_draw_system, [_, _]) = DrawSystem::new(
             &context,
             &Subpass::from(render_pass.clone(), 2).unwrap(),
             draw::load_basic_vs(context.device.clone())
@@ -77,12 +77,12 @@ impl DeferredRenderer {
         let image_count = context.get_image_count();
         let mut object_data =
             create_storage_buffers(&context.allocators, objects_layout, image_count, 10000);
-        let mut unlit_data = create_storage_buffers(
-            &context.allocators,
-            unlit_objects_layout,
-            image_count,
-            10000,
-        );
+        // let mut unlit_data = create_storage_buffers(
+        //     &context.allocators,
+        //     unlit_objects_layout,
+        //     image_count,
+        //     10000,
+        // );
 
         // create frame data
         let mut point_data = create_storage_buffers::<PointLight>(
@@ -126,7 +126,7 @@ impl DeferredRenderer {
             .unwrap()
             .into();
             let (objects_buffer, objects_set) = object_data.pop().unwrap();
-            let (unlit_buffer, unlit_set) = unlit_data.pop().unwrap();
+            // let (unlit_buffer, unlit_set) = unlit_data.pop().unwrap();
 
             let global_light_set = PersistentDescriptorSet::new(
                 &context.allocators.descriptor_set,
@@ -144,13 +144,11 @@ impl DeferredRenderer {
             frame_data.push(FrameData {
                 global_buffer,
                 objects_buffer,
-                unlit_buffer,
                 point_buffer,
                 dir_buffer,
 
                 global_draw_set,
                 objects_set: objects_set.into(),
-                unlit_set: unlit_set.into(),
                 point_set: point_set.into(),
                 global_light_set,
                 dir_set: dir_set.into(),
@@ -198,9 +196,11 @@ impl Renderer for DeferredRenderer {
 
         // get frame data
         let frame = &self.frame_data[index];
+        let mut object_index = 0;
 
         // draw subpass
         self.lit_draw_system.render(
+            &mut object_index,
             vec![frame.global_draw_set.clone(), frame.objects_set.clone()],
             command_builder,
         );
@@ -225,7 +225,8 @@ impl Renderer for DeferredRenderer {
 
         // unlit subpass
         self.unlit_draw_system.render(
-            vec![frame.global_draw_set.clone(), frame.unlit_set.clone()],
+            &mut object_index,
+            vec![frame.global_draw_set.clone(), frame.objects_set.clone()],
             command_builder,
         );
         // end render pass
@@ -252,13 +253,11 @@ impl Renderer for DeferredRenderer {
 pub struct FrameData {
     global_buffer: Subbuffer<GPUGlobalData>,
     objects_buffer: Subbuffer<[GPUObjectData]>,
-    unlit_buffer: Subbuffer<[GPUObjectData]>,
     point_buffer: Subbuffer<[PointLight]>,
     dir_buffer: Subbuffer<[DirectionLight]>,
 
     global_draw_set: DescriptorSetWithOffsets,
     objects_set: DescriptorSetWithOffsets,
-    unlit_set: DescriptorSetWithOffsets,
     global_light_set: DescriptorSetWithOffsets,
     point_set: DescriptorSetWithOffsets,
     dir_set: DescriptorSetWithOffsets,
@@ -271,18 +270,24 @@ impl FrameData {
         write_to_buffer(&self.global_buffer, data);
     }
 
-    pub fn update_objects_data<'a>(&self, draw_system: &mut DrawSystem) {
-        draw_system.update_object_buffer(&self.objects_buffer);
-    }
-    pub fn update_unlit_data<'a>(&self, draw_system: &mut DrawSystem) {
-        draw_system.update_object_buffer(&self.unlit_buffer);
+    pub fn update_objects_data<'a>(
+        &self,
+        lit_system: &mut DrawSystem,
+        unlit_system: &mut DrawSystem,
+    ) {
+        let obj_iter = lit_system
+            .shaders
+            .iter_mut()
+            .chain(unlit_system.shaders.iter_mut())
+            .flat_map(|pipeline| pipeline.upload_pending_objects());
+        write_to_storage_buffer(&self.objects_buffer, obj_iter, 0);
     }
 
     pub fn update_point_lights(&mut self, point_lights: impl Iterator<Item = PointLight>) {
-        self.last_point_index = write_to_storage_buffer(&self.point_buffer, point_lights);
+        self.last_point_index = write_to_storage_buffer(&self.point_buffer, point_lights, 0);
     }
     pub fn update_directional_lights(&mut self, dir_lights: impl Iterator<Item = DirectionLight>) {
-        self.last_dir_index = write_to_storage_buffer(&self.dir_buffer, dir_lights);
+        self.last_dir_index = write_to_storage_buffer(&self.dir_buffer, dir_lights, 0);
     }
 }
 

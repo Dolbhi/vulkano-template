@@ -394,14 +394,15 @@ pub fn create_storage_buffers<T: BufferContents>(
 pub fn write_to_storage_buffer<T: BufferContents>(
     buffer: &Subbuffer<[T]>,
     writes: impl Iterator<Item = impl Into<T>>,
+    offset: usize,
 ) -> Option<usize> {
     let mut contents = buffer
         .write()
         .unwrap_or_else(|e| panic!("Failed to write to storage buffer\n{}", e));
-    let mut last = None;
+    let mut last = if offset == 0 { None } else { Some(offset) };
     for (i, write) in writes.enumerate() {
-        contents[i] = write.into();
-        last = Some(i);
+        contents[i + offset] = write.into();
+        last = Some(i + offset);
     }
     last
 }

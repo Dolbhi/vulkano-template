@@ -155,9 +155,10 @@ impl App {
 
                 frame.update_global_data(global_data);
 
-                frame.update_objects_data(&mut renderer.lit_draw_system);
-
-                frame.update_unlit_data(&mut renderer.unlit_draw_system);
+                frame.update_objects_data(
+                    &mut renderer.lit_draw_system,
+                    &mut renderer.unlit_draw_system,
+                );
 
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();

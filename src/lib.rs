@@ -52,8 +52,7 @@ fn init_render_objects(
     let linear_sampler = resource_loader.load_sampler(vulkano::image::sampler::Filter::Linear);
 
     // materials
-    //  lost empire
-    let basic_shader = &mut lit_system.shaders[0];
+    //  shaders
     let mut uv_shader = unlit_system.create_shader(
         &context,
         draw::load_basic_vs(context.device.clone()).expect("failed to create uv shader module"),
@@ -64,7 +63,10 @@ fn init_render_objects(
         draw::load_basic_vs(context.device.clone()).expect("failed to create grad shader module"),
         draw::load_grad_fs(context.device.clone()).expect("failed to create grad shader module"),
     );
+    let basic_shader = &mut lit_system.shaders[0];
     let solid_shader = &mut unlit_system.shaders[0];
+
+    //  lost empire
 
     let le_mat = resource_loader.init_material(
         basic_shader,
