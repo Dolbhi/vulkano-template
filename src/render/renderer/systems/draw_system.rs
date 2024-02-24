@@ -17,9 +17,9 @@ use crate::{
     vulkano_objects::{buffers::write_to_storage_buffer, pipeline::PipelineHandler},
 };
 
-/// Collection of pipelines and associated rendering data
+/// Collection of shaders, meant to be run on a single subpass
 ///
-/// All pipelines share sets 0 and 1, describing scene data and an array of object data (storage buffer) respectively
+/// All shader pipelines share sets 0 and 1, describing global scene data and an array of object data (storage buffer) respectively
 ///
 /// Materials can optionally add more sets, starting from set 2
 pub struct DrawSystem<const COUNT: usize> {

@@ -53,24 +53,24 @@ fn init_render_objects(
 
     // materials
     //  lost empire
-    let basic_pipeline = &mut lit_system.shaders[0];
-    let [solid_pipeline, uv_pipeline, grad_pipeline] = &mut unlit_system.shaders;
+    let basic_shader = &mut lit_system.shaders[0];
+    let [solid_shader, uv_shader, grad_shader] = &mut unlit_system.shaders;
 
     let le_mat = resource_loader.init_material(
-        basic_pipeline,
+        basic_shader,
         [WriteDescriptorSet::image_view_sampler(
             0,
             le_texture.clone(),
             linear_sampler.clone(),
         )],
     );
-    let le_uv_mat = uv_pipeline.add_material(None);
+    let le_uv_mat = uv_shader.add_material(None);
 
     //  ina
     let ina_mats: Vec<_> = zip(["hair", "cloth", "body", "head"], ina_textures)
         .map(|(_, tex)| {
             resource_loader.init_material(
-                basic_pipeline,
+                basic_shader,
                 [WriteDescriptorSet::image_view_sampler(
                     0,
                     tex,
@@ -81,10 +81,10 @@ fn init_render_objects(
         .collect();
 
     //  uv
-    let uv_mat = uv_pipeline.add_material(None);
+    let uv_mat = uv_shader.add_material(None);
 
     //  grad
-    let grad_mat = grad_pipeline.add_material(None);
+    let grad_mat = grad_shader.add_material(None);
 
     //  unlit solids
     let red_material = {
@@ -95,7 +95,7 @@ fn init_render_objects(
             BufferUsage::empty(),
         );
         resource_loader.init_material(
-            solid_pipeline,
+            solid_shader,
             [WriteDescriptorSet::buffer(0, red_mat_buffer)],
         )
         // solid_pipeline.add_material(Some(resource_loader.load_material_set(
@@ -111,7 +111,7 @@ fn init_render_objects(
             BufferUsage::empty(),
         );
         resource_loader.init_material(
-            solid_pipeline,
+            solid_shader,
             [WriteDescriptorSet::buffer(0, blue_mat_buffer)],
         )
         // solid_pipeline.add_material(Some(resource_loader.load_material_set(

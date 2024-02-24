@@ -242,13 +242,13 @@ impl<'a> ResourceLoader<'a> {
     /// creates a material of the given pipeline with a corresponding descriptor set as set 2
     pub fn init_material(
         &self,
-        pipeline_group: &mut Shader,
+        shader: &mut Shader,
         descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
     ) -> RenderSubmit {
-        pipeline_group.add_material(Some(
+        shader.add_material(Some(
             PersistentDescriptorSet::new(
                 &self.context.allocators.descriptor_set,
-                pipeline_group
+                shader
                     .pipeline
                     .layout()
                     .set_layouts()
