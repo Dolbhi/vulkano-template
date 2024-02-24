@@ -50,6 +50,7 @@ impl DeferredRenderer {
                 &context.allocators,
             );
 
+        // create render systems
         let (lit_draw_system, [global_draw_layout, objects_layout]) = DrawSystem::new(
             &context,
             &Subpass::from(render_pass.clone(), 0).unwrap(),
@@ -77,12 +78,6 @@ impl DeferredRenderer {
         let image_count = context.get_image_count();
         let mut object_data =
             create_storage_buffers(&context.allocators, objects_layout, image_count, 10000);
-        // let mut unlit_data = create_storage_buffers(
-        //     &context.allocators,
-        //     unlit_objects_layout,
-        //     image_count,
-        //     10000,
-        // );
 
         // create frame data
         let mut point_data = create_storage_buffers::<PointLight>(
@@ -101,6 +96,7 @@ impl DeferredRenderer {
         // pack into frames
         let mut frame_data = vec![];
         for _ in 0..image_count {
+            // shared global buffer
             let global_buffer = Buffer::from_data(
                 context.allocators.memory.clone(),
                 BufferCreateInfo {
@@ -115,8 +111,8 @@ impl DeferredRenderer {
                 Default::default(),
             )
             .unwrap();
-            // let (global_buffer, global_draw_set) = global_data.pop().unwrap();
 
+            // draw data
             let global_draw_set = PersistentDescriptorSet::new(
                 &context.allocators.descriptor_set,
                 global_draw_layout.clone(),
@@ -126,8 +122,8 @@ impl DeferredRenderer {
             .unwrap()
             .into();
             let (objects_buffer, objects_set) = object_data.pop().unwrap();
-            // let (unlit_buffer, unlit_set) = unlit_data.pop().unwrap();
 
+            // lighting data
             let global_light_set = PersistentDescriptorSet::new(
                 &context.allocators.descriptor_set,
                 global_light_layout.clone(),

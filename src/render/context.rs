@@ -226,8 +226,8 @@ impl<'a> ResourceLoader<'a> {
     pub fn load_texture(&self, path: &Path) -> Arc<ImageView> {
         load_texture(&self.context.allocators, &self.context.queue, path)
     }
-    pub fn load_sampler(&self, filer: vulkano::image::sampler::Filter) -> Arc<Sampler> {
-        create_sampler(self.context.device.clone(), filer)
+    pub fn load_sampler(&self, filter: vulkano::image::sampler::Filter) -> Arc<Sampler> {
+        create_sampler(self.context.device.clone(), filter)
     }
     pub fn load_mesh(
         &self,
