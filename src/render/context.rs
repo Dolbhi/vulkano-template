@@ -35,7 +35,7 @@ use winit::{
 
 use super::{
     render_data::{
-        material::PipelineGroup,
+        material::Shader,
         texture::{create_sampler, load_texture},
     },
     RenderSubmit,
@@ -242,7 +242,7 @@ impl<'a> ResourceLoader<'a> {
     /// creates a material of the given pipeline with a corresponding descriptor set as set 2
     pub fn init_material(
         &self,
-        pipeline_group: &mut PipelineGroup,
+        pipeline_group: &mut Shader,
         descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
     ) -> RenderSubmit {
         pipeline_group.add_material(Some(

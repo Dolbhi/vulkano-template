@@ -13,7 +13,7 @@ use vulkano::{
 };
 
 use crate::{
-    render::{context::Context, render_data::material::PipelineGroup},
+    render::{context::Context, render_data::material::Shader},
     vulkano_objects::{buffers::write_to_storage_buffer, pipeline::PipelineHandler},
 };
 
@@ -23,7 +23,7 @@ use crate::{
 ///
 /// Materials can optionally add more sets, starting from set 2
 pub struct DrawSystem<const COUNT: usize> {
-    pub pipelines: [PipelineGroup; COUNT],
+    pub shaders: [Shader; COUNT],
 }
 
 impl<'a, const COUNT: usize> DrawSystem<COUNT> {
@@ -33,7 +33,7 @@ impl<'a, const COUNT: usize> DrawSystem<COUNT> {
         subpass: &Subpass,
         shaders: [(EntryPoint, EntryPoint); COUNT],
     ) -> (Self, [Arc<DescriptorSetLayout>; 2]) {
-        let pipelines: [PipelineGroup; COUNT] = shaders
+        let shaders: [Shader; COUNT] = shaders
             .map(|(vs, fs)| {
                 PipelineHandler::new(
                     context.device.clone(),
@@ -45,12 +45,12 @@ impl<'a, const COUNT: usize> DrawSystem<COUNT> {
                     crate::vulkano_objects::pipeline::PipelineType::Drawing,
                 )
             })
-            .map(PipelineGroup::new);
+            .map(Shader::new);
 
-        let layouts = pipelines[0].pipeline.layout().set_layouts();
+        let layouts = shaders[0].pipeline.layout().set_layouts();
         let layouts = [layouts[0].clone(), layouts[1].clone()];
 
-        (DrawSystem { pipelines }, layouts)
+        (DrawSystem { shaders }, layouts)
     }
 
     // requires #![feature(generic_const_exprs)]
@@ -86,7 +86,7 @@ impl<'a, const COUNT: usize> DrawSystem<COUNT> {
     ///
     /// See also: [recreate_pipeline](PipelineHandler::recreate_pipeline)
     pub fn recreate_pipelines(&mut self, context: &Context) {
-        for pipeline in self.pipelines.iter_mut() {
+        for pipeline in self.shaders.iter_mut() {
             pipeline
                 .pipeline
                 .recreate_pipeline(context.device.clone(), context.viewport.clone());
@@ -99,12 +99,12 @@ impl<'a, const COUNT: usize> DrawSystem<COUNT> {
         buffer: &Subbuffer<[O]>,
     ) {
         let obj_iter = self
-            .pipelines
+            .shaders
             .iter_mut()
             .flat_map(|pipeline| pipeline.upload_pending_objects());
         write_to_storage_buffer(buffer, obj_iter);
     }
-    /// bind draw calls to the given command buffer builder, be sure to call `upload_draw_data()` before hand
+    /// bind draw calls to the given command buffer builder, be sure to call `update_object_buffer()` before hand
     pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &mut self,
         // image_i: usize,
@@ -112,7 +112,7 @@ impl<'a, const COUNT: usize> DrawSystem<COUNT> {
         command_builder: &mut AutoCommandBufferBuilder<P, A>,
     ) {
         let mut object_index = 0;
-        for pipeline_group in self.pipelines.iter_mut() {
+        for pipeline_group in self.shaders.iter_mut() {
             pipeline_group.draw_objects(
                 &mut object_index,
                 sets.clone(), //self.frame_data[image_i].descriptor_sets.clone(),

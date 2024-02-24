@@ -53,8 +53,8 @@ fn init_render_objects(
 
     // materials
     //  lost empire
-    let basic_pipeline = &mut lit_system.pipelines[0];
-    let [solid_pipeline, uv_pipeline, grad_pipeline] = &mut unlit_system.pipelines;
+    let basic_pipeline = &mut lit_system.shaders[0];
+    let [solid_pipeline, uv_pipeline, grad_pipeline] = &mut unlit_system.shaders;
 
     let le_mat = resource_loader.init_material(
         basic_pipeline,

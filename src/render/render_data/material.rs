@@ -15,14 +15,14 @@ use crate::{
     VertexFull,
 };
 
-pub struct PipelineGroup {
+pub struct Shader {
     pub pipeline: PipelineHandler<VertexFull>,
     materials: Vec<Material>,
 }
 
-impl PipelineGroup {
+impl Shader {
     pub fn new(pipeline: PipelineHandler<VertexFull>) -> Self {
-        PipelineGroup {
+        Shader {
             pipeline,
             materials: vec![],
         }
