@@ -9,7 +9,7 @@ use vulkano::{
     command_buffer::AutoCommandBufferBuilder,
     descriptor_set::{layout::DescriptorSetLayout, DescriptorSetsCollection},
     render_pass::Subpass,
-    shader::EntryPoint,
+    shader::{EntryPoint, ShaderModule},
 };
 
 use crate::{
@@ -22,65 +22,58 @@ use crate::{
 /// All shader pipelines share sets 0 and 1, describing global scene data and an array of object data (storage buffer) respectively
 ///
 /// Materials can optionally add more sets, starting from set 2
-pub struct DrawSystem<const COUNT: usize> {
-    pub shaders: [Shader; COUNT],
+pub struct DrawSystem {
+    pub shaders: Vec<Shader>,
+    subpass: Subpass,
 }
 
-impl<'a, const COUNT: usize> DrawSystem<COUNT> {
+impl<'a> DrawSystem {
     /// creates from a collection of shader entry points
     pub fn new(
         context: &Context,
         subpass: &Subpass,
-        shaders: [(EntryPoint, EntryPoint); COUNT],
+        vs: Arc<ShaderModule>,
+        fs: Arc<ShaderModule>,
     ) -> (Self, [Arc<DescriptorSetLayout>; 2]) {
-        let shaders: [Shader; COUNT] = shaders
-            .map(|(vs, fs)| {
-                PipelineHandler::new(
-                    context.device.clone(),
-                    vs,
-                    fs,
-                    context.viewport.clone(),
-                    subpass.clone(),
-                    [], // [(0, 0)],
-                    crate::vulkano_objects::pipeline::PipelineType::Drawing,
-                )
-            })
-            .map(Shader::new);
+        let shader = Shader::new(PipelineHandler::new(
+            context.device.clone(),
+            vs.entry_point("main").unwrap(),
+            fs.entry_point("main").unwrap(),
+            context.viewport.clone(),
+            subpass.clone(),
+            [], // [(0, 0)],
+            crate::vulkano_objects::pipeline::PipelineType::Drawing,
+        ));
 
-        let layouts = shaders[0].pipeline.layout().set_layouts();
+        let layouts = shader.pipeline.layout().set_layouts();
         let layouts = [layouts[0].clone(), layouts[1].clone()];
 
-        (DrawSystem { shaders }, layouts)
+        (
+            DrawSystem {
+                shaders: vec![shader],
+                subpass: subpass.clone(),
+            },
+            layouts,
+        )
     }
 
-    // requires #![feature(generic_const_exprs)]
-    // pub fn extend<const EXTEND: usize>(
-    //     self,
-    //     context: &Context,
-    //     subpass: &Subpass,
-    //     shaders: [(EntryPoint, EntryPoint); EXTEND],
-    // ) -> DrawSystem<{ COUNT + EXTEND }> {
-    //     let new_pipelines = shaders.map(|(vs, fs)| {
-    //         PipelineGroup::new(PipelineHandler::new(
-    //             context.device.clone(),
-    //             vs,
-    //             fs,
-    //             context.viewport.clone(),
-    //             subpass.clone(),
-    //             [], // [(0, 0)],
-    //             crate::vulkano_objects::pipeline::PipelineType::Drawing,
-    //         ))
-    //     });
-
-    //     let pipelines = [0; COUNT + EXTEND].map(|n| {
-    //         if n < COUNT {
-    //             self.pipelines[n]
-    //         } else {
-    //             new_pipelines[n - COUNT]
-    //         }
-    //     });
-    //     DrawSystem { pipelines }
-    // }
+    /// creates shader with the same subpass and dynamic bindings as this system, must be manually added later
+    pub fn create_shader(
+        &mut self,
+        context: &Context,
+        vs: Arc<ShaderModule>,
+        fs: Arc<ShaderModule>,
+    ) -> Shader {
+        Shader::new(PipelineHandler::new(
+            context.device.clone(),
+            vs.entry_point("main").unwrap(),
+            fs.entry_point("main").unwrap(),
+            context.viewport.clone(),
+            self.subpass.clone(),
+            [], // [(0, 0)],
+            crate::vulkano_objects::pipeline::PipelineType::Drawing,
+        ))
+    }
 
     /// Recreate all pipelines with any changes in viewport
     ///

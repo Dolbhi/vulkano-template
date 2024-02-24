@@ -5,6 +5,7 @@ use crate::{
         self,
         allocators::Allocators,
         buffers::{self, Buffers},
+        pipeline::PipelineHandler,
     },
     VertexFull,
 };
@@ -15,7 +16,9 @@ use vulkano::{
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
     image::{sampler::Sampler, view::ImageView, Image},
     instance::Instance,
-    pipeline::graphics::viewport::Viewport,
+    pipeline::graphics::{vertex_input::Vertex, viewport::Viewport},
+    render_pass::Subpass,
+    shader::ShaderModule,
     swapchain::{
         self, PresentFuture, Surface, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
         SwapchainPresentInfo,
@@ -237,6 +240,42 @@ impl<'a> ResourceLoader<'a> {
             vertices,
             indices,
         ))
+    }
+
+    pub fn load_pipeline<V: Vertex>(
+        &self,
+        vs: Arc<ShaderModule>,
+        fs: Arc<ShaderModule>,
+        subpass: Subpass,
+        dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
+        pipeline_type: crate::vulkano_objects::pipeline::PipelineType,
+    ) -> PipelineHandler<V> {
+        PipelineHandler::new(
+            self.context.device.clone(),
+            vs.entry_point("main").unwrap(),
+            fs.entry_point("main").unwrap(),
+            self.context.viewport.clone(),
+            subpass,
+            dynamic_bindings,
+            pipeline_type,
+        )
+    }
+    pub fn load_pipelines<V: Vertex, const SHADERS: usize>(
+        &self,
+        modules: [(Arc<ShaderModule>, Arc<ShaderModule>); SHADERS],
+        subpass: Subpass,
+        dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
+        pipeline_type: crate::vulkano_objects::pipeline::PipelineType,
+    ) -> [PipelineHandler<V>; SHADERS] {
+        modules.map(|(vs, fs)| {
+            self.load_pipeline(
+                vs,
+                fs,
+                subpass.clone(),
+                dynamic_bindings.clone(), // [(0, 0)],
+                pipeline_type,
+            )
+        })
     }
 
     /// creates a material of the given pipeline with a corresponding descriptor set as set 2

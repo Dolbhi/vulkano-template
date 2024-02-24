@@ -33,8 +33,8 @@ fn init_render_objects(
     world: &mut World,
     transform_sys: &mut TransformSystem,
     context: &Context,
-    lit_system: &mut DrawSystem<{ DeferredRenderer::LIT }>,
-    unlit_system: &mut DrawSystem<{ DeferredRenderer::UNLIT }>,
+    lit_system: &mut DrawSystem,
+    unlit_system: &mut DrawSystem,
 ) -> TransformID {
     let resource_loader = context.get_resource_loader();
 
@@ -54,7 +54,17 @@ fn init_render_objects(
     // materials
     //  lost empire
     let basic_shader = &mut lit_system.shaders[0];
-    let [solid_shader, uv_shader, grad_shader] = &mut unlit_system.shaders;
+    let mut uv_shader = unlit_system.create_shader(
+        &context,
+        draw::load_basic_vs(context.device.clone()).expect("failed to create uv shader module"),
+        draw::load_uv_fs(context.device.clone()).expect("failed to create uv shader module"),
+    );
+    let mut grad_shader = unlit_system.create_shader(
+        &context,
+        draw::load_basic_vs(context.device.clone()).expect("failed to create grad shader module"),
+        draw::load_grad_fs(context.device.clone()).expect("failed to create grad shader module"),
+    );
+    let solid_shader = &mut unlit_system.shaders[0];
 
     let le_mat = resource_loader.init_material(
         basic_shader,
@@ -98,10 +108,6 @@ fn init_render_objects(
             solid_shader,
             [WriteDescriptorSet::buffer(0, red_mat_buffer)],
         )
-        // solid_pipeline.add_material(Some(resource_loader.load_material_set(
-        //     &solid_pipeline,
-        //     [WriteDescriptorSet::buffer(0, red_mat_buffer)],
-        // )))
     };
     let blue_material = {
         let blue_mat_buffer = resource_loader.create_material_buffer(
@@ -114,11 +120,11 @@ fn init_render_objects(
             solid_shader,
             [WriteDescriptorSet::buffer(0, blue_mat_buffer)],
         )
-        // solid_pipeline.add_material(Some(resource_loader.load_material_set(
-        //     &solid_pipeline,
-        //     [WriteDescriptorSet::buffer(0, blue_mat_buffer)],
-        // )))
     };
+
+    // push shaders
+    unlit_system.shaders.push(uv_shader);
+    unlit_system.shaders.push(grad_shader);
 
     // meshes
     //      suzanne

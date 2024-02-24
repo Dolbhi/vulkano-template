@@ -33,15 +33,12 @@ pub struct DeferredRenderer {
     framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
     attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
     pub frame_data: Vec<FrameData>,
-    pub lit_draw_system: DrawSystem<{ Self::LIT }>,
+    pub lit_draw_system: DrawSystem,
     pub lighting_system: LightingSystem,
-    pub unlit_draw_system: DrawSystem<{ Self::UNLIT }>,
+    pub unlit_draw_system: DrawSystem,
 }
 
 impl DeferredRenderer {
-    pub const LIT: usize = 1;
-    pub const UNLIT: usize = 3;
-
     pub fn new(context: &Context) -> Self {
         // let render_pass = deferred_render_pass(context.device.clone(), context.swapchain.clone());
         let render_pass =
@@ -53,64 +50,28 @@ impl DeferredRenderer {
                 &context.allocators,
             );
 
-        let (lit_draw_system, [global_draw_layout, objects_layout]) = {
-            let shaders = [(
-                draw::load_basic_vs(context.device.clone())
-                    .expect("failed to create basic shader module"),
-                draw::load_basic_fs(context.device.clone())
-                    .expect("failed to create basic shader module"),
-            )];
-
-            DrawSystem::new(
-                &context,
-                &Subpass::from(render_pass.clone(), 0).unwrap(),
-                shaders.map(|(v, f)| {
-                    (
-                        v.entry_point("main").unwrap(),
-                        f.entry_point("main").unwrap(),
-                    )
-                }),
-            )
-        };
+        let (lit_draw_system, [global_draw_layout, objects_layout]) = DrawSystem::new(
+            &context,
+            &Subpass::from(render_pass.clone(), 0).unwrap(),
+            draw::load_basic_vs(context.device.clone())
+                .expect("failed to create basic shader module"),
+            draw::load_basic_fs(context.device.clone())
+                .expect("failed to create basic shader module"),
+        );
         let (lighting_system, [global_light_layout, point_layout, dir_layout]) =
             LightingSystem::new(
                 &context,
                 &Subpass::from(render_pass.clone(), 1).unwrap(),
                 &attachments,
             );
-        let (unlit_draw_system, [_, unlit_objects_layout]) = {
-            let shaders = [
-                (
-                    draw::load_basic_vs(context.device.clone())
-                        .expect("failed to create basic shader module"),
-                    draw::load_solid_fs(context.device.clone())
-                        .expect("failed to create basic shader module"),
-                ),
-                (
-                    draw::load_basic_vs(context.device.clone())
-                        .expect("failed to create uv shader module"),
-                    draw::load_uv_fs(context.device.clone())
-                        .expect("failed to create uv shader module"),
-                ),
-                (
-                    draw::load_basic_vs(context.device.clone())
-                        .expect("failed to create grad shader module"),
-                    draw::load_grad_fs(context.device.clone())
-                        .expect("failed to create grad shader module"),
-                ),
-            ];
-
-            DrawSystem::new(
-                &context,
-                &Subpass::from(render_pass.clone(), 2).unwrap(),
-                shaders.map(|(v, f)| {
-                    (
-                        v.entry_point("main").unwrap(),
-                        f.entry_point("main").unwrap(),
-                    )
-                }),
-            )
-        };
+        let (unlit_draw_system, [_, unlit_objects_layout]) = DrawSystem::new(
+            &context,
+            &Subpass::from(render_pass.clone(), 2).unwrap(),
+            draw::load_basic_vs(context.device.clone())
+                .expect("failed to create basic shader module"),
+            draw::load_solid_fs(context.device.clone())
+                .expect("failed to create basic shader module"),
+        );
 
         // create buffers and descriptor sets
         let image_count = context.get_image_count();
@@ -310,10 +271,10 @@ impl FrameData {
         write_to_buffer(&self.global_buffer, data);
     }
 
-    pub fn update_objects_data<'a, const COUNT: usize>(&self, draw_system: &mut DrawSystem<COUNT>) {
+    pub fn update_objects_data<'a>(&self, draw_system: &mut DrawSystem) {
         draw_system.update_object_buffer(&self.objects_buffer);
     }
-    pub fn update_unlit_data<'a, const COUNT: usize>(&self, draw_system: &mut DrawSystem<COUNT>) {
+    pub fn update_unlit_data<'a>(&self, draw_system: &mut DrawSystem) {
         draw_system.update_object_buffer(&self.unlit_buffer);
     }
 
