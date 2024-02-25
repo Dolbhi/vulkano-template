@@ -227,7 +227,6 @@ fn init_render_objects(
         translation: [0.0, 5.0, -1.0].into(),
         ..Default::default()
     });
-    // world.push((ina_transform));
     for (mesh, mat) in zip(ina_meshes, ina_mats.clone()) {
         let obj = RenderObject::new(mesh, mat);
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
