@@ -1,5 +1,6 @@
 mod camera;
 pub mod light;
+pub mod object_loader;
 mod scene;
 pub mod transform;
 
