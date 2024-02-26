@@ -82,6 +82,16 @@ impl App {
         );
 
         let total_elapse = init_start_time.elapsed().as_millis();
+
+        println!("[Renderer Info]\nLit shaders:");
+        for shader in &renderer.lit_draw_system.shaders {
+            println!("{}", shader);
+        }
+        println!("Unlit shaders:");
+        for shader in &renderer.unlit_draw_system.shaders {
+            println!("{}", shader);
+        }
+
         println!(
             "[Benchmarking] render init: {} ms, world init: {} ms, total: {} ms",
             render_init_elapse,

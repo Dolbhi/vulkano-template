@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     sync::{Arc, Mutex},
     vec,
 };
@@ -20,6 +21,16 @@ pub struct Shader {
     id: MaterialID,
     pub pipeline: PipelineHandler<VertexFull>,
     materials: Vec<Material>,
+}
+
+impl Display for Shader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "Shader {:?} with {} material(s)",
+            self.id,
+            self.materials.len()
+        ))
+    }
 }
 
 impl Shader {

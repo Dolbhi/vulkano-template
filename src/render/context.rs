@@ -100,7 +100,7 @@ impl Context {
             vulkano_objects::swapchain::create_swapchain(&physical_device, device.clone(), surface);
 
         println!(
-            "[Renderer info]\nswapchain image count: {}\nQueue family: {}\nSwapchain format: {:?}",
+            "[Render Context Info]\nswapchain image count: {}\nQueue family: {}\nSwapchain format: {:?}",
             images.len(),
             queue_family_index,
             swapchain.image_format(),

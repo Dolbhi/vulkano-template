@@ -30,7 +30,9 @@ pub enum MeshID {
     Gun,
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+const LOST_EMPIRE_MESH_COUNT: u8 = 45;
+
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum MaterialID {
     LitTexture(TextureID),
     UnlitColor([u8; 4]),
@@ -38,7 +40,7 @@ pub enum MaterialID {
     Gradient,
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum TextureID {
     InaBody,
     InaCloth,
@@ -146,7 +148,11 @@ impl<'a> ResourceRetriever<'a> {
                             loaded_meshes.insert(i, mesh);
                         }
                     }
-                    MeshID::LostEmpire(_) => {
+                    MeshID::LostEmpire(n) => {
+                        assert!(
+                            n < LOST_EMPIRE_MESH_COUNT,
+                            "Lost empire only has 45 sub-meshes"
+                        );
                         for (i, mesh) in
                             mesh_from_file(&self.context, "models/lost_empire.obj").enumerate()
                         {

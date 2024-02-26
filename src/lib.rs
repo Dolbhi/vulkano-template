@@ -10,7 +10,7 @@ pub use vertex_data::{Vertex2d, Vertex3d, VertexFull};
 
 use crate::{
     game_objects::{light::PointLightComponent, transform::TransformCreateInfo},
-    render::{mesh::from_obj, RenderObject},
+    render::RenderObject,
 };
 
 use game_objects::transform::{TransformID, TransformSystem};
@@ -19,7 +19,7 @@ use render::{
     resource_manager::{MaterialID, MeshID, ResourceRetriever, TextureID},
     RenderSubmit,
 };
-use std::{iter::zip, path::Path};
+use std::iter::zip;
 
 #[cfg(test)]
 mod tests {
@@ -35,7 +35,7 @@ fn init_render_objects(
     transform_sys: &mut TransformSystem,
     resources: &mut ResourceRetriever,
 ) -> TransformID {
-    let le_mesh_count = from_obj(Path::new("models/lost_empire.obj")).len();
+    // let le_mesh_count = from_obj(Path::new("models/lost_empire.obj")).len(); // 45
 
     // meshes
     let suzanne_mesh = resources.get_mesh(MeshID::Suzanne);
@@ -50,8 +50,7 @@ fn init_render_objects(
     ]
     .map(|id| resources.get_mesh(id));
 
-    let le_meshes: Vec<std::sync::Arc<vulkano_objects::buffers::Buffers<VertexFull>>> = (0
-        ..le_mesh_count)
+    let le_meshes: Vec<std::sync::Arc<vulkano_objects::buffers::Buffers<VertexFull>>> = (0..45)
         .map(|n| resources.get_mesh(MeshID::LostEmpire(n as u8)))
         .collect();
 
