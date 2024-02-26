@@ -2,7 +2,7 @@ use legion::World;
 
 use crate::{
     render::{
-        resource_manager::{MaterialID, MeshID, ResourceRetriever},
+        resource_manager::{self, MaterialID, MeshID, ResourceRetriever},
         RenderObject, RenderSubmit,
     },
     MaterialSwapper,
@@ -32,6 +32,18 @@ pub struct ObjectLoader<'a> {
 }
 
 impl<'a> ObjectLoader<'a> {
+    pub fn new(
+        resource_loader: ResourceRetriever<'a>,
+        world: &'a mut World,
+        transforms: &'a mut TransformSystem,
+    ) -> Self {
+        ObjectLoader {
+            resource_loader,
+            world,
+            transforms,
+        }
+    }
+
     pub fn create_object(&mut self, info: ObjectInfo) -> TransformID {
         let transform = self.transforms.add_transform(info.transform);
         let entity = self.world.push((transform.clone(),));
