@@ -13,7 +13,10 @@ use crate::{
     render::RenderObject,
 };
 
-use game_objects::transform::{TransformID, TransformSystem};
+use game_objects::{
+    object_loader::{self, ObjectInfo, ObjectLoader, SerialComponentInfo},
+    transform::{self, TransformID, TransformSystem},
+};
 use legion::World;
 use render::{
     resource_manager::{MaterialID, MeshID, ResourceRetriever, TextureID},
@@ -30,148 +33,272 @@ mod tests {
     }
 }
 
-fn init_render_objects(
-    world: &mut World,
-    transform_sys: &mut TransformSystem,
-    resources: &mut ResourceRetriever,
-) -> TransformID {
+fn init_render_objects(mut object_loader: ObjectLoader) -> TransformID {
     // let le_mesh_count = from_obj(Path::new("models/lost_empire.obj")).len(); // 45
 
-    // meshes
-    let suzanne_mesh = resources.get_mesh(MeshID::Suzanne);
-    let square_mesh = resources.get_mesh(MeshID::Square);
-    let cube_mesh = resources.get_mesh(MeshID::Cube);
+    // // meshes
+    // let suzanne_mesh = resources.get_mesh(MeshID::Suzanne);
+    // let square_mesh = resources.get_mesh(MeshID::Square);
+    // let cube_mesh = resources.get_mesh(MeshID::Cube);
 
     let ina_meshes = [
         MeshID::InaBody,
         MeshID::InaCloth,
         MeshID::InaHair,
         MeshID::InaHead,
-    ]
-    .map(|id| resources.get_mesh(id));
+    ];
+    // .map(|id| resources.get_mesh(id));
 
-    let le_meshes: Vec<std::sync::Arc<vulkano_objects::buffers::Buffers<VertexFull>>> = (0..45)
-        .map(|n| resources.get_mesh(MeshID::LostEmpire(n as u8)))
-        .collect();
+    // let le_meshes: Vec<std::sync::Arc<vulkano_objects::buffers::Buffers<VertexFull>>> = (0..45)
+    //     .map(|n| resources.get_mesh(MeshID::LostEmpire(n as u8)))
+    //     .collect();
 
-    // materials
-    let uv_mat = resources.get_material(MaterialID::UV);
-    let grad_mat = resources.get_material(MaterialID::Gradient);
+    // // materials
+    // let uv_mat = resources.get_material(MaterialID::UV);
+    // let grad_mat = resources.get_material(MaterialID::Gradient);
 
     let ina_mats = [
         TextureID::InaBody,
         TextureID::InaCloth,
         TextureID::InaHair,
         TextureID::InaHead,
-    ]
-    .map(|id| resources.get_material(MaterialID::LitTexture(id)));
+    ];
+    // .map(|id| resources.get_material(MaterialID::LitTexture(id)));
 
-    let le_mat = resources.get_material(MaterialID::LitTexture(TextureID::LostEmpire));
+    // let le_mat = resources.get_material(MaterialID::LitTexture(TextureID::LostEmpire));
 
-    let red_mat = resources.get_material(MaterialID::UnlitColor([u8::MAX, 0, 0, u8::MAX]));
-    let blue_mat = resources.get_material(MaterialID::UnlitColor([0, 0, u8::MAX, u8::MAX]));
+    // let red_mat = resources.get_material(MaterialID::UnlitColor([u8::MAX, 0, 0, u8::MAX]));
+    // let blue_mat = resources.get_material(MaterialID::UnlitColor([0, 0, u8::MAX, u8::MAX]));
 
     // objects
     //      Suzanne
-    let suzanne_obj = RenderObject::new(suzanne_mesh.clone(), uv_mat.clone());
-    let suzanne = transform_sys.next().unwrap();
-    world.push((suzanne, suzanne_obj));
+    let suzanne = {
+        let info = ObjectInfo {
+            components: vec![SerialComponentInfo::Render(MeshID::Suzanne, MaterialID::UV)],
+            ..Default::default()
+        };
+        object_loader.create_object(info)
+    };
+
+    // let suzanne_obj = RenderObject::new(suzanne_mesh.clone(), uv_mat.clone());
+    // let suzanne = transform_sys.next().unwrap();
+    // world.push((suzanne, suzanne_obj));
 
     //      Spam Suzanne
+    let ro_info =
+        SerialComponentInfo::Render(MeshID::Suzanne, MaterialID::LitTexture(TextureID::InaCloth));
     for x in 0..20 {
         for z in 0..20 {
-            let square_obj = RenderObject::new(suzanne_mesh.clone(), ina_mats[1].clone());
-            let transform_id = transform_sys.add_transform(TransformCreateInfo {
+            let transform = TransformCreateInfo {
                 translation: [x as f32, 7f32, z as f32].into(),
                 ..Default::default()
+            };
+            object_loader.create_object(ObjectInfo {
+                transform,
+                components: vec![ro_info.clone()],
+                ..Default::default()
             });
+            // let square_obj = RenderObject::new(suzanne_mesh.clone(), ina_mats[1].clone());
+            // let transform_id = transform_sys.add_transform(TransformCreateInfo {
+            //     translation: [x as f32, 7f32, z as f32].into(),
+            //     ..Default::default()
+            // });
 
-            world.push((transform_id, square_obj));
+            // world.push((transform_id, square_obj));
         }
     }
 
     //      Squares
+    let ro_info = SerialComponentInfo::Render(MeshID::Square, MaterialID::Gradient);
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
-        let square_obj = RenderObject::new(square_mesh.clone(), grad_mat.clone()); //uv_mat.clone());
-        let transform_id = transform_sys.add_transform(TransformCreateInfo {
+        let transform = TransformCreateInfo {
             translation: [x, y, z].into(),
+            ..Default::default()
+        };
+        object_loader.create_object(ObjectInfo {
+            transform,
+            components: vec![ro_info.clone()],
             ..Default::default()
         });
 
-        world.push((transform_id, square_obj));
+        // let square_obj = RenderObject::new(square_mesh.clone(), grad_mat.clone()); //uv_mat.clone());
+        // let transform_id = transform_sys.add_transform(TransformCreateInfo {
+        //     translation: [x, y, z].into(),
+        //     ..Default::default()
+        // });
+
+        // world.push((transform_id, square_obj));
     }
 
     //      Ina
-    let ina_transform = transform_sys.add_transform(TransformCreateInfo {
+    let children = zip(ina_meshes, ina_mats)
+        .map(|(mesh, tex)| ObjectInfo {
+            components: vec![SerialComponentInfo::Render(
+                mesh,
+                MaterialID::LitTexture(tex),
+            )],
+            ..Default::default()
+        })
+        .collect();
+    let transform = TransformCreateInfo {
         translation: [0.0, 5.0, -1.0].into(),
         ..Default::default()
-    });
-    for (mesh, mat) in zip(ina_meshes, ina_mats.clone()) {
-        let obj = RenderObject::new(mesh, mat);
-        let transform_id = transform_sys.add_transform(TransformCreateInfo {
-            parent: Some(ina_transform),
-            ..Default::default()
-        });
+    };
+    let ina = ObjectInfo {
+        transform,
+        children,
+        ..Default::default()
+    };
+    object_loader.create_object(ina);
+    // let ina_transform = transform_sys.add_transform(TransformCreateInfo {
+    //     translation: [0.0, 5.0, -1.0].into(),
+    //     ..Default::default()
+    // });
+    // for (mesh, mat) in zip(ina_meshes, ina_mats.clone()) {
+    //     let obj = RenderObject::new(mesh, mat);
+    //     let transform_id = transform_sys.add_transform(TransformCreateInfo {
+    //         parent: Some(ina_transform),
+    //         ..Default::default()
+    //     });
 
-        world.push((transform_id, obj));
-    }
+    //     world.push((transform_id, obj));
+    // }
 
     //      lost empires
-    let le_transform = transform_sys.add_transform(TransformCreateInfo::default());
-    for mesh in le_meshes {
-        let le_obj = RenderObject::new(mesh, le_mat.clone());
-        let transform_id = transform_sys.add_transform(TransformCreateInfo {
-            parent: Some(le_transform),
+    let le_mat = MaterialID::LitTexture(TextureID::LostEmpire);
+    let children = (0..45)
+        .map(|n| ObjectInfo {
+            components: vec![
+                SerialComponentInfo::Render(MeshID::LostEmpire(n), le_mat),
+                SerialComponentInfo::MaterialSwapper(vec![
+                    le_mat,
+                    MaterialID::LitTexture(TextureID::InaHead),
+                    MaterialID::UV,
+                ]),
+            ],
             ..Default::default()
-        });
+        })
+        .collect();
+    let lost_empire = ObjectInfo {
+        children,
+        ..Default::default()
+    };
+    object_loader.create_object(lost_empire);
+    // let le_transform = transform_sys.add_transform(TransformCreateInfo::default());
+    // for mesh in le_meshes {
+    //     let le_obj = RenderObject::new(mesh, le_mat.clone());
+    //     let transform_id = transform_sys.add_transform(TransformCreateInfo {
+    //         parent: Some(le_transform),
+    //         ..Default::default()
+    //     });
 
-        let mat_swapper =
-            MaterialSwapper::new([le_mat.clone(), uv_mat.clone(), ina_mats[1].clone()]);
+    //     let mat_swapper =
+    //         MaterialSwapper::new([le_mat.clone(), uv_mat.clone(), ina_mats[1].clone()]);
 
-        world.push((transform_id, le_obj, mat_swapper));
-    }
+    //     world.push((transform_id, le_obj, mat_swapper));
+    // }
 
     // lights
-    world.push((
-        transform_sys.add_transform(TransformCreateInfo {
+    // red light
+    let info = ObjectInfo {
+        transform: TransformCreateInfo {
             scale: Vector3::new(0.1, 0.1, 0.1),
             translation: Vector3::new(0., 5., -1.),
             ..Default::default()
-        }),
-        PointLightComponent {
-            color: Vector4::new(1., 0., 0., 3.),
-            half_radius: 3.,
         },
-        RenderObject::new(cube_mesh.clone(), red_mat.clone()),
-    ));
-    world.push((
-        transform_sys.add_transform(TransformCreateInfo {
+        components: vec![
+            SerialComponentInfo::PointLight(PointLightComponent {
+                color: Vector4::new(1., 0., 0., 3.),
+                half_radius: 3.,
+            }),
+            SerialComponentInfo::Render(
+                MeshID::Cube,
+                MaterialID::UnlitColor([u8::MAX, 0, 0, u8::MAX]),
+            ),
+        ],
+        ..Default::default()
+    };
+    object_loader.create_object(info);
+    // blue light
+    let info = ObjectInfo {
+        transform: TransformCreateInfo {
             scale: Vector3::new(0.1, 0.1, 0.1),
             translation: Vector3::new(0.0, 6.0, -0.5),
             ..Default::default()
-        }),
-        PointLightComponent {
-            color: Vector4::new(0., 0., 1., 2.),
-            half_radius: 3.,
         },
-        RenderObject::new(cube_mesh.clone(), blue_mat),
-    ));
+        components: vec![
+            SerialComponentInfo::PointLight(PointLightComponent {
+                color: Vector4::new(0., 0., 1., 2.),
+                half_radius: 3.,
+            }),
+            SerialComponentInfo::Render(
+                MeshID::Cube,
+                MaterialID::UnlitColor([0, 0, u8::MAX, u8::MAX]),
+            ),
+        ],
+        ..Default::default()
+    };
+    object_loader.create_object(info);
+    // world.push((
+    //     transform_sys.add_transform(TransformCreateInfo {
+    //         scale: Vector3::new(0.1, 0.1, 0.1),
+    //         translation: Vector3::new(0., 5., -1.),
+    //         ..Default::default()
+    //     }),
+    //     PointLightComponent {
+    //         color: Vector4::new(1., 0., 0., 3.),
+    //         half_radius: 3.,
+    //     },
+    //     RenderObject::new(cube_mesh.clone(), red_mat.clone()),
+    // ));
+    // world.push((
+    //     transform_sys.add_transform(TransformCreateInfo {
+    //         scale: Vector3::new(0.1, 0.1, 0.1),
+    //         translation: Vector3::new(0.0, 6.0, -0.5),
+    //         ..Default::default()
+    //     }),
+    //     PointLightComponent {
+    //         color: Vector4::new(0., 0., 1., 2.),
+    //         half_radius: 3.,
+    //     },
+    //     RenderObject::new(cube_mesh.clone(), blue_mat),
+    // ));
 
     // spam lights
+    let light_component = vec![
+        SerialComponentInfo::PointLight(PointLightComponent {
+            color: Vector4::new(1., 0., 0., 1.),
+            half_radius: 1.,
+        }),
+        SerialComponentInfo::Render(
+            MeshID::Cube,
+            MaterialID::UnlitColor([u8::MAX, 0, 0, u8::MAX]),
+        ),
+    ];
     for x in 0..20 {
         for z in -10..10 {
-            world.push((
-                transform_sys.add_transform(TransformCreateInfo {
-                    scale: Vector3::new(0.1, 0.1, 0.1),
-                    translation: Vector3::new(x as f32, 6.1, z as f32),
-                    ..Default::default()
-                }),
-                PointLightComponent {
-                    color: Vector4::new(1., 0., 0., 1.),
-                    half_radius: 1.,
-                },
-                RenderObject::new(cube_mesh.clone(), red_mat.clone()),
-            ));
+            let transform = TransformCreateInfo {
+                scale: Vector3::new(0.1, 0.1, 0.1),
+                translation: Vector3::new(x as f32, 6.1, z as f32),
+                ..Default::default()
+            };
+            object_loader.create_object(ObjectInfo {
+                transform,
+                components: light_component.clone(),
+                ..Default::default()
+            });
+            // world.push((
+            //     transform_sys.add_transform(TransformCreateInfo {
+            //         scale: Vector3::new(0.1, 0.1, 0.1),
+            //         translation: Vector3::new(x as f32, 6.1, z as f32),
+            //         ..Default::default()
+            //     }),
+            //     PointLightComponent {
+            //         color: Vector4::new(1., 0., 0., 1.),
+            //         half_radius: 1.,
+            //     },
+            //     RenderObject::new(cube_mesh.clone(), red_mat.clone()),
+            // ));
         }
     }
 

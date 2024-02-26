@@ -17,6 +17,7 @@ impl PointLightComponent {
     }
 }
 
+#[derive(Clone)]
 pub struct DirectionalLightComponent {
     pub color: Vector4<f32>,
     pub direction: Vector3<f32>,

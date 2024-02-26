@@ -8,6 +8,7 @@ use winit::{event::ElementState, event_loop::EventLoop, keyboard::KeyCode};
 use crate::{
     game_objects::{
         light::PointLightComponent,
+        object_loader::ObjectLoader,
         transform::{TransformID, TransformSystem},
         Camera,
     },
@@ -71,15 +72,16 @@ impl App {
         let mut resources = ResourceManager::new(&render_loop.context);
 
         // draw objects
-        let suzanne = init_render_objects(
-            &mut world,
-            &mut transforms,
-            &mut resources.begin_retrieving(
+        let obj_loader = ObjectLoader::new(
+            resources.begin_retrieving(
                 &render_loop.context,
                 &mut renderer.lit_draw_system,
                 &mut renderer.unlit_draw_system,
             ),
+            &mut world,
+            &mut transforms,
         );
+        let suzanne = init_render_objects(obj_loader);
 
         let total_elapse = init_start_time.elapsed().as_millis();
 
@@ -124,6 +126,15 @@ impl App {
             suzanne,
             camera_light,
         }
+    }
+
+    pub fn get_object_loader(&mut self) -> ObjectLoader {
+        let resource_loader = self.resources.begin_retrieving(
+            &self.render_loop.context,
+            &mut self.renderer.lit_draw_system,
+            &mut self.renderer.unlit_draw_system,
+        );
+        ObjectLoader::new(resource_loader, &mut self.world, &mut self.transforms)
     }
 
     pub fn update(&mut self, duration_since_last_update: &Duration) {
