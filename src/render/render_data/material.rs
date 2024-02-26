@@ -11,21 +11,28 @@ use vulkano::{
 };
 
 use crate::{
+    render::resource_manager::MaterialID,
     vulkano_objects::{buffers::Buffers, pipeline::PipelineHandler},
     VertexFull,
 };
 
 pub struct Shader {
+    id: MaterialID,
     pub pipeline: PipelineHandler<VertexFull>,
     materials: Vec<Material>,
 }
 
 impl Shader {
-    pub fn new(pipeline: PipelineHandler<VertexFull>) -> Self {
+    pub fn new(id: MaterialID, pipeline: PipelineHandler<VertexFull>) -> Self {
         Shader {
+            id,
             pipeline,
             materials: vec![],
         }
+    }
+
+    pub fn get_id(&self) -> MaterialID {
+        self.id
     }
 
     /// Add draw calls of each object in each material of this pipeline

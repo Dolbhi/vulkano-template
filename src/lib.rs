@@ -17,7 +17,10 @@ use crate::{
 
 use game_objects::transform::{TransformID, TransformSystem};
 use legion::World;
-use render::{Context, DrawSystem, RenderSubmit};
+use render::{
+    resource_manager::{MaterialID, MeshID, ResourceRetriever, TextureID},
+    Context, DrawSystem, RenderSubmit,
+};
 use std::{iter::zip, path::Path};
 
 #[cfg(test)]
@@ -32,165 +35,214 @@ mod tests {
 fn init_render_objects(
     world: &mut World,
     transform_sys: &mut TransformSystem,
-    context: &Context,
+    resources: &mut ResourceRetriever,
     lit_system: &mut DrawSystem,
     unlit_system: &mut DrawSystem,
 ) -> TransformID {
-    let resource_loader = context.get_resource_loader();
+    // let resource_loader = context.get_resource_loader();
 
     // Texture
-    let le_texture = resource_loader.load_texture(Path::new("models/lost_empire-RGBA.png"));
+    // let le_texture = resource_loader.load_texture(Path::new("models/lost_empire-RGBA.png"));
 
-    let ina_textures = [
-        "models/ina/Hair_Base_Color.png",
-        "models/ina/Cloth_Base_Color.png",
-        "models/ina/Body_Base_Color.png",
-        "models/ina/Head_Base_Color.png",
-    ]
-    .map(|p| resource_loader.load_texture(Path::new(p)));
+    // let ina_textures = [
+    //     "models/ina/Hair_Base_Color.png",
+    //     "models/ina/Cloth_Base_Color.png",
+    //     "models/ina/Body_Base_Color.png",
+    //     "models/ina/Head_Base_Color.png",
+    // ]
+    // .map(|p| resource_loader.load_texture(Path::new(p)));
 
-    let linear_sampler = resource_loader.load_sampler(vulkano::image::sampler::Filter::Linear);
+    // let linear_sampler = resource_loader.load_sampler(vulkano::image::sampler::Filter::Linear);
 
-    // materials
-    //  shaders
-    let mut uv_shader = unlit_system.create_shader(
-        &context,
-        draw::load_basic_vs(context.device.clone()).expect("failed to create uv shader module"),
-        draw::load_uv_fs(context.device.clone()).expect("failed to create uv shader module"),
-    );
-    let mut grad_shader = unlit_system.create_shader(
-        &context,
-        draw::load_basic_vs(context.device.clone()).expect("failed to create grad shader module"),
-        draw::load_grad_fs(context.device.clone()).expect("failed to create grad shader module"),
-    );
-    let basic_shader = &mut lit_system.shaders[0];
-    let solid_shader = &mut unlit_system.shaders[0];
+    // // materials
+    // //  shaders
+    // let mut uv_shader = unlit_system.create_shader(
+    //     &context,
+    //     draw::load_basic_vs(context.device.clone()).expect("failed to create uv shader module"),
+    //     draw::load_uv_fs(context.device.clone()).expect("failed to create uv shader module"),
+    // );
+    // let mut grad_shader = unlit_system.create_shader(
+    //     &context,
+    //     draw::load_basic_vs(context.device.clone()).expect("failed to create grad shader module"),
+    //     draw::load_grad_fs(context.device.clone()).expect("failed to create grad shader module"),
+    // );
+    // let basic_shader = &mut lit_system.shaders[0];
+    // let solid_shader = &mut unlit_system.shaders[0];
 
-    //  lost empire
+    // //  lost empire
 
-    let le_mat = resource_loader.init_material(
-        basic_shader,
-        [WriteDescriptorSet::image_view_sampler(
-            0,
-            le_texture.clone(),
-            linear_sampler.clone(),
-        )],
-    );
-    let le_uv_mat = uv_shader.add_material(None);
+    // let le_mat = resource_loader.init_material(
+    //     basic_shader,
+    //     [WriteDescriptorSet::image_view_sampler(
+    //         0,
+    //         le_texture.clone(),
+    //         linear_sampler.clone(),
+    //     )],
+    // );
+    // let le_uv_mat = uv_shader.add_material(None);
 
-    //  ina
-    let ina_mats: Vec<_> = zip(["hair", "cloth", "body", "head"], ina_textures)
-        .map(|(_, tex)| {
-            resource_loader.init_material(
-                basic_shader,
-                [WriteDescriptorSet::image_view_sampler(
-                    0,
-                    tex,
-                    linear_sampler.clone(),
-                )],
-            )
-        })
-        .collect();
+    // //  ina
+    // let ina_mats: Vec<_> = zip(["hair", "cloth", "body", "head"], ina_textures)
+    //     .map(|(_, tex)| {
+    //         resource_loader.init_material(
+    //             basic_shader,
+    //             [WriteDescriptorSet::image_view_sampler(
+    //                 0,
+    //                 tex,
+    //                 linear_sampler.clone(),
+    //             )],
+    //         )
+    //     })
+    //     .collect();
 
-    //  uv
-    let uv_mat = uv_shader.add_material(None);
+    // //  uv
+    // let uv_mat = uv_shader.add_material(None);
 
-    //  grad
-    let grad_mat = grad_shader.add_material(None);
+    // //  grad
+    // let grad_mat = grad_shader.add_material(None);
 
-    //  unlit solids
-    let red_material = {
-        let red_mat_buffer = resource_loader.create_material_buffer(
-            draw::SolidData {
-                color: [1., 0., 0., 1.],
-            },
-            BufferUsage::empty(),
-        );
-        resource_loader.init_material(
-            solid_shader,
-            [WriteDescriptorSet::buffer(0, red_mat_buffer)],
-        )
-    };
-    let blue_material = {
-        let blue_mat_buffer = resource_loader.create_material_buffer(
-            draw::SolidData {
-                color: [0., 0., 1., 1.],
-            },
-            BufferUsage::empty(),
-        );
-        resource_loader.init_material(
-            solid_shader,
-            [WriteDescriptorSet::buffer(0, blue_mat_buffer)],
-        )
-    };
+    // //  unlit solids
+    // let red_material = {
+    //     let red_mat_buffer = resource_loader.create_material_buffer(
+    //         draw::SolidData {
+    //             color: [1., 0., 0., 1.],
+    //         },
+    //         BufferUsage::empty(),
+    //     );
+    //     resource_loader.init_material(
+    //         solid_shader,
+    //         [WriteDescriptorSet::buffer(0, red_mat_buffer)],
+    //     )
+    // };
+    // let blue_material = {
+    //     let blue_mat_buffer = resource_loader.create_material_buffer(
+    //         draw::SolidData {
+    //             color: [0., 0., 1., 1.],
+    //         },
+    //         BufferUsage::empty(),
+    //     );
+    //     resource_loader.init_material(
+    //         solid_shader,
+    //         [WriteDescriptorSet::buffer(0, blue_mat_buffer)],
+    //     )
+    // };
 
-    // push shaders
-    unlit_system.shaders.push(uv_shader);
-    unlit_system.shaders.push(grad_shader);
+    // // push shaders
+    // unlit_system.shaders.push(uv_shader);
+    // unlit_system.shaders.push(grad_shader);
+
+    // // meshes
+    // //      suzanne
+    // let suzanne_mesh = {
+    //     let (vertices, indices) = from_obj(Path::new("models/suzanne.obj")).pop().unwrap();
+    //     resource_loader.load_mesh(vertices, indices)
+    // };
+
+    // //      square
+    // let square = {
+    //     let vertices = vec![
+    //         VertexFull {
+    //             position: [-0.25, -0.25, 0.0],
+    //             normal: [0.0, 0.0, 1.0],
+    //             colour: [0.0, 1.0, 0.0],
+    //             uv: [0.0, 0.0],
+    //         },
+    //         VertexFull {
+    //             position: [0.25, -0.25, 0.0],
+    //             normal: [0.0, 0.0, 1.0],
+    //             colour: [0.0, 1.0, 0.0],
+    //             uv: [1.0, 0.0],
+    //         },
+    //         VertexFull {
+    //             position: [-0.25, 0.25, 0.0],
+    //             normal: [0.0, 0.0, 1.0],
+    //             colour: [0.0, 1.0, 0.0],
+    //             uv: [0.0, 1.0],
+    //         },
+    //         VertexFull {
+    //             position: [0.25, 0.25, 0.0],
+    //             normal: [0.0, 0.0, 1.0],
+    //             colour: [0.0, 1.0, 0.0],
+    //             uv: [1.0, 1.0],
+    //         },
+    //     ];
+    //     let indices = vec![0, 1, 2, 2, 1, 3];
+    //     resource_loader.load_mesh(vertices, indices)
+    // };
+
+    // //      cube
+    // let cube_mesh = {
+    //     let (vertices, indices) = from_obj(Path::new("models/default_cube.obj"))
+    //         .pop()
+    //         .expect("Failed to load cube mesh");
+    //     resource_loader.load_mesh(vertices, indices)
+    // };
+
+    // //      lost empire
+    // let le_meshes: Vec<_> = from_obj(Path::new("models/lost_empire.obj"))
+    //     .into_iter()
+    //     .map(|(vertices, indices)| resource_loader.load_mesh(vertices, indices))
+    //     .collect();
+
+    // //      ina
+    // let ina_meshes: Vec<_> = from_obj(Path::new("models/ina/ReadyToRigINA.obj"))
+    //     .into_iter()
+    //     .skip(2)
+    //     .map(|(vertices, indices)| resource_loader.load_mesh(vertices, indices))
+    //     .collect();
+
+    // println!("[Rendering Data]");
+    // println!("Lost empire mesh count: {}", le_meshes.len());
+    // println!("Ina mesh count: {}", ina_meshes.len());
+
+    let le_mesh_count = from_obj(Path::new("models/lost_empire.obj")).len();
 
     // meshes
-    //      suzanne
-    let suzanne_mesh = {
-        let (vertices, indices) = from_obj(Path::new("models/suzanne.obj")).pop().unwrap();
-        resource_loader.load_mesh(vertices, indices)
-    };
+    let suzanne_mesh = resources.get_mesh(MeshID::Suzanne);
+    let square_mesh = resources.get_mesh(MeshID::Square);
+    let cube_mesh = resources.get_mesh(MeshID::Cube);
 
-    //      square
-    let square = {
-        let vertices = vec![
-            VertexFull {
-                position: [-0.25, -0.25, 0.0],
-                normal: [0.0, 0.0, 1.0],
-                colour: [0.0, 1.0, 0.0],
-                uv: [0.0, 0.0],
-            },
-            VertexFull {
-                position: [0.25, -0.25, 0.0],
-                normal: [0.0, 0.0, 1.0],
-                colour: [0.0, 1.0, 0.0],
-                uv: [1.0, 0.0],
-            },
-            VertexFull {
-                position: [-0.25, 0.25, 0.0],
-                normal: [0.0, 0.0, 1.0],
-                colour: [0.0, 1.0, 0.0],
-                uv: [0.0, 1.0],
-            },
-            VertexFull {
-                position: [0.25, 0.25, 0.0],
-                normal: [0.0, 0.0, 1.0],
-                colour: [0.0, 1.0, 0.0],
-                uv: [1.0, 1.0],
-            },
-        ];
-        let indices = vec![0, 1, 2, 2, 1, 3];
-        resource_loader.load_mesh(vertices, indices)
-    };
+    let ina_meshes = [
+        MeshID::InaBody,
+        MeshID::InaCloth,
+        MeshID::InaHair,
+        MeshID::InaHead,
+    ]
+    .map(|id| resources.get_mesh(id));
 
-    //      cube
-    let cube_mesh = {
-        let (vertices, indices) = from_obj(Path::new("models/default_cube.obj"))
-            .pop()
-            .expect("Failed to load cube mesh");
-        resource_loader.load_mesh(vertices, indices)
-    };
-
-    //      lost empire
-    let le_meshes: Vec<_> = from_obj(Path::new("models/lost_empire.obj"))
-        .into_iter()
-        .map(|(vertices, indices)| resource_loader.load_mesh(vertices, indices))
+    let le_meshes: Vec<std::sync::Arc<vulkano_objects::buffers::Buffers<VertexFull>>> = (0
+        ..le_mesh_count)
+        .map(|n| resources.get_mesh(MeshID::LostEmpire(n as u8)))
         .collect();
 
-    //      ina
-    let ina_meshes: Vec<_> = from_obj(Path::new("models/ina/ReadyToRigINA.obj"))
-        .into_iter()
-        .skip(2)
-        .map(|(vertices, indices)| resource_loader.load_mesh(vertices, indices))
-        .collect();
+    // materials
+    let uv_mat = resources.get_material(MaterialID::UV, lit_system, unlit_system);
+    let grad_mat = resources.get_material(MaterialID::Gradient, lit_system, unlit_system);
 
-    println!("[Rendering Data]");
-    println!("Lost empire mesh count: {}", le_meshes.len());
-    println!("Ina mesh count: {}", ina_meshes.len());
+    let ina_mats = [
+        TextureID::InaBody,
+        TextureID::InaCloth,
+        TextureID::InaHair,
+        TextureID::InaHead,
+    ]
+    .map(|id| resources.get_material(MaterialID::LitTexture(id), lit_system, unlit_system));
+
+    let le_mat = resources.get_material(
+        MaterialID::LitTexture(TextureID::LostEmpire),
+        lit_system,
+        unlit_system,
+    );
+
+    let red_mat = resources.get_material(
+        MaterialID::UnlitColor([u8::MAX, 0, 0, u8::MAX]),
+        lit_system,
+        unlit_system,
+    );
+    let blue_mat = resources.get_material(
+        MaterialID::UnlitColor([0, 0, u8::MAX, u8::MAX]),
+        lit_system,
+        unlit_system,
+    );
 
     // objects
     //      Suzanne
@@ -213,7 +265,7 @@ fn init_render_objects(
 
     //      Squares
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
-        let square_obj = RenderObject::new(square.clone(), grad_mat.clone()); //uv_mat.clone());
+        let square_obj = RenderObject::new(square_mesh.clone(), grad_mat.clone()); //uv_mat.clone());
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
             translation: [x, y, z].into(),
             ..Default::default()
@@ -247,7 +299,7 @@ fn init_render_objects(
         });
 
         let mat_swapper =
-            MaterialSwapper::new([le_mat.clone(), le_uv_mat.clone(), ina_mats[1].clone()]);
+            MaterialSwapper::new([le_mat.clone(), uv_mat.clone(), ina_mats[1].clone()]);
 
         world.push((transform_id, le_obj, mat_swapper));
     }
@@ -263,7 +315,7 @@ fn init_render_objects(
             color: Vector4::new(1., 0., 0., 3.),
             half_radius: 3.,
         },
-        RenderObject::new(cube_mesh.clone(), red_material.clone()),
+        RenderObject::new(cube_mesh.clone(), red_mat.clone()),
     ));
     world.push((
         transform_sys.add_transform(TransformCreateInfo {
@@ -275,7 +327,7 @@ fn init_render_objects(
             color: Vector4::new(0., 0., 1., 2.),
             half_radius: 3.,
         },
-        RenderObject::new(cube_mesh.clone(), blue_material),
+        RenderObject::new(cube_mesh.clone(), blue_mat),
     ));
 
     // spam lights
@@ -291,7 +343,7 @@ fn init_render_objects(
                     color: Vector4::new(1., 0., 0., 1.),
                     half_radius: 1.,
                 },
-                RenderObject::new(cube_mesh.clone(), red_material.clone()),
+                RenderObject::new(cube_mesh.clone(), red_mat.clone()),
             ));
         }
     }

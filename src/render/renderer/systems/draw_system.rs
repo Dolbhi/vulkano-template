@@ -13,7 +13,7 @@ use vulkano::{
 };
 
 use crate::{
-    render::{context::Context, render_data::material::Shader},
+    render::{context::Context, render_data::material::Shader, resource_manager::MaterialID},
     vulkano_objects::{buffers::write_to_storage_buffer, pipeline::PipelineHandler},
 };
 
@@ -32,18 +32,22 @@ impl<'a> DrawSystem {
     pub fn new(
         context: &Context,
         subpass: &Subpass,
+        id: MaterialID,
         vs: Arc<ShaderModule>,
         fs: Arc<ShaderModule>,
     ) -> (Self, [Arc<DescriptorSetLayout>; 2]) {
-        let shader = Shader::new(PipelineHandler::new(
-            context.device.clone(),
-            vs.entry_point("main").unwrap(),
-            fs.entry_point("main").unwrap(),
-            context.viewport.clone(),
-            subpass.clone(),
-            [], // [(0, 0)],
-            crate::vulkano_objects::pipeline::PipelineType::Drawing,
-        ));
+        let shader = Shader::new(
+            id,
+            PipelineHandler::new(
+                context.device.clone(),
+                vs.entry_point("main").unwrap(),
+                fs.entry_point("main").unwrap(),
+                context.viewport.clone(),
+                subpass.clone(),
+                [], // [(0, 0)],
+                crate::vulkano_objects::pipeline::PipelineType::Drawing,
+            ),
+        );
 
         let layouts = shader.pipeline.layout().set_layouts();
         let layouts = [layouts[0].clone(), layouts[1].clone()];
@@ -59,20 +63,34 @@ impl<'a> DrawSystem {
 
     /// creates shader with the same subpass and dynamic bindings as this system, must be manually added later
     pub fn create_shader(
-        &mut self,
+        &self,
         context: &Context,
+        id: MaterialID,
         vs: Arc<ShaderModule>,
         fs: Arc<ShaderModule>,
     ) -> Shader {
-        Shader::new(PipelineHandler::new(
-            context.device.clone(),
-            vs.entry_point("main").unwrap(),
-            fs.entry_point("main").unwrap(),
-            context.viewport.clone(),
-            self.subpass.clone(),
-            [], // [(0, 0)],
-            crate::vulkano_objects::pipeline::PipelineType::Drawing,
-        ))
+        Shader::new(
+            id,
+            PipelineHandler::new(
+                context.device.clone(),
+                vs.entry_point("main").unwrap(),
+                fs.entry_point("main").unwrap(),
+                context.viewport.clone(),
+                self.subpass.clone(),
+                [], // [(0, 0)],
+                crate::vulkano_objects::pipeline::PipelineType::Drawing,
+            ),
+        )
+    }
+
+    /// search for shader via MaterialID
+    pub fn find_shader(&mut self, id: MaterialID) -> Option<&mut Shader> {
+        for shader in &mut self.shaders {
+            if std::mem::discriminant(&shader.get_id()) == std::mem::discriminant(&id) {
+                return Some(shader);
+            }
+        }
+        None
     }
 
     /// Recreate all pipelines with any changes in viewport
@@ -95,7 +113,7 @@ impl<'a> DrawSystem {
         let obj_iter = self
             .shaders
             .iter_mut()
-            .flat_map(|pipeline| pipeline.upload_pending_objects());
+            .flat_map(|shader| shader.upload_pending_objects());
         write_to_storage_buffer(buffer, obj_iter, offset)
     }
     /// bind draw calls to the given command buffer builder, be sure to call `update_object_buffer()` before hand

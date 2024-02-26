@@ -12,7 +12,9 @@ use crate::{
         Camera,
     },
     init_render_objects,
-    render::{renderer::DeferredRenderer, RenderLoop, RenderObject},
+    render::{
+        renderer::DeferredRenderer, resource_manager::ResourceManager, RenderLoop, RenderObject,
+    },
     shaders::{draw::GPUGlobalData, lighting::DirectionLight},
     MaterialSwapper,
 };
@@ -42,6 +44,7 @@ struct Keys {
 pub struct App {
     render_loop: RenderLoop,
     renderer: DeferredRenderer,
+    resources: ResourceManager,
     camera: Camera,
     keys: Keys,
     world: World,
@@ -65,11 +68,13 @@ impl App {
 
         let render_init_elapse = init_start_time.elapsed().as_millis();
 
+        let mut resources = ResourceManager::new(&render_loop.context);
+
         // draw objects
         let suzanne = init_render_objects(
             &mut world,
             &mut transforms,
-            &render_loop.context,
+            &mut resources.begin_retrieving(&render_loop.context),
             &mut renderer.lit_draw_system,
             &mut renderer.unlit_draw_system,
         );
@@ -98,6 +103,7 @@ impl App {
         Self {
             render_loop,
             renderer,
+            resources,
             camera: Default::default(),
             keys: Keys::default(),
             world,
