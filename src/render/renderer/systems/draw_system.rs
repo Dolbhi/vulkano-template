@@ -61,15 +61,15 @@ impl<'a> DrawSystem {
         )
     }
 
-    /// creates shader with the same subpass and dynamic bindings as this system, must be manually added later
-    pub fn create_shader(
-        &self,
+    /// creates shader with the same subpass and dynamic bindings as this system
+    pub fn add_shader(
+        &mut self,
         context: &Context,
         id: MaterialID,
         vs: Arc<ShaderModule>,
         fs: Arc<ShaderModule>,
-    ) -> Shader {
-        Shader::new(
+    ) {
+        self.shaders.push(Shader::new(
             id,
             PipelineHandler::new(
                 context.device.clone(),
@@ -80,7 +80,7 @@ impl<'a> DrawSystem {
                 [], // [(0, 0)],
                 crate::vulkano_objects::pipeline::PipelineType::Drawing,
             ),
-        )
+        ));
     }
 
     /// search for shader via MaterialID

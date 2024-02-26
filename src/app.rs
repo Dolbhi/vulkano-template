@@ -74,9 +74,11 @@ impl App {
         let suzanne = init_render_objects(
             &mut world,
             &mut transforms,
-            &mut resources.begin_retrieving(&render_loop.context),
-            &mut renderer.lit_draw_system,
-            &mut renderer.unlit_draw_system,
+            &mut resources.begin_retrieving(
+                &render_loop.context,
+                &mut renderer.lit_draw_system,
+                &mut renderer.unlit_draw_system,
+            ),
         );
 
         let total_elapse = init_start_time.elapsed().as_millis();

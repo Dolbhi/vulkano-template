@@ -1,24 +1,12 @@
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 
-use crate::{
-    vulkano_objects::{
-        self,
-        allocators::Allocators,
-        buffers::{self, Buffers},
-        pipeline::PipelineHandler,
-    },
-    VertexFull,
-};
+use crate::vulkano_objects::{self, allocators::Allocators};
 use vulkano::{
-    buffer::{BufferContents, BufferUsage, Subbuffer},
     command_buffer::{self, AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
-    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
-    image::{sampler::Sampler, view::ImageView, Image},
+    image::Image,
     instance::Instance,
-    pipeline::graphics::{vertex_input::Vertex, viewport::Viewport},
-    render_pass::Subpass,
-    shader::ShaderModule,
+    pipeline::graphics::viewport::Viewport,
     swapchain::{
         self, PresentFuture, Surface, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
         SwapchainPresentInfo,
@@ -34,14 +22,6 @@ use winit::{
     dpi::LogicalSize,
     event_loop::EventLoop,
     window::{CursorGrabMode, Window, WindowBuilder},
-};
-
-use super::{
-    render_data::{
-        material::Shader,
-        texture::{create_sampler, load_texture},
-    },
-    RenderSubmit,
 };
 
 pub type Fence = FenceSignalFuture<
@@ -212,101 +192,101 @@ impl Context {
             .then_signal_fence_and_flush()
     }
 
-    pub fn get_resource_loader(&self) -> ResourceLoader {
-        ResourceLoader { context: &self }
-    }
+    // pub fn get_resource_loader(&self) -> ResourceLoader {
+    //     ResourceLoader { context: &self }
+    // }
 }
 
-pub struct ResourceLoader<'a> {
-    context: &'a Context,
-    // draw_system: &'a mut DrawSystem<GPUObjectData, Matrix4<f32>>,
-}
+// pub struct ResourceLoader<'a> {
+//     context: &'a Context,
+//     // draw_system: &'a mut DrawSystem<GPUObjectData, Matrix4<f32>>,
+// }
 
-impl<'a> ResourceLoader<'a> {
-    pub fn load_texture(&self, path: &Path) -> Arc<ImageView> {
-        load_texture(&self.context.allocators, &self.context.queue, path)
-    }
-    pub fn load_sampler(&self, filter: vulkano::image::sampler::Filter) -> Arc<Sampler> {
-        create_sampler(self.context.device.clone(), filter)
-    }
-    pub fn load_mesh(
-        &self,
-        vertices: Vec<VertexFull>,
-        indices: Vec<u32>,
-    ) -> Arc<Buffers<VertexFull>> {
-        Arc::new(Buffers::initialize_device_local(
-            &self.context.allocators,
-            self.context.queue.clone(),
-            vertices,
-            indices,
-        ))
-    }
+// impl<'a> ResourceLoader<'a> {
+//     pub fn load_texture(&self, path: &Path) -> Arc<ImageView> {
+//         load_texture(&self.context.allocators, &self.context.queue, path)
+//     }
+//     pub fn load_sampler(&self, filter: vulkano::image::sampler::Filter) -> Arc<Sampler> {
+//         create_sampler(self.context.device.clone(), filter)
+//     }
+//     pub fn load_mesh(
+//         &self,
+//         vertices: Vec<VertexFull>,
+//         indices: Vec<u32>,
+//     ) -> Arc<Buffers<VertexFull>> {
+//         Arc::new(Buffers::initialize_device_local(
+//             &self.context.allocators,
+//             self.context.queue.clone(),
+//             vertices,
+//             indices,
+//         ))
+//     }
 
-    pub fn load_pipeline<V: Vertex>(
-        &self,
-        vs: Arc<ShaderModule>,
-        fs: Arc<ShaderModule>,
-        subpass: Subpass,
-        dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
-        pipeline_type: crate::vulkano_objects::pipeline::PipelineType,
-    ) -> PipelineHandler<V> {
-        PipelineHandler::new(
-            self.context.device.clone(),
-            vs.entry_point("main").unwrap(),
-            fs.entry_point("main").unwrap(),
-            self.context.viewport.clone(),
-            subpass,
-            dynamic_bindings,
-            pipeline_type,
-        )
-    }
-    pub fn load_pipelines<V: Vertex, const SHADERS: usize>(
-        &self,
-        modules: [(Arc<ShaderModule>, Arc<ShaderModule>); SHADERS],
-        subpass: Subpass,
-        dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
-        pipeline_type: crate::vulkano_objects::pipeline::PipelineType,
-    ) -> [PipelineHandler<V>; SHADERS] {
-        modules.map(|(vs, fs)| {
-            self.load_pipeline(
-                vs,
-                fs,
-                subpass.clone(),
-                dynamic_bindings.clone(), // [(0, 0)],
-                pipeline_type,
-            )
-        })
-    }
+//     pub fn load_pipeline<V: Vertex>(
+//         &self,
+//         vs: Arc<ShaderModule>,
+//         fs: Arc<ShaderModule>,
+//         subpass: Subpass,
+//         dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
+//         pipeline_type: crate::vulkano_objects::pipeline::PipelineType,
+//     ) -> PipelineHandler<V> {
+//         PipelineHandler::new(
+//             self.context.device.clone(),
+//             vs.entry_point("main").unwrap(),
+//             fs.entry_point("main").unwrap(),
+//             self.context.viewport.clone(),
+//             subpass,
+//             dynamic_bindings,
+//             pipeline_type,
+//         )
+//     }
+//     pub fn load_pipelines<V: Vertex, const SHADERS: usize>(
+//         &self,
+//         modules: [(Arc<ShaderModule>, Arc<ShaderModule>); SHADERS],
+//         subpass: Subpass,
+//         dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
+//         pipeline_type: crate::vulkano_objects::pipeline::PipelineType,
+//     ) -> [PipelineHandler<V>; SHADERS] {
+//         modules.map(|(vs, fs)| {
+//             self.load_pipeline(
+//                 vs,
+//                 fs,
+//                 subpass.clone(),
+//                 dynamic_bindings.clone(), // [(0, 0)],
+//                 pipeline_type,
+//             )
+//         })
+//     }
 
-    /// creates a material of the given pipeline with a corresponding descriptor set as set 2
-    pub fn init_material(
-        &self,
-        shader: &mut Shader,
-        descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
-    ) -> RenderSubmit {
-        shader.add_material(Some(
-            PersistentDescriptorSet::new(
-                &self.context.allocators.descriptor_set,
-                shader
-                    .pipeline
-                    .layout()
-                    .set_layouts()
-                    .get(2)
-                    .unwrap()
-                    .clone(),
-                descriptor_writes,
-                [],
-            )
-            .unwrap(), // pipeline_group.create_material_set(&self.context.allocators, descriptor_writes),
-        ))
-    }
-    pub fn create_material_buffer<T: BufferContents>(
-        &self,
-        data: T,
-        usage: BufferUsage,
-    ) -> Subbuffer<T> {
-        buffers::create_material_buffer(&self.context.allocators, data, usage)
-    }
-    // pub fn build_material
-    // pub fn
-}
+//     /// creates a material of the given pipeline with a corresponding descriptor set as set 2
+//     pub fn init_material(
+//         &self,
+//         shader: &mut Shader,
+//         descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
+//     ) -> RenderSubmit {
+//         shader.add_material(Some(
+//             PersistentDescriptorSet::new(
+//                 &self.context.allocators.descriptor_set,
+//                 shader
+//                     .pipeline
+//                     .layout()
+//                     .set_layouts()
+//                     .get(2)
+//                     .unwrap()
+//                     .clone(),
+//                 descriptor_writes,
+//                 [],
+//             )
+//             .unwrap(), // pipeline_group.create_material_set(&self.context.allocators, descriptor_writes),
+//         ))
+//     }
+//     pub fn create_material_buffer<T: BufferContents>(
+//         &self,
+//         data: T,
+//         usage: BufferUsage,
+//     ) -> Subbuffer<T> {
+//         buffers::create_material_buffer(&self.context.allocators, data, usage)
+//     }
+//     // pub fn build_material
+//     // pub fn
+// }

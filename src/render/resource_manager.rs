@@ -8,13 +8,12 @@ use vulkano::{
 use crate::{shaders::draw, vulkano_objects::buffers::Buffers, VertexFull};
 
 use super::{
-    context,
     mesh::from_obj,
     render_data::{
         material::Shader,
         texture::{create_sampler, load_texture},
     },
-    Context, DeferredRenderer, DrawSystem, RenderSubmit,
+    Context, DrawSystem, RenderSubmit,
 };
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -68,10 +67,17 @@ impl ResourceManager {
         }
     }
 
-    pub fn begin_retrieving<'a>(&'a mut self, context: &'a Context) -> ResourceRetriever {
+    pub fn begin_retrieving<'a>(
+        &'a mut self,
+        context: &'a Context,
+        lit_system: &'a mut DrawSystem,
+        unlit_system: &'a mut DrawSystem,
+    ) -> ResourceRetriever {
         ResourceRetriever {
             loaded_resources: self,
             context,
+            lit_system,
+            unlit_system,
         }
     }
 }
@@ -79,6 +85,8 @@ impl ResourceManager {
 pub struct ResourceRetriever<'a> {
     loaded_resources: &'a mut ResourceManager,
     context: &'a Context,
+    lit_system: &'a mut DrawSystem,
+    unlit_system: &'a mut DrawSystem,
 }
 
 impl<'a> ResourceRetriever<'a> {
@@ -163,58 +171,50 @@ impl<'a> ResourceRetriever<'a> {
         }
     }
 
-    pub fn get_material(
-        &mut self,
-        id: MaterialID,
-        lit_system: &mut DrawSystem,
-        unlit_system: &mut DrawSystem,
-    ) -> RenderSubmit {
+    pub fn get_material(&mut self, id: MaterialID) -> RenderSubmit {
         match self.loaded_resources.loaded_materials.get(&id) {
             Some(mat) => mat.clone(),
             None => {
                 // Narrow down system
                 let system = match id {
-                    MaterialID::LitTexture(_) => lit_system,
-                    _ => unlit_system,
+                    MaterialID::LitTexture(_) => &mut self.lit_system,
+                    _ => &mut self.unlit_system,
                 };
                 // Narrow down shader
                 let shader = match system.find_shader(id) {
                     Some(s) => s,
                     None => {
-                        // load shader
-                        match id {
-                            MaterialID::LitTexture(_) => {
-                                panic!("Basic lit shader should be loaded by default")
-                            }
-                            MaterialID::UnlitColor(_) => {
-                                panic!("Unlit color shader should be loaded by default")
-                            }
-                            MaterialID::UV => {
-                                system.shaders.push(
-                                    system.create_shader(
+                        {
+                            // load shader
+                            match id {
+                                MaterialID::LitTexture(_) => {
+                                    panic!("Basic lit shader should be loaded by default")
+                                }
+                                MaterialID::UnlitColor(_) => {
+                                    panic!("Unlit color shader should be loaded by default")
+                                }
+                                MaterialID::UV => {
+                                    system.add_shader(
                                         &self.context,
                                         MaterialID::UV,
                                         draw::load_basic_vs(self.context.device.clone())
                                             .expect("failed to create uv shader module"),
                                         draw::load_uv_fs(self.context.device.clone())
                                             .expect("failed to create uv shader module"),
-                                    ),
-                                );
-                                system.find_shader(id).unwrap()
-                            }
-                            MaterialID::Gradient => {
-                                system.shaders.push(
-                                    system.create_shader(
+                                    );
+                                }
+                                MaterialID::Gradient => {
+                                    system.add_shader(
                                         &self.context,
                                         MaterialID::Gradient,
                                         draw::load_basic_vs(self.context.device.clone())
                                             .expect("failed to create grad shader module"),
                                         draw::load_grad_fs(self.context.device.clone())
                                             .expect("failed to create grad shader module"),
-                                    ),
-                                );
-                                system.find_shader(id).unwrap()
-                            }
+                                    );
+                                }
+                            };
+                            system.find_shader(id).unwrap()
                         }
                     }
                 };
@@ -224,7 +224,7 @@ impl<'a> ResourceRetriever<'a> {
                         let tex = self.get_texture(tex_id);
                         init_material(
                             &self.context,
-                            shader,
+                            self.lit_system.find_shader(id).unwrap(),
                             [WriteDescriptorSet::image_view_sampler(
                                 0,
                                 tex,
