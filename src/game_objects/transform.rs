@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cgmath::{Matrix4, Quaternion, SquareMatrix, Vector3, Zero};
+use cgmath::{Matrix4, One, Quaternion, SquareMatrix, Vector3, Zero};
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct TransformID(u32);
@@ -114,7 +114,7 @@ impl Default for TransformCreateInfo {
         Self {
             parent: Default::default(),
             translation: Zero::zero(),
-            rotation: Zero::zero(),
+            rotation: One::one(),
             scale: Vector3::new(1., 1., 1.),
         }
     }

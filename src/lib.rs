@@ -5,7 +5,7 @@ pub mod shaders;
 mod vertex_data;
 pub mod vulkano_objects;
 
-use cgmath::{Vector3, Vector4};
+use cgmath::{Rad, Vector3, Vector4};
 pub use vertex_data::{Vertex2d, Vertex3d, VertexFull};
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
     render::RenderObject,
 };
 
-use game_objects::transform::{TransformID, TransformSystem};
+use game_objects::{transform::TransformSystem, Rotate};
 use legion::World;
 use render::{
     resource_manager::{MaterialID, MeshID, ResourceRetriever, TextureID},
@@ -30,11 +30,11 @@ mod tests {
     }
 }
 
-fn init_render_objects(
+fn init_world(
     world: &mut World,
     transform_sys: &mut TransformSystem,
     resources: &mut ResourceRetriever,
-) -> TransformID {
+) {
     // let le_mesh_count = from_obj(Path::new("models/lost_empire.obj")).len(); // 45
 
     // meshes
@@ -50,8 +50,8 @@ fn init_render_objects(
     ]
     .map(|id| resources.get_mesh(id));
 
-    let le_meshes: Vec<std::sync::Arc<vulkano_objects::buffers::Buffers<VertexFull>>> = (0..45)
-        .map(|n| resources.get_mesh(MeshID::LostEmpire(n as u8)))
+    let le_meshes: Vec<std::sync::Arc<vulkano_objects::buffers::Buffers<VertexFull>>> = (0..45u8)
+        .map(|n| resources.get_mesh(MeshID::LostEmpire(n)))
         .collect();
 
     // materials
@@ -73,9 +73,10 @@ fn init_render_objects(
 
     // objects
     //      Suzanne
-    let suzanne_obj = RenderObject::new(suzanne_mesh.clone(), uv_mat.clone());
     let suzanne = transform_sys.next().unwrap();
-    world.push((suzanne, suzanne_obj));
+    let suzanne_obj = RenderObject::new(suzanne_mesh.clone(), uv_mat.clone());
+    let rotate = Rotate([0., 1., 0.].into(), Rad(1.0));
+    world.push((suzanne, suzanne_obj, rotate));
 
     //      Spam Suzanne
     for x in 0..20 {
@@ -106,6 +107,8 @@ fn init_render_objects(
         translation: [0.0, 5.0, -1.0].into(),
         ..Default::default()
     });
+    let rotate = Rotate([0., 1., 0.].into(), Rad(0.5));
+    world.push((ina_transform, rotate));
     for (mesh, mat) in zip(ina_meshes, ina_mats.clone()) {
         let obj = RenderObject::new(mesh, mat);
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
@@ -174,8 +177,6 @@ fn init_render_objects(
             ));
         }
     }
-
-    suzanne
 }
 
 pub struct MaterialSwapper {

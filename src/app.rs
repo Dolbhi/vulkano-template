@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use cgmath::{Euler, Matrix4, Rad, Vector3, Vector4};
+use cgmath::{Matrix4, Quaternion, Rotation3, Vector3, Vector4};
 use legion::{IntoQuery, *};
 
 use winit::{event::ElementState, event_loop::EventLoop, keyboard::KeyCode};
@@ -9,9 +9,9 @@ use crate::{
     game_objects::{
         light::PointLightComponent,
         transform::{TransformID, TransformSystem},
-        Camera,
+        Camera, Rotate,
     },
-    init_render_objects,
+    init_world,
     render::{
         renderer::DeferredRenderer, resource_manager::ResourceManager, RenderLoop, RenderObject,
     },
@@ -50,7 +50,6 @@ pub struct App {
     world: World,
     transforms: TransformSystem,
     total_seconds: f32,
-    suzanne: TransformID,
     camera_light: TransformID,
 }
 
@@ -71,7 +70,7 @@ impl App {
         let mut resources = ResourceManager::new(&render_loop.context);
 
         // draw objects
-        let suzanne = init_render_objects(
+        init_world(
             &mut world,
             &mut transforms,
             &mut resources.begin_retrieving(
@@ -121,7 +120,6 @@ impl App {
             world,
             transforms,
             total_seconds: 0.,
-            suzanne,
             camera_light,
         }
     }
@@ -138,15 +136,20 @@ impl App {
             .unwrap()
             .set_translation(self.camera.position + Vector3::new(0., 0.01, 0.01)); // light pos cannot = cam pos else the light will glitch
 
-        // rotate suzanne
-        self.transforms
-            .get_transform_mut(&self.suzanne)
-            .unwrap()
-            .set_rotation(Euler {
-                x: Rad(0.),
-                y: Rad(self.total_seconds),
-                z: Rad(0.),
-            });
+        // update rotate
+        let mut query = <(&TransformID, &Rotate)>::query();
+        for (transform_id, rotate) in query.iter(&self.world) {
+            let transform = self.transforms.get_transform_mut(transform_id).unwrap();
+            transform.set_rotation(
+                Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
+                    * transform.get_transform().rotation,
+            );
+            // println!(
+            //     "multiplying {:?} for new rotation of {:?}",
+            //     rotate.0,
+            //     transform.get_transform().rotation
+            // );
+        }
 
         // update render objects
         let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query();
