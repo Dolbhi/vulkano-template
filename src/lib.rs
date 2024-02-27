@@ -14,7 +14,7 @@ use crate::{
 };
 
 use game_objects::{
-    object_loader::{self, ObjectInfo, ObjectLoader, SerialComponentInfo},
+    object_loader::{self, ComponentInfo, ObjectInfo, ObjectLoader},
     transform::{self, TransformID, TransformSystem},
 };
 use legion::World;
@@ -72,13 +72,10 @@ fn init_render_objects(mut object_loader: ObjectLoader) -> TransformID {
 
     // objects
     //      Suzanne
-    let suzanne = {
-        let info = ObjectInfo {
-            components: vec![SerialComponentInfo::Render(MeshID::Suzanne, MaterialID::UV)],
-            ..Default::default()
-        };
-        object_loader.create_object(info)
-    };
+    let suzanne = object_loader.create_object(ObjectInfo {
+        components: vec![ComponentInfo::Render(MeshID::Suzanne, MaterialID::UV)],
+        ..Default::default()
+    });
 
     // let suzanne_obj = RenderObject::new(suzanne_mesh.clone(), uv_mat.clone());
     // let suzanne = transform_sys.next().unwrap();
@@ -86,15 +83,14 @@ fn init_render_objects(mut object_loader: ObjectLoader) -> TransformID {
 
     //      Spam Suzanne
     let ro_info =
-        SerialComponentInfo::Render(MeshID::Suzanne, MaterialID::LitTexture(TextureID::InaCloth));
+        ComponentInfo::Render(MeshID::Suzanne, MaterialID::LitTexture(TextureID::InaCloth));
     for x in 0..20 {
         for z in 0..20 {
-            let transform = TransformCreateInfo {
-                translation: [x as f32, 7f32, z as f32].into(),
-                ..Default::default()
-            };
             object_loader.create_object(ObjectInfo {
-                transform,
+                transform: TransformCreateInfo {
+                    translation: [x as f32, 7f32, z as f32].into(),
+                    ..Default::default()
+                },
                 components: vec![ro_info.clone()],
                 ..Default::default()
             });
@@ -109,14 +105,13 @@ fn init_render_objects(mut object_loader: ObjectLoader) -> TransformID {
     }
 
     //      Squares
-    let ro_info = SerialComponentInfo::Render(MeshID::Square, MaterialID::Gradient);
+    let ro_info = ComponentInfo::Render(MeshID::Square, MaterialID::Gradient);
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
-        let transform = TransformCreateInfo {
-            translation: [x, y, z].into(),
-            ..Default::default()
-        };
         object_loader.create_object(ObjectInfo {
-            transform,
+            transform: TransformCreateInfo {
+                translation: [x, y, z].into(),
+                ..Default::default()
+            },
             components: vec![ro_info.clone()],
             ..Default::default()
         });
@@ -133,10 +128,7 @@ fn init_render_objects(mut object_loader: ObjectLoader) -> TransformID {
     //      Ina
     let children = zip(ina_meshes, ina_mats)
         .map(|(mesh, tex)| ObjectInfo {
-            components: vec![SerialComponentInfo::Render(
-                mesh,
-                MaterialID::LitTexture(tex),
-            )],
+            components: vec![ComponentInfo::Render(mesh, MaterialID::LitTexture(tex))],
             ..Default::default()
         })
         .collect();
@@ -169,8 +161,8 @@ fn init_render_objects(mut object_loader: ObjectLoader) -> TransformID {
     let children = (0..45)
         .map(|n| ObjectInfo {
             components: vec![
-                SerialComponentInfo::Render(MeshID::LostEmpire(n), le_mat),
-                SerialComponentInfo::MaterialSwapper(vec![
+                ComponentInfo::Render(MeshID::LostEmpire(n), le_mat),
+                ComponentInfo::MaterialSwapper(vec![
                     le_mat,
                     MaterialID::LitTexture(TextureID::InaHead),
                     MaterialID::UV,
@@ -207,11 +199,11 @@ fn init_render_objects(mut object_loader: ObjectLoader) -> TransformID {
             ..Default::default()
         },
         components: vec![
-            SerialComponentInfo::PointLight(PointLightComponent {
+            ComponentInfo::PointLight(PointLightComponent {
                 color: Vector4::new(1., 0., 0., 3.),
                 half_radius: 3.,
             }),
-            SerialComponentInfo::Render(
+            ComponentInfo::Render(
                 MeshID::Cube,
                 MaterialID::UnlitColor([u8::MAX, 0, 0, u8::MAX]),
             ),
@@ -227,11 +219,11 @@ fn init_render_objects(mut object_loader: ObjectLoader) -> TransformID {
             ..Default::default()
         },
         components: vec![
-            SerialComponentInfo::PointLight(PointLightComponent {
+            ComponentInfo::PointLight(PointLightComponent {
                 color: Vector4::new(0., 0., 1., 2.),
                 half_radius: 3.,
             }),
-            SerialComponentInfo::Render(
+            ComponentInfo::Render(
                 MeshID::Cube,
                 MaterialID::UnlitColor([0, 0, u8::MAX, u8::MAX]),
             ),
@@ -266,11 +258,11 @@ fn init_render_objects(mut object_loader: ObjectLoader) -> TransformID {
 
     // spam lights
     let light_component = vec![
-        SerialComponentInfo::PointLight(PointLightComponent {
+        ComponentInfo::PointLight(PointLightComponent {
             color: Vector4::new(1., 0., 0., 1.),
             half_radius: 1.,
         }),
-        SerialComponentInfo::Render(
+        ComponentInfo::Render(
             MeshID::Cube,
             MaterialID::UnlitColor([u8::MAX, 0, 0, u8::MAX]),
         ),

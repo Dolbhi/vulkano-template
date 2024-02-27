@@ -1,5 +1,5 @@
 mod camera;
-pub mod component_info;
+// pub mod component_info;
 pub mod light;
 pub mod object_loader;
 mod scene;

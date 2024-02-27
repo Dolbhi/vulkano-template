@@ -9,43 +9,42 @@ use crate::{
 };
 
 use super::{
-    component_info::ComponentInfo,
     light::{DirectionalLightComponent, PointLightComponent},
     transform::{TransformCreateInfo, TransformID, TransformSystem},
 };
 
 #[derive(Clone)]
-pub enum SerialComponentInfo {
+pub enum ComponentInfo {
     Render(MeshID, MaterialID),
     MaterialSwapper(Vec<MaterialID>),
     PointLight(PointLightComponent),
     DirectionLight(DirectionalLightComponent),
 }
 
-impl ComponentInfo for SerialComponentInfo {
+impl ComponentInfo {
     fn add_to_entry(&self, entry: &mut legion::world::Entry, resources: &mut ResourceRetriever) {
         match self {
-            SerialComponentInfo::Render(mesh, mat) => {
+            ComponentInfo::Render(mesh, mat) => {
                 let mesh = resources.get_mesh(*mesh);
                 let mat = resources.get_material(*mat);
                 entry.add_component(RenderObject::new(mesh, mat));
             }
-            SerialComponentInfo::MaterialSwapper(mats) => {
+            ComponentInfo::MaterialSwapper(mats) => {
                 let mats: Vec<RenderSubmit> = mats
                     .into_iter()
                     .map(|id| resources.get_material(*id))
                     .collect();
                 entry.add_component(MaterialSwapper::new(mats));
             }
-            SerialComponentInfo::PointLight(c) => entry.add_component(c.clone()),
-            SerialComponentInfo::DirectionLight(c) => entry.add_component(c.clone()),
+            ComponentInfo::PointLight(c) => entry.add_component(c.clone()),
+            ComponentInfo::DirectionLight(c) => entry.add_component(c.clone()),
         };
     }
 }
 
 pub struct ObjectInfo {
     pub transform: TransformCreateInfo,
-    pub components: Vec<SerialComponentInfo>,
+    pub components: Vec<ComponentInfo>,
     pub children: Vec<ObjectInfo>,
 }
 
