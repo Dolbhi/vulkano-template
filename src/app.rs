@@ -155,7 +155,7 @@ impl App {
         let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query();
         // println!("==== RENDER OBJECT DATA ====");
         for (transform_id, render_object) in query.iter_mut(&mut self.world) {
-            let transfrom_matrix = self.transforms.get_global_model(transform_id);
+            let transfrom_matrix = self.transforms.get_global_model(transform_id).unwrap();
             // println!("Obj {:?}: {:?}", transform_id, obj);
             render_object.set_matrix(transfrom_matrix);
             render_object.upload();
@@ -188,7 +188,6 @@ impl App {
                         self.transforms
                             .get_transform(t)
                             .unwrap()
-                            .get_transform()
                             .translation
                             .clone(),
                     )

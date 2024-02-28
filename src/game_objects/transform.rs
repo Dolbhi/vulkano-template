@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use cgmath::{Matrix4, One, Quaternion, SquareMatrix, Vector3, Zero};
 
@@ -8,6 +8,7 @@ pub struct TransformID(u32);
 #[derive(Clone)]
 pub struct Transform {
     parent: Option<TransformID>,
+    children: HashSet<TransformID>,
     local_model: Option<Matrix4<f32>>,
     global_model: Option<Matrix4<f32>>,
     translation: Vector3<f32>,
@@ -15,25 +16,7 @@ pub struct Transform {
     scale: Vector3<f32>,
 }
 impl Transform {
-    pub fn new(create_info: TransformCreateInfo) -> Self {
-        let TransformCreateInfo {
-            parent,
-            translation,
-            rotation,
-            scale,
-        } = create_info;
-
-        Transform {
-            local_model: None,
-            global_model: None,
-            parent,
-            translation,
-            rotation,
-            scale,
-        }
-    }
-
-    pub fn get_local_model(&mut self) -> Matrix4<f32> {
+    fn get_local_model(&mut self) -> Matrix4<f32> {
         match self.local_model {
             Some(matrix) => matrix,
             None => {
@@ -42,19 +25,22 @@ impl Transform {
                     * Matrix4::from(self.rotation)
                     * Matrix4::from_nonuniform_scale(self.scale.x, self.scale.y, self.scale.z);
 
-                if self.parent == None {
-                    self.global_model = Some(model);
-                }
                 self.local_model = Some(model);
                 model
             }
         }
     }
 
-    pub fn update_global_model(&mut self, parent_global: &Matrix4<f32>) -> Matrix4<f32> {
-        let new_global = *parent_global * self.get_local_model();
-        self.global_model = Some(new_global);
-        new_global
+    /// update global model of self if needed and return global model
+    fn clean(&mut self, parent_global: &Matrix4<f32>) -> Matrix4<f32> {
+        match self.global_model {
+            Some(model) => model,
+            None => {
+                let new_global = *parent_global * self.get_local_model();
+                self.global_model = Some(new_global);
+                new_global
+            }
+        }
     }
 
     pub fn get_transform(&self) -> TransformView {
@@ -64,10 +50,7 @@ impl Transform {
             scale: &self.scale,
         }
     }
-    pub fn set_parent(&mut self, parent: TransformID) -> Option<TransformID> {
-        self.global_model = None;
-        self.parent.replace(parent)
-    }
+
     pub fn set_translation(&mut self, translation: impl Into<Vector3<f32>>) -> &mut Self {
         self.translation = translation.into();
         self.local_model = None;
@@ -86,16 +69,6 @@ impl Transform {
         self.global_model = None;
         self
     }
-
-    // pub fn get_parent_mut<'a>(
-    //     &self,
-    //     transfrom_system: &'a mut TransformSystem,
-    // ) -> Option<&'a mut Transform> {
-    //     match &self.parent {
-    //         Some(id) => transfrom_system.get_transform_mut(id),
-    //         None => None,
-    //     }
-    // }
 }
 
 pub struct TransformCreateInfo {
@@ -106,13 +79,21 @@ pub struct TransformCreateInfo {
 }
 impl Into<Transform> for TransformCreateInfo {
     fn into(self) -> Transform {
-        Transform::new(self)
+        Transform {
+            parent: self.parent,
+            children: HashSet::new(),
+            local_model: None,
+            global_model: None,
+            translation: self.translation,
+            rotation: self.rotation,
+            scale: self.scale,
+        }
     }
 }
 impl Default for TransformCreateInfo {
     fn default() -> Self {
         Self {
-            parent: Default::default(),
+            parent: None,
             translation: Zero::zero(),
             rotation: One::one(),
             scale: Vector3::new(1., 1., 1.),
@@ -127,66 +108,126 @@ pub struct TransformView<'a> {
     pub scale: &'a Vector3<f32>,
 }
 
+#[derive(Debug)]
+pub enum TransformError {
+    IDNotFound,
+}
 pub struct TransformSystem {
+    root: HashSet<TransformID>,
     transforms: HashMap<TransformID, Transform>,
     next_id: u32,
 }
 impl TransformSystem {
     pub fn new() -> Self {
         Self {
+            root: HashSet::new(),
             transforms: HashMap::new(),
             next_id: 0,
         }
     }
 
-    pub fn get_global_model(&mut self, id: &TransformID) -> Matrix4<f32> {
-        let mut current = self
-            .get_transform(id)
-            .unwrap_or_else(|| panic!("transform system missing given ID"));
+    pub fn get_global_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
+        let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
 
-        // collect ids of parents in order
-        let mut ids = vec![*id];
-        while let Some(parent_id) = current.parent {
-            ids.push(parent_id);
-            current = self
-                .get_transform(&parent_id)
-                .unwrap_or_else(|| panic!("transform system missing parent ID"));
-        }
+        transform
+            .global_model
+            .ok_or(TransformError::IDNotFound)
+            .or({
+                let parent_model = match transform.parent {
+                    Some(parent_id) => self.get_global_model(&parent_id)?,
+                    None => Matrix4::identity(),
+                };
 
-        // skip parents with clean global_models
-        let mut last_model = Matrix4::identity();
-        while let Some(id) = ids.pop() {
-            let transform = self.get_transform_mut(&id).unwrap();
-            match transform.global_model {
-                None => {
-                    last_model = transform.update_global_model(&last_model);
-                    break;
-                }
-                Some(new_model) => last_model = new_model,
-            }
-        }
-
-        // update all models after
-        for id in ids {
-            last_model = self
-                .get_transform_mut(&id)
-                .unwrap()
-                .update_global_model(&last_model);
-        }
-        last_model
+                Ok(self.transforms.get_mut(id).unwrap().clean(&parent_model))
+            })
     }
 
-    // adds given transform to the system and returns its unique ID
-    pub fn add_transform(&mut self, transform: impl Into<Transform>) -> TransformID {
+    /// Flag the global model of the corresponding transform and all its children as dirty
+    ///
+    /// Dirty models are recalculated when they are next retrived
+    fn dirty(&mut self, id: &TransformID) -> Result<(), TransformError> {
+        let transform = self
+            .transforms
+            .get_mut(id)
+            .ok_or(TransformError::IDNotFound)?;
+        transform.global_model = None;
+
+        for child in transform.children.clone() {
+            self.dirty(&child)?;
+        }
+
+        Ok(())
+    }
+
+    /// adds given transform to the system and returns its unique ID
+    pub fn add_transform(&mut self, info: TransformCreateInfo) -> TransformID {
+        // create id
         let id = TransformID(self.next_id);
-        self.transforms.insert(id, transform.into());
+
+        // add to parent
+        match info.parent {
+            Some(parent_id) => self
+                .transforms
+                .get_mut(&parent_id)
+                .unwrap()
+                .children
+                .insert(id),
+            None => self.root.insert(id),
+        };
+
+        // create transform
+        self.transforms.insert(id, info.into());
         self.next_id += 1;
+
         id
     }
-    pub fn get_transform(&self, id: &TransformID) -> Option<&Transform> {
-        self.transforms.get(id)
+    /// swaps parent of child with given parent, dirtying the child accordingly
+    pub fn set_parent(
+        &mut self,
+        child: &TransformID,
+        parent: Option<TransformID>,
+    ) -> Result<(), TransformError> {
+        // update child
+        let child_trans = self
+            .transforms
+            .get_mut(child)
+            .ok_or(TransformError::IDNotFound)?;
+        let old_parent = child_trans.parent;
+        child_trans.parent = parent;
+        let _ = self.dirty(child);
+
+        // update old parent
+        match old_parent {
+            Some(parent_id) => self
+                .transforms
+                .get_mut(&parent_id)
+                .ok_or(TransformError::IDNotFound)?
+                .children
+                .remove(child),
+            None => self.root.remove(child),
+        };
+
+        // update new parent
+        match parent {
+            Some(parent_id) => self
+                .transforms
+                .get_mut(&parent_id)
+                .ok_or(TransformError::IDNotFound)?
+                .children
+                .insert(*child),
+            None => self.root.insert(*child),
+        };
+
+        Ok(())
     }
+
+    /// get an immutable view of local transform values
+    pub fn get_transform(&self, id: &TransformID) -> Option<TransformView> {
+        self.transforms.get(id).map(|t| t.get_transform())
+    }
+    /// Get mutable reference to the corresponding transform, automatically sets transform and its children to dirty
     pub fn get_transform_mut(&mut self, id: &TransformID) -> Option<&mut Transform> {
+        self.dirty(id).ok()?;
         self.transforms.get_mut(id)
     }
 }
@@ -194,6 +235,6 @@ impl Iterator for TransformSystem {
     type Item = TransformID;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.add_transform(Transform::new(Default::default())))
+        Some(self.add_transform(Default::default()))
     }
 }
