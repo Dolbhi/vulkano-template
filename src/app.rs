@@ -142,7 +142,7 @@ impl App {
             let transform = self.transforms.get_transform_mut(transform_id).unwrap();
             transform.set_rotation(
                 Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
-                    * transform.get_transform().rotation,
+                    * transform.get_local_transform().rotation,
             );
             // println!(
             //     "multiplying {:?} for new rotation of {:?}",
@@ -184,13 +184,8 @@ impl App {
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();
                 let point_lights = point_query.iter(&self.world).map(|(t, pl)| {
-                    pl.clone().into_light(
-                        self.transforms
-                            .get_transform(t)
-                            .unwrap()
-                            .translation
-                            .clone(),
-                    )
+                    pl.clone()
+                        .into_light(self.transforms.get_global_position(t).unwrap())
                 });
                 frame.update_point_lights(point_lights);
 

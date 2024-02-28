@@ -4,7 +4,7 @@ use cgmath::{Matrix4, Rad, SquareMatrix};
 
 use crate::{vulkano_objects::buffers::Buffers, VertexFull};
 
-use super::material::{RenderSubmit};
+use super::material::RenderSubmit;
 
 #[derive(Debug)]
 /// Data for standard rendering of a mesh

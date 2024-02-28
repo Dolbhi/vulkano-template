@@ -43,12 +43,17 @@ impl Transform {
         }
     }
 
-    pub fn get_transform(&self) -> TransformView {
+    pub fn get_local_transform(&self) -> TransformView {
         TransformView {
             translation: &self.translation,
             rotation: &self.rotation,
             scale: &self.scale,
         }
+    }
+
+    fn get_global_translation(&self, parent_matrix: &Matrix4<f32>) -> Vector3<f32> {
+        let pos = parent_matrix * self.translation.extend(1.0);
+        [pos.x, pos.y, pos.z].map(|v| v / pos.w).into()
     }
 
     pub fn set_translation(&mut self, translation: impl Into<Vector3<f32>>) -> &mut Self {
@@ -141,6 +146,26 @@ impl TransformSystem {
                 Ok(self.transforms.get_mut(id).unwrap().clean(&parent_model))
             })
     }
+    pub fn get_parent_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
+        let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
+        if let Some(id) = transform.parent {
+            self.get_global_model(&id)
+        } else {
+            Ok(Matrix4::identity())
+        }
+    }
+
+    /// Get corresponding transform's position in global space
+    pub fn get_global_position(
+        &mut self,
+        id: &TransformID,
+    ) -> Result<Vector3<f32>, TransformError> {
+        let parent_model = self.get_parent_model(id)?;
+        Ok(self
+            .get_transform(id)
+            .ok_or(TransformError::IDNotFound)?
+            .get_global_translation(&parent_model))
+    }
 
     /// Flag the global model of the corresponding transform and all its children as dirty
     ///
@@ -222,8 +247,8 @@ impl TransformSystem {
     }
 
     /// get an immutable view of local transform values
-    pub fn get_transform(&self, id: &TransformID) -> Option<TransformView> {
-        self.transforms.get(id).map(|t| t.get_transform())
+    pub fn get_transform(&self, id: &TransformID) -> Option<&Transform> {
+        self.transforms.get(id)
     }
     /// Get mutable reference to the corresponding transform, automatically sets transform and its children to dirty
     pub fn get_transform_mut(&mut self, id: &TransformID) -> Option<&mut Transform> {
