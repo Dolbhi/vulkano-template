@@ -54,7 +54,7 @@ impl DeferredRenderer {
         let (lit_draw_system, [global_draw_layout, objects_layout]) = DrawSystem::new(
             &context,
             &Subpass::from(render_pass.clone(), 0).unwrap(),
-            MaterialID::LitTexture(crate::render::resource_manager::TextureID::InaBody),
+            MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
             draw::load_basic_vs(context.device.clone())
                 .expect("failed to create lit shader module"),
             draw::load_basic_fs(context.device.clone())
@@ -69,7 +69,7 @@ impl DeferredRenderer {
         let (unlit_draw_system, [_, _]) = DrawSystem::new(
             &context,
             &Subpass::from(render_pass.clone(), 2).unwrap(),
-            MaterialID::UnlitTexture(crate::render::resource_manager::TextureID::InaBody),
+            MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
             draw::load_basic_vs(context.device.clone())
                 .expect("failed to create unlit shader module"),
             draw::load_basic_fs(context.device.clone())

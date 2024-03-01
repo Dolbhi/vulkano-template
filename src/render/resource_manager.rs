@@ -34,10 +34,8 @@ const LOST_EMPIRE_MESH_COUNT: u8 = 45;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum MaterialID {
-    LitTexture(TextureID),
-    LitColor([u8; 4]),
-    UnlitTexture(TextureID),
-    UnlitColor([u8; 4]),
+    Texture(TextureID),
+    Color([u8; 4]),
     UV,
     Gradient,
 }
@@ -53,7 +51,7 @@ pub enum TextureID {
 
 pub struct ResourceManager {
     loaded_meshes: HashMap<MeshID, Arc<Buffers<VertexFull>>>,
-    loaded_materials: HashMap<MaterialID, RenderSubmit>,
+    loaded_materials: HashMap<(MaterialID, bool), RenderSubmit>,
     loaded_textures: HashMap<TextureID, Arc<ImageView>>,
     linear_sampler: Arc<Sampler>,
 }
@@ -179,15 +177,17 @@ impl<'a> ResourceRetriever<'a> {
         }
     }
 
-    pub fn get_material(&mut self, id: MaterialID) -> RenderSubmit {
-        match self.loaded_resources.loaded_materials.get(&id) {
+    pub fn get_material(&mut self, id: MaterialID, lit: bool) -> RenderSubmit {
+        match self.loaded_resources.loaded_materials.get(&(id, lit)) {
             Some(mat) => mat.clone(),
             None => {
                 // Narrow down system
-                let system = match id {
-                    MaterialID::LitTexture(_) | MaterialID::LitColor(_) => &mut self.lit_system,
-                    _ => &mut self.unlit_system,
+                let system = if lit {
+                    &mut self.lit_system
+                } else {
+                    &mut self.unlit_system
                 };
+
                 // Narrow down shader
                 let shader = match system.find_shader(id) {
                     Some(s) => s,
@@ -195,26 +195,13 @@ impl<'a> ResourceRetriever<'a> {
                         {
                             // load shader
                             match id {
-                                MaterialID::LitTexture(_) => {
-                                    panic!("Basic lit shader should be loaded by default")
+                                MaterialID::Texture(_) => {
+                                    panic!("Texture shader should be loaded by default")
                                 }
-                                MaterialID::LitColor(_) => {
+                                MaterialID::Color(_) => {
                                     system.add_shader(
                                         &self.context,
-                                        MaterialID::LitColor([0, 0, 0, 0]),
-                                        draw::load_basic_vs(self.context.device.clone())
-                                            .expect("failed to create solid shader module"),
-                                        draw::load_solid_fs(self.context.device.clone())
-                                            .expect("failed to create solid shader module"),
-                                    );
-                                }
-                                MaterialID::UnlitTexture(_) => {
-                                    panic!("Lit color shader should be loaded by default")
-                                }
-                                MaterialID::UnlitColor(_) => {
-                                    system.add_shader(
-                                        &self.context,
-                                        MaterialID::UnlitColor([0, 0, 0, 0]),
+                                        MaterialID::Color([0, 0, 0, 0]),
                                         draw::load_basic_vs(self.context.device.clone())
                                             .expect("failed to create solid shader module"),
                                         draw::load_solid_fs(self.context.device.clone())
@@ -248,7 +235,7 @@ impl<'a> ResourceRetriever<'a> {
                 };
                 // make material
                 let material = match id {
-                    MaterialID::LitTexture(tex_id) | MaterialID::UnlitTexture(tex_id) => {
+                    MaterialID::Texture(tex_id) => {
                         let tex =
                             Self::get_texture(&mut self.loaded_resources, &self.context, tex_id);
                         init_material(
@@ -261,7 +248,7 @@ impl<'a> ResourceRetriever<'a> {
                             )],
                         )
                     }
-                    MaterialID::LitColor(color) | MaterialID::UnlitColor(color) => {
+                    MaterialID::Color(color) => {
                         let color_buffer = create_material_buffer(
                             &self.context,
                             draw::SolidData {
@@ -279,7 +266,7 @@ impl<'a> ResourceRetriever<'a> {
                 };
                 self.loaded_resources
                     .loaded_materials
-                    .insert(id, material.clone());
+                    .insert((id, lit), material.clone());
                 material
             }
         }

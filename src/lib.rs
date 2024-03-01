@@ -55,8 +55,8 @@ fn init_world(
         .collect();
 
     // materials
-    let uv_mat = resources.get_material(MaterialID::UV);
-    let grad_mat = resources.get_material(MaterialID::Gradient);
+    let uv_mat = resources.get_material(MaterialID::UV, false);
+    let grad_mat = resources.get_material(MaterialID::Gradient, false);
 
     let ina_mats = [
         TextureID::InaBody,
@@ -64,15 +64,15 @@ fn init_world(
         TextureID::InaHair,
         TextureID::InaHead,
     ]
-    .map(|id| resources.get_material(MaterialID::LitTexture(id)));
+    .map(|id| resources.get_material(MaterialID::Texture(id), true));
 
-    let le_mat = resources.get_material(MaterialID::LitTexture(TextureID::LostEmpire));
-    let le_mat_unlit = resources.get_material(MaterialID::UnlitTexture(TextureID::LostEmpire));
+    let le_mat = resources.get_material(MaterialID::Texture(TextureID::LostEmpire), true);
+    let le_mat_unlit = resources.get_material(MaterialID::Texture(TextureID::LostEmpire), false);
 
-    let red_mat = resources.get_material(MaterialID::UnlitColor([u8::MAX, 0, 0, u8::MAX]));
-    let blue_mat = resources.get_material(MaterialID::UnlitColor([0, 0, u8::MAX, u8::MAX]));
+    let red_mat = resources.get_material(MaterialID::Color([u8::MAX, 0, 0, u8::MAX]), false);
+    let blue_mat = resources.get_material(MaterialID::Color([0, 0, u8::MAX, u8::MAX]), false);
 
-    let green_mat = resources.get_material(MaterialID::LitColor([0, u8::MAX, 0, u8::MAX]));
+    let green_mat = resources.get_material(MaterialID::Color([0, u8::MAX, 0, u8::MAX]), true);
 
     // objects
     //      Suzanne
