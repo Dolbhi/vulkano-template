@@ -67,9 +67,12 @@ fn init_world(
     .map(|id| resources.get_material(MaterialID::LitTexture(id)));
 
     let le_mat = resources.get_material(MaterialID::LitTexture(TextureID::LostEmpire));
+    let le_mat_unlit = resources.get_material(MaterialID::UnlitTexture(TextureID::LostEmpire));
 
     let red_mat = resources.get_material(MaterialID::UnlitColor([u8::MAX, 0, 0, u8::MAX]));
     let blue_mat = resources.get_material(MaterialID::UnlitColor([0, 0, u8::MAX, u8::MAX]));
+
+    let green_mat = resources.get_material(MaterialID::LitColor([0, u8::MAX, 0, u8::MAX]));
 
     // objects
     //      Suzanne
@@ -81,7 +84,12 @@ fn init_world(
     //      Spam Suzanne
     for x in 0..20 {
         for z in 0..20 {
-            let square_obj = RenderObject::new(suzanne_mesh.clone(), ina_mats[1].clone());
+            let mat = if (x + z) % 2 == 0 {
+                &ina_mats[1]
+            } else {
+                &green_mat
+            };
+            let square_obj = RenderObject::new(suzanne_mesh.clone(), mat.clone());
             let transform_id = transform_sys.add_transform(TransformCreateInfo {
                 translation: [x as f32, 7f32, z as f32].into(),
                 ..Default::default()
@@ -128,8 +136,12 @@ fn init_world(
             ..Default::default()
         });
 
-        let mat_swapper =
-            MaterialSwapper::new([le_mat.clone(), uv_mat.clone(), ina_mats[1].clone()]);
+        let mat_swapper = MaterialSwapper::new([
+            le_mat.clone(),
+            le_mat_unlit.clone(),
+            uv_mat.clone(),
+            ina_mats[1].clone(),
+        ]);
 
         world.push((transform_id, le_obj, mat_swapper));
     }

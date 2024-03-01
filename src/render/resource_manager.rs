@@ -35,6 +35,8 @@ const LOST_EMPIRE_MESH_COUNT: u8 = 45;
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum MaterialID {
     LitTexture(TextureID),
+    LitColor([u8; 4]),
+    UnlitTexture(TextureID),
     UnlitColor([u8; 4]),
     UV,
     Gradient,
@@ -183,7 +185,7 @@ impl<'a> ResourceRetriever<'a> {
             None => {
                 // Narrow down system
                 let system = match id {
-                    MaterialID::LitTexture(_) => &mut self.lit_system,
+                    MaterialID::LitTexture(_) | MaterialID::LitColor(_) => &mut self.lit_system,
                     _ => &mut self.unlit_system,
                 };
                 // Narrow down shader
@@ -196,8 +198,28 @@ impl<'a> ResourceRetriever<'a> {
                                 MaterialID::LitTexture(_) => {
                                     panic!("Basic lit shader should be loaded by default")
                                 }
+                                MaterialID::LitColor(_) => {
+                                    system.add_shader(
+                                        &self.context,
+                                        MaterialID::LitColor([0, 0, 0, 0]),
+                                        draw::load_basic_vs(self.context.device.clone())
+                                            .expect("failed to create solid shader module"),
+                                        draw::load_solid_fs(self.context.device.clone())
+                                            .expect("failed to create solid shader module"),
+                                    );
+                                }
+                                MaterialID::UnlitTexture(_) => {
+                                    panic!("Lit color shader should be loaded by default")
+                                }
                                 MaterialID::UnlitColor(_) => {
-                                    panic!("Unlit color shader should be loaded by default")
+                                    system.add_shader(
+                                        &self.context,
+                                        MaterialID::UnlitColor([0, 0, 0, 0]),
+                                        draw::load_basic_vs(self.context.device.clone())
+                                            .expect("failed to create solid shader module"),
+                                        draw::load_solid_fs(self.context.device.clone())
+                                            .expect("failed to create solid shader module"),
+                                    );
                                 }
                                 MaterialID::UV => {
                                     system.add_shader(
@@ -226,11 +248,12 @@ impl<'a> ResourceRetriever<'a> {
                 };
                 // make material
                 let material = match id {
-                    MaterialID::LitTexture(tex_id) => {
-                        let tex = self.get_texture(tex_id);
+                    MaterialID::LitTexture(tex_id) | MaterialID::UnlitTexture(tex_id) => {
+                        let tex =
+                            Self::get_texture(&mut self.loaded_resources, &self.context, tex_id);
                         init_material(
                             &self.context,
-                            self.lit_system.find_shader(id).unwrap(),
+                            shader,
                             [WriteDescriptorSet::image_view_sampler(
                                 0,
                                 tex,
@@ -238,7 +261,7 @@ impl<'a> ResourceRetriever<'a> {
                             )],
                         )
                     }
-                    MaterialID::UnlitColor(color) => {
+                    MaterialID::LitColor(color) | MaterialID::UnlitColor(color) => {
                         let color_buffer = create_material_buffer(
                             &self.context,
                             draw::SolidData {
@@ -262,8 +285,12 @@ impl<'a> ResourceRetriever<'a> {
         }
     }
 
-    pub fn get_texture(&mut self, id: TextureID) -> Arc<ImageView> {
-        match self.loaded_resources.loaded_textures.get(&id) {
+    pub fn get_texture(
+        loaded_resources: &mut ResourceManager,
+        context: &Context,
+        id: TextureID,
+    ) -> Arc<ImageView> {
+        match loaded_resources.loaded_textures.get(&id) {
             Some(tex) => tex.clone(),
             None => {
                 let path = match id {
@@ -273,14 +300,8 @@ impl<'a> ResourceRetriever<'a> {
                     TextureID::InaHead => "models/ina/Head_Base_Color.png",
                     TextureID::LostEmpire => "models/lost_empire-RGBA.png",
                 };
-                let tex = load_texture(
-                    &self.context.allocators,
-                    &self.context.queue,
-                    Path::new(path),
-                );
-                self.loaded_resources
-                    .loaded_textures
-                    .insert(id, tex.clone());
+                let tex = load_texture(&context.allocators, &context.queue, Path::new(path));
+                loaded_resources.loaded_textures.insert(id, tex.clone());
                 tex
             }
         }

@@ -56,9 +56,9 @@ impl DeferredRenderer {
             &Subpass::from(render_pass.clone(), 0).unwrap(),
             MaterialID::LitTexture(crate::render::resource_manager::TextureID::InaBody),
             draw::load_basic_vs(context.device.clone())
-                .expect("failed to create basic shader module"),
+                .expect("failed to create lit shader module"),
             draw::load_basic_fs(context.device.clone())
-                .expect("failed to create basic shader module"),
+                .expect("failed to create lit shader module"),
         );
         let (lighting_system, [global_light_layout, point_layout, dir_layout]) =
             LightingSystem::new(
@@ -69,11 +69,11 @@ impl DeferredRenderer {
         let (unlit_draw_system, [_, _]) = DrawSystem::new(
             &context,
             &Subpass::from(render_pass.clone(), 2).unwrap(),
-            MaterialID::UnlitColor([0, 0, 0, 0]),
+            MaterialID::UnlitTexture(crate::render::resource_manager::TextureID::InaBody),
             draw::load_basic_vs(context.device.clone())
-                .expect("failed to create basic shader module"),
-            draw::load_solid_fs(context.device.clone())
-                .expect("failed to create basic shader module"),
+                .expect("failed to create unlit shader module"),
+            draw::load_basic_fs(context.device.clone())
+                .expect("failed to create unlit shader module"),
         );
 
         // create buffers and descriptor sets
