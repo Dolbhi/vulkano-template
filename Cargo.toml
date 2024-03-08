@@ -13,6 +13,7 @@ cgmath = "0.18"
 png = "0.17"
 tobj = "4.0"
 legion = "0.4"
+crossterm = "0.27"
 
 [profile.dev]
 opt-level = 1

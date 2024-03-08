@@ -170,6 +170,8 @@ impl Context {
     where
         F: FnOnce(&mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>),
     {
+        let now = std::time::Instant::now();
+
         // create builder
         let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
             &self.allocators.command_buffer,
@@ -180,8 +182,11 @@ impl Context {
 
         build_commands(&mut builder);
 
+        println!("\rComBuf building {:>4} μs", now.elapsed().as_micros());
+        let now = std::time::Instant::now();
+
         // Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
-        previous_future
+        let result = previous_future
             .join(swapchain_acquire_future)
             .then_execute(self.queue.clone(), builder.build().unwrap())
             .unwrap()
@@ -189,7 +194,14 @@ impl Context {
                 self.queue.clone(),
                 SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_i),
             )
-            .then_signal_fence_and_flush()
+            .then_signal_fence_and_flush();
+
+        println!(
+            "\rExecute ComBuf  {:>4} μs       ",
+            now.elapsed().as_micros()
+        );
+
+        result
     }
 
     // pub fn get_resource_loader(&self) -> ResourceLoader {

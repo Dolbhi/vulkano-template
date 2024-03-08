@@ -38,6 +38,8 @@ impl RenderLoop {
         R: Renderer,
         F: FnOnce(&mut R, usize),
     {
+        let now = std::time::Instant::now();
+
         // check zero sized window
         let image_extent: [u32; 2] = self.context.window.inner_size().into();
         if image_extent.contains(&0) {
@@ -69,6 +71,9 @@ impl RenderLoop {
             self.recreate_swapchain = true;
         }
 
+        println!("\rPre-render      {:>4} μs", now.elapsed().as_micros());
+        let now = std::time::Instant::now();
+
         // wait for upcoming image to be ready (it should be by this point)
         let index = image_i as usize;
         if let Some(image_fence) = &mut self.fences[index] {
@@ -76,8 +81,14 @@ impl RenderLoop {
             image_fence.cleanup_finished();
         }
 
+        println!("\rFrame cleanup   {:>4} μs", now.elapsed().as_micros());
+        let now = std::time::Instant::now();
+
         // let renderer = renderer.upload_data(index);
         upload_render_data(renderer, index);
+
+        println!("\rRender upload   {:>4} μs", now.elapsed().as_micros());
+        let now = std::time::Instant::now();
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
         let something_needs_all_gpu_resources = false;
@@ -93,6 +104,9 @@ impl RenderLoop {
         if something_needs_all_gpu_resources {
             // logic that can use every GPU resource (the GPU is sleeping)
         }
+
+        println!("\rLast frame wait {:>4} μs", now.elapsed().as_micros());
+        // let now = std::time::Instant::now();
 
         // RENDER
         // println!("[Pre-render state] seconds_passed: {}, image_i: {}, window_resized: {}, recreate_swapchain: {}", seconds_passed, image_i, self.window_resized, self.recreate_swapchain);
@@ -113,6 +127,9 @@ impl RenderLoop {
                 None
             }
         };
+
+        // println!("\rFlush future    {:>4} μs", now.elapsed().as_micros());
+
         self.previous_frame_i = image_i;
     }
 

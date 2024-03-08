@@ -10,6 +10,8 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     let mut app = App::start(&event_loop);
 
+    print!("\n\n\n\n\n\n\n\n");
+
     let mut previous_frame_time = Instant::now();
     let mut window_focused = false;
     event_loop
@@ -58,12 +60,6 @@ fn main() {
                 let duration_from_last_frame = this_frame_time - previous_frame_time;
 
                 app.update(&duration_from_last_frame);
-                let elapsed = this_frame_time.elapsed().as_micros();
-                print!(
-                    "\rUpdate took {}μs ({}fps)   ",
-                    elapsed,
-                    1_000_000 / elapsed
-                );
 
                 previous_frame_time = this_frame_time;
             }

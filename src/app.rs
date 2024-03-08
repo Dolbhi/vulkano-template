@@ -1,6 +1,7 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use cgmath::{Matrix4, Quaternion, Rotation3, Vector3, Vector4};
+use crossterm::QueueableCommand;
 use legion::{IntoQuery, *};
 
 use winit::{event::ElementState, event_loop::EventLoop, keyboard::KeyCode};
@@ -58,7 +59,7 @@ impl App {
         println!("Welcome to THE RUSTY RENDERER!");
         println!("Press WASD, SPACE and LSHIFT to move and Q to swap materials");
 
-        let init_start_time = std::time::Instant::now();
+        let init_start_time = Instant::now();
 
         let mut world = World::default();
         let mut transforms = TransformSystem::new();
@@ -125,9 +126,15 @@ impl App {
     }
 
     pub fn update(&mut self, duration_since_last_update: &Duration) {
+        std::io::stdout()
+            .queue(crossterm::cursor::MoveToPreviousLine(8))
+            .unwrap();
+
         let seconds_passed = duration_since_last_update.as_secs_f32();
         self.total_seconds += seconds_passed;
         // println!("Current time: {}", seconds_passed);
+
+        let update_start = Instant::now();
 
         // move cam
         self.update_movement(seconds_passed);
@@ -160,6 +167,11 @@ impl App {
             render_object.set_matrix(transfrom_matrix);
             render_object.upload();
         }
+
+        println!(
+            "\rLogic update    {:>4} μs",
+            update_start.elapsed().as_micros()
+        );
 
         // do render loop
         let extends = self.render_loop.context.window.inner_size();
@@ -205,6 +217,13 @@ impl App {
                     .lighting_system
                     .set_ambient_color([0.1, 0.1, 0.1, 1.]);
             });
+
+        let elapsed = update_start.elapsed().as_micros();
+        println!(
+            "\rTotal           {:>4} μs ({} fps)    ",
+            elapsed,
+            1_000_000 / elapsed
+        );
     }
 
     fn update_movement(&mut self, seconds_passed: f32) {
