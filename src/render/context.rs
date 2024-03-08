@@ -1,10 +1,14 @@
 use std::sync::Arc;
 
 use crate::vulkano_objects::{self, allocators::Allocators};
+use egui_winit_vulkano::{Gui, GuiConfig};
 use vulkano::{
     command_buffer::{self, AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
-    image::Image,
+    image::{
+        view::{ImageView, ImageViewCreateInfo},
+        Image,
+    },
     instance::Instance,
     pipeline::graphics::viewport::Viewport,
     swapchain::{
@@ -20,7 +24,7 @@ use vulkano::{
 };
 use winit::{
     dpi::LogicalSize,
-    event_loop::EventLoop,
+    event_loop::{EventLoop, EventLoopWindowTarget},
     window::{CursorGrabMode, Window, WindowBuilder},
 };
 
@@ -36,13 +40,15 @@ const INIT_WINDOW_SIZE: LogicalSize<f32> = LogicalSize::new(1000.0f32, 600.0);
 
 pub struct Context {
     _instance: Arc<Instance>,
-    pub window: Arc<Window>, // for get inner size and request redraw
-    pub viewport: Viewport,  // just for pipeline creation
+    pub window: Arc<Window>,   // for get inner size and request redraw
+    pub surface: Arc<Surface>, // for making gui
+    pub viewport: Viewport,    // just for pipeline creation
     pub device: Arc<Device>,
     pub queue: Arc<Queue>, // for submitting command buffers
     pub allocators: Allocators,
     pub swapchain: Arc<Swapchain>, // swapchain recreation and image presenting
     pub images: Vec<Arc<Image>>,
+    pub gui_image_views: Vec<Arc<ImageView>>,
 }
 
 impl Context {
@@ -54,7 +60,8 @@ impl Context {
 
         // window settings
         window.set_title("Rusty Renderer");
-        let _new_size = window.request_inner_size(INIT_WINDOW_SIZE);
+        window.set_inner_size(INIT_WINDOW_SIZE);
+        // let _new_size = window.request_inner_size(INIT_WINDOW_SIZE);
         window.set_cursor_visible(false);
         window
             .set_cursor_grab(CursorGrabMode::Confined)
@@ -70,6 +77,8 @@ impl Context {
         let device_extensions = DeviceExtensions {
             khr_swapchain: true,
             khr_shader_draw_parameters: true,
+            khr_image_format_list: true,
+            khr_swapchain_mutable_format: true,
             ..DeviceExtensions::empty()
         };
         let (physical_device, queue_family_index) =
@@ -96,8 +105,24 @@ impl Context {
 
         let queue = queues.next().unwrap();
 
-        let (swapchain, images) =
-            vulkano_objects::swapchain::create_swapchain(&physical_device, device.clone(), surface);
+        let (swapchain, images) = vulkano_objects::swapchain::create_swapchain(
+            &physical_device,
+            device.clone(),
+            surface.clone(),
+        );
+        let gui_image_views = images
+            .iter()
+            .map(|image| {
+                ImageView::new(
+                    image.clone(),
+                    ImageViewCreateInfo {
+                        format: vulkano::format::Format::B8G8R8A8_UNORM,
+                        ..ImageViewCreateInfo::from_image(&image)
+                    },
+                )
+                .unwrap()
+            })
+            .collect();
 
         println!(
             "[Render Context Info]\nswapchain image count: {}\nQueue family: {}\nSwapchain format: {:?}",
@@ -112,13 +137,28 @@ impl Context {
         Self {
             _instance: instance,
             window,
+            surface,
             viewport,
             device,
             queue,
             allocators,
             swapchain,
             images,
+            gui_image_views,
         }
+    }
+
+    pub fn create_gui(&self, event_loop: &EventLoopWindowTarget<()>) -> Gui {
+        Gui::new(
+            event_loop,
+            self.surface.clone(),
+            self.queue.clone(),
+            vulkano::format::Format::B8G8R8A8_UNORM,
+            GuiConfig {
+                is_overlay: true,
+                ..Default::default()
+            },
+        )
     }
 
     pub fn get_image_count(&self) -> usize {
@@ -139,6 +179,20 @@ impl Context {
 
         self.swapchain = new_swapchain;
         self.images = new_images;
+        self.gui_image_views = self
+            .images
+            .iter()
+            .map(|image| {
+                ImageView::new(
+                    image.clone(),
+                    ImageViewCreateInfo {
+                        format: vulkano::format::Format::B8G8R8A8_UNORM,
+                        ..ImageViewCreateInfo::from_image(&image)
+                    },
+                )
+                .unwrap()
+            })
+            .collect();
     }
     pub fn handle_window_resize(&mut self) {
         self.recreate_swapchain();

@@ -4,7 +4,10 @@ use cgmath::{Matrix4, Quaternion, Rotation3, Vector3, Vector4};
 use crossterm::QueueableCommand;
 use legion::{IntoQuery, *};
 
-use winit::{event::ElementState, event_loop::EventLoop, keyboard::KeyCode};
+use winit::{
+    event::{ElementState, VirtualKeyCode},
+    event_loop::EventLoop,
+};
 
 use crate::{
     game_objects::{
@@ -257,14 +260,14 @@ impl App {
         //     self.camera.rotation.x.0, self.camera.rotation.y.0, self.camera.rotation.z.0
         // );
     }
-    pub fn handle_keyboard_input(&mut self, key_code: KeyCode, state: ElementState) {
+    pub fn handle_keyboard_input(&mut self, key_code: VirtualKeyCode, state: ElementState) {
         let state = match state {
             ElementState::Pressed => Pressed,
             ElementState::Released => Released,
         };
 
         match key_code {
-            KeyCode::KeyQ => {
+            VirtualKeyCode::Q => {
                 if state == Pressed && self.keys.q == Released {
                     let mut query =
                         <(&mut MaterialSwapper, &mut RenderObject<Matrix4<f32>>)>::query();
@@ -277,13 +280,32 @@ impl App {
                 }
                 self.keys.q = state;
             }
-            KeyCode::KeyW => self.keys.w = state,
-            KeyCode::KeyA => self.keys.a = state,
-            KeyCode::KeyS => self.keys.s = state,
-            KeyCode::KeyD => self.keys.d = state,
-            KeyCode::Space => self.keys.space = state,
-            KeyCode::ShiftLeft => self.keys.shift = state,
-            _ => {}
+            VirtualKeyCode::W => self.keys.w = state,
+            VirtualKeyCode::A => self.keys.a = state,
+            VirtualKeyCode::S => self.keys.s = state,
+            VirtualKeyCode::D => self.keys.d = state,
+            VirtualKeyCode::Space => self.keys.space = state,
+            VirtualKeyCode::LShift => self.keys.shift = state,
+            _ => {} // KeyCode::KeyQ => {
+                    //     if state == Pressed && self.keys.q == Released {
+                    //         let mut query =
+                    //             <(&mut MaterialSwapper, &mut RenderObject<Matrix4<f32>>)>::query();
+
+                    //         query.for_each_mut(&mut self.world, |(swapper, render_object)| {
+                    //             let next_mat = swapper.swap_material();
+                    //             // println!("Swapped mat: {:?}", next_mat);
+                    //             render_object.material = next_mat;
+                    //         });
+                    //     }
+                    //     self.keys.q = state;
+                    // }
+                    // KeyCode::KeyW => self.keys.w = state,
+                    // KeyCode::KeyA => self.keys.a = state,
+                    // KeyCode::KeyS => self.keys.s = state,
+                    // KeyCode::KeyD => self.keys.d = state,
+                    // KeyCode::Space => self.keys.space = state,
+                    // KeyCode::ShiftLeft => self.keys.shift = state,
+                    // _ => {}
         }
     }
 

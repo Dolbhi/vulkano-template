@@ -8,12 +8,13 @@ edition = "2021"
 [dependencies]
 vulkano = "0.34"
 vulkano-shaders = "0.34"
-winit = { version = "0.29", features = ["rwh_05"] }
+winit = "0.28"
 cgmath = "0.18"
 png = "0.17"
 tobj = "4.0"
 legion = "0.4"
 crossterm = "0.27"
+egui_winit_vulkano = "0.27"
 
 [profile.dev]
 opt-level = 1
