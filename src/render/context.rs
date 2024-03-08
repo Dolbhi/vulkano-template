@@ -17,38 +17,33 @@ use vulkano::{
     },
     sync::{
         self,
-        future::{FenceSignalFuture, JoinFuture, NowFuture},
+        future::{FenceSignalFuture, NowFuture},
         GpuFuture,
     },
     Validated, VulkanError,
 };
 use winit::{
     dpi::LogicalSize,
-    event_loop::{EventLoop, EventLoopWindowTarget},
+    event_loop::EventLoop,
     window::{CursorGrabMode, Window, WindowBuilder},
 };
 
-pub type Fence = FenceSignalFuture<
-    PresentFuture<
-        command_buffer::CommandBufferExecFuture<
-            JoinFuture<Box<dyn GpuFuture>, SwapchainAcquireFuture>,
-        >,
-    >,
->;
+pub type Fence = FenceSignalFuture<PresentFuture<Box<dyn GpuFuture>>>;
 
 const INIT_WINDOW_SIZE: LogicalSize<f32> = LogicalSize::new(1000.0f32, 600.0);
 
 pub struct Context {
     _instance: Arc<Instance>,
-    pub window: Arc<Window>,   // for get inner size and request redraw
-    pub surface: Arc<Surface>, // for making gui
-    pub viewport: Viewport,    // just for pipeline creation
+    pub window: Arc<Window>, // for get inner size and request redraw
+    // pub surface: Arc<Surface>, // for making gui
+    pub viewport: Viewport, // just for pipeline creation
     pub device: Arc<Device>,
     pub queue: Arc<Queue>, // for submitting command buffers
     pub allocators: Allocators,
     pub swapchain: Arc<Swapchain>, // swapchain recreation and image presenting
     pub images: Vec<Arc<Image>>,
-    pub gui_image_views: Vec<Arc<ImageView>>,
+    // pub gui_image_views: Vec<Arc<ImageView>>,
+    pub gui: Gui,
 }
 
 impl Context {
@@ -110,19 +105,29 @@ impl Context {
             device.clone(),
             surface.clone(),
         );
-        let gui_image_views = images
-            .iter()
-            .map(|image| {
-                ImageView::new(
-                    image.clone(),
-                    ImageViewCreateInfo {
-                        format: vulkano::format::Format::B8G8R8A8_UNORM,
-                        ..ImageViewCreateInfo::from_image(&image)
-                    },
-                )
-                .unwrap()
-            })
-            .collect();
+        // let gui_image_views = images
+        //     .iter()
+        //     .map(|image| {
+        //         ImageView::new(
+        //             image.clone(),
+        //             ImageViewCreateInfo {
+        //                 format: vulkano::format::Format::B8G8R8A8_UNORM,
+        //                 ..ImageViewCreateInfo::from_image(&image)
+        //             },
+        //         )
+        //         .unwrap()
+        //     })
+        //     .collect();
+        let gui = Gui::new(
+            event_loop,
+            surface.clone(),
+            queue.clone(),
+            vulkano::format::Format::B8G8R8A8_UNORM,
+            GuiConfig {
+                is_overlay: true,
+                ..Default::default()
+            },
+        );
 
         println!(
             "[Render Context Info]\nswapchain image count: {}\nQueue family: {}\nSwapchain format: {:?}",
@@ -137,28 +142,15 @@ impl Context {
         Self {
             _instance: instance,
             window,
-            surface,
             viewport,
             device,
             queue,
             allocators,
             swapchain,
             images,
-            gui_image_views,
+            // gui_image_views,
+            gui,
         }
-    }
-
-    pub fn create_gui(&self, event_loop: &EventLoopWindowTarget<()>) -> Gui {
-        Gui::new(
-            event_loop,
-            self.surface.clone(),
-            self.queue.clone(),
-            vulkano::format::Format::B8G8R8A8_UNORM,
-            GuiConfig {
-                is_overlay: true,
-                ..Default::default()
-            },
-        )
     }
 
     pub fn get_image_count(&self) -> usize {
@@ -179,20 +171,20 @@ impl Context {
 
         self.swapchain = new_swapchain;
         self.images = new_images;
-        self.gui_image_views = self
-            .images
-            .iter()
-            .map(|image| {
-                ImageView::new(
-                    image.clone(),
-                    ImageViewCreateInfo {
-                        format: vulkano::format::Format::B8G8R8A8_UNORM,
-                        ..ImageViewCreateInfo::from_image(&image)
-                    },
-                )
-                .unwrap()
-            })
-            .collect();
+        // self.gui_image_views = self
+        //     .images
+        //     .iter()
+        //     .map(|image| {
+        //         ImageView::new(
+        //             image.clone(),
+        //             ImageViewCreateInfo {
+        //                 format: vulkano::format::Format::B8G8R8A8_UNORM,
+        //                 ..ImageViewCreateInfo::from_image(&image)
+        //             },
+        //         )
+        //         .unwrap()
+        //     })
+        //     .collect();
     }
     pub fn handle_window_resize(&mut self) {
         self.recreate_swapchain();
@@ -215,7 +207,7 @@ impl Context {
 
     /// Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
     pub fn flush_next_future<F>(
-        &self,
+        &mut self,
         previous_future: Box<dyn GpuFuture>,
         swapchain_acquire_future: SwapchainAcquireFuture,
         image_i: u32,
@@ -240,10 +232,26 @@ impl Context {
         let now = std::time::Instant::now();
 
         // Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
-        let result = previous_future
+        let draw_future = previous_future
             .join(swapchain_acquire_future)
             .then_execute(self.queue.clone(), builder.build().unwrap())
             .unwrap()
+            .then_signal_fence_and_flush()
+            .unwrap();
+
+        let image = &self.images[image_i as usize];
+        let gui_image_view = ImageView::new(
+            image.clone(),
+            ImageViewCreateInfo {
+                format: vulkano::format::Format::B8G8R8A8_UNORM,
+                ..ImageViewCreateInfo::from_image(image)
+            },
+        )
+        .unwrap();
+
+        let result = self
+            .gui
+            .draw_on_image(draw_future, gui_image_view)
             .then_swapchain_present(
                 self.queue.clone(),
                 SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_i),

@@ -2,10 +2,11 @@ use std::time::{Duration, Instant};
 
 use cgmath::{Matrix4, Quaternion, Rotation3, Vector3, Vector4};
 use crossterm::QueueableCommand;
+use egui_winit_vulkano::egui::{self, Rect, Vec2};
 use legion::{IntoQuery, *};
 
 use winit::{
-    event::{ElementState, VirtualKeyCode},
+    event::{ElementState, VirtualKeyCode, WindowEvent},
     event_loop::EventLoop,
 };
 
@@ -128,6 +129,10 @@ impl App {
         }
     }
 
+    pub fn gui_update(&mut self, event: &WindowEvent) -> bool {
+        self.render_loop.context.gui.update(event)
+    }
+
     pub fn update(&mut self, duration_since_last_update: &Duration) {
         std::io::stdout()
             .queue(crossterm::cursor::MoveToPreviousLine(8))
@@ -170,6 +175,38 @@ impl App {
             render_object.set_matrix(transfrom_matrix);
             render_object.upload();
         }
+
+        // gui
+        self.render_loop.context.gui.immediate_ui(|gui| {
+            let ctx = &gui.context();
+
+            let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
+            egui::Window::new("TESTIS")
+                .default_rect(window_rect)
+                .show(ctx, |ui| {
+                    ui.label("KILL ME");
+                });
+
+            // egui::CentralPanel::default().show(ctx, |ui| {
+            //     ui.heading("HELLOW ORLD");
+            // ui.horizontal(|ui| {
+            //     let name_label = ui.label("Your name: ");
+            //     ui.text_edit_singleline(&mut "Dolbs".to_owned())
+            //         .labelled_by(name_label.id);
+            // });
+            // // ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
+            // // if ui.button("Increment").clicked() {
+            // //     self.age += 1;
+            // // }
+            // ui.label(format!(
+            //     "Hello '{}', age {}",
+            //     &mut "Dolbs".to_owned(),
+            //     &mut 2
+            // ));
+
+            // ui.image(egui::include_image!("../models/lost_empire-RGBA.png"));
+            // });
+        });
 
         println!(
             "\rLogic update    {:>4} μs",

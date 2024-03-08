@@ -16,6 +16,7 @@ fn main() {
     let mut window_focused = false;
     event_loop.run(move |event, _elwt, control_flow| match event {
         Event::WindowEvent { event, .. } => {
+            app.gui_update(&event);
             match event {
                 WindowEvent::CloseRequested => {
                     control_flow.set_exit();
