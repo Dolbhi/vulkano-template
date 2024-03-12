@@ -16,29 +16,30 @@ fn main() {
     let mut window_focused = false;
     event_loop.run(move |event, _elwt, control_flow| match event {
         Event::WindowEvent { event, .. } => {
-            app.gui_update(&event);
-            match event {
-                WindowEvent::CloseRequested => {
-                    control_flow.set_exit();
-                    // elwt.exit();
-                }
-                WindowEvent::Resized(_) => {
-                    app.handle_window_resize();
-                }
-                WindowEvent::Focused(focused) => {
-                    window_focused = focused;
-                }
-                WindowEvent::KeyboardInput { input, .. } => {
-                    if window_focused {
-                        if let Some(code) = input.virtual_keycode {
-                            app.handle_keyboard_input(code, input.state);
-                        }
-                        // if let PhysicalKey::Code(code) = event.physical_key {
-                        //     app.handle_keyboard_input(code, event.state);
-                        // }
+            if !app.gui_update(&event) {
+                match event {
+                    WindowEvent::CloseRequested => {
+                        control_flow.set_exit();
+                        // elwt.exit();
                     }
+                    WindowEvent::Resized(_) => {
+                        app.handle_window_resize();
+                    }
+                    WindowEvent::Focused(focused) => {
+                        window_focused = focused;
+                    }
+                    WindowEvent::KeyboardInput { input, .. } => {
+                        if window_focused {
+                            if let Some(code) = input.virtual_keycode {
+                                app.handle_keyboard_input(code, input.state);
+                            }
+                            // if let PhysicalKey::Code(code) = event.physical_key {
+                            //     app.handle_keyboard_input(code, event.state);
+                            // }
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
         Event::DeviceEvent {

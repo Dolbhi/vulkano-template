@@ -5,6 +5,7 @@ use crossterm::QueueableCommand;
 use legion::{IntoQuery, *};
 
 use winit::{
+    dpi::PhysicalPosition,
     event::{ElementState, VirtualKeyCode, WindowEvent},
     event_loop::EventLoop,
 };
@@ -42,6 +43,14 @@ struct Keys {
     q: KeyState,
     space: KeyState,
     shift: KeyState,
+    escape: KeyState,
+}
+
+#[derive(Default, PartialEq, Eq)]
+enum GameState {
+    #[default]
+    Playing,
+    Paused,
 }
 
 pub struct App {
@@ -54,6 +63,7 @@ pub struct App {
     transforms: TransformSystem,
     total_seconds: f32,
     camera_light: TransformID,
+    game_state: GameState,
 }
 
 impl App {
@@ -65,7 +75,7 @@ impl App {
 
         let mut world = World::default();
         let mut transforms = TransformSystem::new();
-        let render_loop = RenderLoop::new(event_loop);
+        let mut render_loop = RenderLoop::new(event_loop);
         let mut renderer = DeferredRenderer::new(&render_loop.context);
 
         let render_init_elapse = init_start_time.elapsed().as_millis();
@@ -114,6 +124,18 @@ impl App {
             camera_light
         };
 
+        // fps cursor
+        // render_loop.context.gui.begin_frame();
+        // render_loop.context.gui.context().send_viewport_cmd(
+        //     egui_winit_vulkano::egui::ViewportCommand::CursorVisible(false),
+        // );
+        let window = &render_loop.context.window;
+        window.set_cursor_visible(false);
+        window
+            .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+            .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
+            .unwrap();
+
         Self {
             render_loop,
             renderer,
@@ -124,6 +146,7 @@ impl App {
             transforms,
             total_seconds: 0.,
             camera_light,
+            game_state: Default::default(),
         }
     }
 
@@ -135,33 +158,34 @@ impl App {
         std::io::stdout()
             .queue(crossterm::cursor::MoveToPreviousLine(8))
             .unwrap();
-
-        let seconds_passed = duration_since_last_update.as_secs_f32();
-        self.total_seconds += seconds_passed;
-        // println!("Current time: {}", seconds_passed);
-
         let update_start = Instant::now();
 
-        // move cam
-        self.update_movement(seconds_passed);
-        self.transforms
-            .get_transform_mut(&self.camera_light)
-            .unwrap()
-            .set_translation(self.camera.position + Vector3::new(0., 0.01, 0.01)); // light pos cannot = cam pos else the light will glitch
+        if self.game_state == GameState::Playing {
+            let seconds_passed = duration_since_last_update.as_secs_f32();
+            self.total_seconds += seconds_passed;
+            // println!("Current time: {}", seconds_passed);
 
-        // update rotate
-        let mut query = <(&TransformID, &Rotate)>::query();
-        for (transform_id, rotate) in query.iter(&self.world) {
-            let transform = self.transforms.get_transform_mut(transform_id).unwrap();
-            transform.set_rotation(
-                Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
-                    * transform.get_local_transform().rotation,
-            );
-            // println!(
-            //     "multiplying {:?} for new rotation of {:?}",
-            //     rotate.0,
-            //     transform.get_transform().rotation
-            // );
+            // move cam
+            self.update_movement(seconds_passed);
+            self.transforms
+                .get_transform_mut(&self.camera_light)
+                .unwrap()
+                .set_translation(self.camera.position + Vector3::new(0., 0.01, 0.01)); // light pos cannot = cam pos else the light will glitch
+
+            // update rotate
+            let mut query = <(&TransformID, &Rotate)>::query();
+            for (transform_id, rotate) in query.iter(&self.world) {
+                let transform = self.transforms.get_transform_mut(transform_id).unwrap();
+                transform.set_rotation(
+                    Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
+                        * transform.get_local_transform().rotation,
+                );
+                // println!(
+                //     "multiplying {:?} for new rotation of {:?}",
+                //     rotate.0,
+                //     transform.get_transform().rotation
+                // );
+            }
         }
 
         // update render objects
@@ -179,7 +203,12 @@ impl App {
             let ctx = &gui.context();
 
             // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
-            ui::pause_menu(ctx);
+            match self.game_state {
+                GameState::Paused => {
+                    ui::pause_menu(ctx);
+                }
+                _ => {}
+            }
         });
 
         println!(
@@ -264,7 +293,9 @@ impl App {
     }
 
     pub fn handle_mouse_input(&mut self, dx: f32, dy: f32) {
-        self.camera.rotate(dx, dy);
+        if self.game_state == GameState::Playing {
+            self.camera.rotate(dx, dy);
+        }
 
         // println!(
         //     "[Camera Rotation] x: {}, y: {}, z: {}",
@@ -279,7 +310,10 @@ impl App {
 
         match key_code {
             VirtualKeyCode::Q => {
-                if state == Pressed && self.keys.q == Released {
+                if self.game_state == GameState::Playing
+                    && state == Pressed
+                    && self.keys.q == Released
+                {
                     let mut query =
                         <(&mut MaterialSwapper, &mut RenderObject<Matrix4<f32>>)>::query();
 
@@ -297,6 +331,42 @@ impl App {
             VirtualKeyCode::D => self.keys.d = state,
             VirtualKeyCode::Space => self.keys.space = state,
             VirtualKeyCode::LShift => self.keys.shift = state,
+            VirtualKeyCode::Escape => {
+                // pause and unpause
+                if state == Pressed && self.keys.escape == Released {
+                    match self.game_state {
+                        GameState::Playing => {
+                            self.game_state = GameState::Paused;
+
+                            let window = &self.render_loop.context.window;
+                            let window_size = window.inner_size();
+                            window
+                                .set_cursor_position(PhysicalPosition::new(
+                                    window_size.width / 2,
+                                    window_size.height / 2,
+                                ))
+                                .unwrap();
+                            window.set_cursor_visible(true);
+                            window
+                                .set_cursor_grab(winit::window::CursorGrabMode::None)
+                                .unwrap();
+                        }
+                        GameState::Paused => {
+                            self.game_state = GameState::Playing;
+
+                            let window = &self.render_loop.context.window;
+                            window.set_cursor_visible(false);
+                            window
+                                .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+                                .or_else(|_e| {
+                                    window.set_cursor_grab(winit::window::CursorGrabMode::Locked)
+                                })
+                                .unwrap();
+                        }
+                    }
+                };
+                self.keys.escape = state;
+            }
             _ => {} // KeyCode::KeyQ => {
                     //     if state == Pressed && self.keys.q == Released {
                     //         let mut query =

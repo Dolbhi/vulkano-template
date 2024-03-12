@@ -264,10 +264,14 @@ pub struct FrameData {
 }
 
 impl FrameData {
+    /// write global data to buffer
     pub fn update_global_data(&mut self, data: impl Into<GPUGlobalData>) {
         write_to_buffer(&self.global_buffer, data);
     }
 
+    /// write object data to storage buffer
+    ///
+    /// `RenderObject::upload(&self)` must have been called beforehand
     pub fn update_objects_data<'a>(
         &self,
         lit_system: &mut DrawSystem,

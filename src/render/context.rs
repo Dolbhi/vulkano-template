@@ -25,7 +25,7 @@ use vulkano::{
 use winit::{
     dpi::LogicalSize,
     event_loop::EventLoop,
-    window::{CursorGrabMode, Window, WindowBuilder},
+    window::{Window, WindowBuilder},
 };
 
 pub type Fence = FenceSignalFuture<PresentFuture<Box<dyn GpuFuture>>>;
@@ -56,12 +56,6 @@ impl Context {
         // window settings
         window.set_title("Rusty Renderer");
         window.set_inner_size(INIT_WINDOW_SIZE);
-        // let _new_size = window.request_inner_size(INIT_WINDOW_SIZE);
-        window.set_cursor_visible(false);
-        window
-            .set_cursor_grab(CursorGrabMode::Confined)
-            .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
-            .unwrap();
 
         let viewport: Viewport = Viewport {
             extent: window.inner_size().into(),

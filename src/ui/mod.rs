@@ -17,7 +17,6 @@ pub fn pause_menu(ctx: &Context) {
                             .color(Color32::WHITE),
                     );
                 });
-            ui.label("KILL ME");
         });
 }
 
