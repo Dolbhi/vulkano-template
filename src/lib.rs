@@ -2,6 +2,7 @@ pub mod app;
 pub mod game_objects;
 pub mod render;
 pub mod shaders;
+pub mod ui;
 mod vertex_data;
 pub mod vulkano_objects;
 
@@ -30,6 +31,9 @@ mod tests {
     }
 }
 
+type Mesh = std::sync::Arc<vulkano_objects::buffers::Buffers<VertexFull>>;
+
+#[allow(dead_code)]
 fn init_world(
     world: &mut World,
     transform_sys: &mut TransformSystem,
@@ -50,7 +54,7 @@ fn init_world(
     ]
     .map(|id| resources.get_mesh(id));
 
-    let le_meshes: Vec<std::sync::Arc<vulkano_objects::buffers::Buffers<VertexFull>>> = (0..45u8)
+    let le_meshes: Vec<Mesh> = (0..45u8)
         .map(|n| resources.get_mesh(MeshID::LostEmpire(n)))
         .collect();
 
@@ -188,6 +192,30 @@ fn init_world(
                 RenderObject::new(cube_mesh.clone(), red_mat.clone()),
             ));
         }
+    }
+}
+
+#[allow(dead_code)]
+/// Empty scene with just the lost empire map
+fn init_ui_test(
+    world: &mut World,
+    transform_sys: &mut TransformSystem,
+    resources: &mut ResourceRetriever,
+) {
+    let le_meshes: Vec<Mesh> = (0..45u8)
+        .map(|n| resources.get_mesh(MeshID::LostEmpire(n)))
+        .collect();
+
+    let le_mat = resources.get_material(MaterialID::Texture(TextureID::LostEmpire), true);
+
+    let le_root = transform_sys.add_transform(TransformCreateInfo::default());
+    for mesh in le_meshes {
+        let transform_id = transform_sys.add_transform(TransformCreateInfo {
+            parent: Some(le_root),
+            ..Default::default()
+        });
+        let le_obj = RenderObject::new(mesh, le_mat.clone());
+        world.push((transform_id, le_obj));
     }
 }
 

@@ -2,7 +2,6 @@ use std::time::{Duration, Instant};
 
 use cgmath::{Matrix4, Quaternion, Rotation3, Vector3, Vector4};
 use crossterm::QueueableCommand;
-use egui_winit_vulkano::egui::{self, Rect, Vec2};
 use legion::{IntoQuery, *};
 
 use winit::{
@@ -16,12 +15,11 @@ use crate::{
         transform::{TransformID, TransformSystem},
         Camera, Rotate,
     },
-    init_world,
     render::{
         renderer::DeferredRenderer, resource_manager::ResourceManager, RenderLoop, RenderObject,
     },
     shaders::{draw::GPUGlobalData, lighting::DirectionLight},
-    MaterialSwapper,
+    ui, MaterialSwapper,
 };
 
 // TO flush_next_future METHOD ADD PARAMS FOR PASSING CAMERA DESCRIPTOR SET
@@ -75,7 +73,7 @@ impl App {
         let mut resources = ResourceManager::new(&render_loop.context);
 
         // draw objects
-        init_world(
+        crate::init_ui_test(
             &mut world,
             &mut transforms,
             &mut resources.begin_retrieving(
@@ -180,32 +178,8 @@ impl App {
         self.render_loop.context.gui.immediate_ui(|gui| {
             let ctx = &gui.context();
 
-            let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
-            egui::Window::new("TESTIS")
-                .default_rect(window_rect)
-                .show(ctx, |ui| {
-                    ui.label("KILL ME");
-                });
-
-            // egui::CentralPanel::default().show(ctx, |ui| {
-            //     ui.heading("HELLOW ORLD");
-            // ui.horizontal(|ui| {
-            //     let name_label = ui.label("Your name: ");
-            //     ui.text_edit_singleline(&mut "Dolbs".to_owned())
-            //         .labelled_by(name_label.id);
-            // });
-            // // ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
-            // // if ui.button("Increment").clicked() {
-            // //     self.age += 1;
-            // // }
-            // ui.label(format!(
-            //     "Hello '{}', age {}",
-            //     &mut "Dolbs".to_owned(),
-            //     &mut 2
-            // ));
-
-            // ui.image(egui::include_image!("../models/lost_empire-RGBA.png"));
-            // });
+            // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
+            ui::pause_menu(ctx);
         });
 
         println!(
