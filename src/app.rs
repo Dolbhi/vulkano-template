@@ -199,10 +199,10 @@ impl App {
                     let ctx = &gui.context();
 
                     // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
-                    gui_result = match self.game_state {
-                        GameState::MainMenu => ui::main_menu(ctx),
-                        GameState::Paused => ui::pause_menu(ctx),
-                        _ => ui::MenuOption::None,
+                    match self.game_state {
+                        GameState::MainMenu => ui::main_menu(ctx, &mut gui_result),
+                        GameState::Paused => ui::pause_menu(ctx, &mut gui_result),
+                        _ => {}
                     };
                 });
                 match gui_result {
@@ -218,7 +218,7 @@ impl App {
                 }
 
                 if self.game_state == GameState::Playing {
-                    self.game_update(duration_from_last_frame.as_secs_f32());
+                    self.update_game(duration_from_last_frame.as_secs_f32());
                 }
 
                 println!(
@@ -226,7 +226,7 @@ impl App {
                     update_start.elapsed().as_micros()
                 );
 
-                self.render_update();
+                self.update_render();
 
                 let elapsed = update_start.elapsed().as_micros();
                 println!(
@@ -250,7 +250,7 @@ impl App {
     }
 
     /// update game logic
-    fn game_update(&mut self, seconds_passed: f32) {
+    fn update_game(&mut self, seconds_passed: f32) {
         self.total_seconds += seconds_passed;
 
         // move cam
@@ -290,7 +290,7 @@ impl App {
     }
 
     /// upload render objects and do render loop
-    fn render_update(&mut self) {
+    fn update_render(&mut self) {
         // update render objects
         let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query();
         // println!("==== RENDER OBJECT DATA ====");
