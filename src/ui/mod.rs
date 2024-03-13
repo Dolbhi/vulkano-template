@@ -1,4 +1,4 @@
-use egui_winit_vulkano::egui::{self, Color32, Context, FontId, Layout, RichText, Style};
+use egui_winit_vulkano::egui::{self, Align2, Color32, Context, FontId, Layout, RichText, Style};
 
 pub enum MenuOption {
     None,
@@ -111,5 +111,21 @@ pub fn test_area(ctx: &Context) {
                     ui.label("inside frame");
                 });
             ui.label("KILL ME");
+        });
+}
+
+pub fn test_window(ctx: &Context) {
+    egui::Window::new("Testis")
+        .fixed_pos((750.0, 300.0))
+        .fixed_size((200.0, 200.0))
+        .pivot(Align2::CENTER_CENTER)
+        .title_bar(false)
+        .interactable(false)
+        .show(ctx, |ui| {
+            ui.label("Test window");
+            ui.allocate_space(ui.available_size());
+            // ui.allocate_ui((200.0, 200.0).into(), |ui| {
+            //     ui.label("Test window");
+            // });
         });
 }

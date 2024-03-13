@@ -198,6 +198,8 @@ impl App {
                 self.render_loop.context.gui.immediate_ui(|gui| {
                     let ctx = &gui.context();
 
+                    ui::test_window(ctx);
+
                     // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
                     match self.game_state {
                         GameState::MainMenu => ui::main_menu(ctx, &mut gui_result),
@@ -207,8 +209,13 @@ impl App {
                 });
                 match gui_result {
                     ui::MenuOption::None => {}
-                    ui::MenuOption::LoadLevel(i) => self.load_level(i),
+                    ui::MenuOption::LoadLevel(i) => {
+                        self.lock_cursor();
+                        self.load_level(i);
+                    }
                     ui::MenuOption::QuitLevel => {
+                        self.unlock_cursor();
+
                         self.game_state = GameState::MainMenu;
                         self.world.clear();
                         self.transforms = TransformSystem::new();
@@ -396,30 +403,12 @@ impl App {
                         GameState::Playing => {
                             self.game_state = GameState::Paused;
 
-                            let window = &self.render_loop.context.window;
-                            let window_size = window.inner_size();
-                            window
-                                .set_cursor_position(PhysicalPosition::new(
-                                    window_size.width / 2,
-                                    window_size.height / 2,
-                                ))
-                                .unwrap();
-                            window.set_cursor_visible(true);
-                            window
-                                .set_cursor_grab(winit::window::CursorGrabMode::None)
-                                .unwrap();
+                            self.unlock_cursor();
                         }
                         GameState::Paused => {
                             self.game_state = GameState::Playing;
 
-                            let window = &self.render_loop.context.window;
-                            window.set_cursor_visible(false);
-                            window
-                                .set_cursor_grab(winit::window::CursorGrabMode::Confined)
-                                .or_else(|_e| {
-                                    window.set_cursor_grab(winit::window::CursorGrabMode::Locked)
-                                })
-                                .unwrap();
+                            self.lock_cursor();
                         }
                         _ => {}
                     }
@@ -428,5 +417,28 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    fn lock_cursor(&mut self) {
+        let window = &self.render_loop.context.window;
+        window.set_cursor_visible(false);
+        window
+            .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+            .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
+            .unwrap();
+    }
+    fn unlock_cursor(&mut self) {
+        let window = &self.render_loop.context.window;
+        let window_size = window.inner_size();
+        window
+            .set_cursor_position(PhysicalPosition::new(
+                window_size.width / 2,
+                window_size.height / 2,
+            ))
+            .unwrap();
+        window.set_cursor_visible(true);
+        window
+            .set_cursor_grab(winit::window::CursorGrabMode::None)
+            .unwrap();
     }
 }
