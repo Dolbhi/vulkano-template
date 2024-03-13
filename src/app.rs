@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use cgmath::{Matrix4, Quaternion, Rotation3, Vector3, Vector4};
 use crossterm::QueueableCommand;
@@ -6,7 +6,7 @@ use legion::{IntoQuery, *};
 
 use winit::{
     dpi::PhysicalPosition,
-    event::{ElementState, VirtualKeyCode, WindowEvent},
+    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::EventLoop,
 };
 
@@ -14,13 +14,15 @@ use crate::{
     game_objects::{
         light::PointLightComponent,
         transform::{TransformID, TransformSystem},
-        Camera, Rotate,
+        Camera, FollowCamera, Rotate,
     },
+    init_ui_test, init_world,
     render::{
         renderer::DeferredRenderer, resource_manager::ResourceManager, RenderLoop, RenderObject,
     },
     shaders::{draw::GPUGlobalData, lighting::DirectionLight},
-    ui, MaterialSwapper,
+    ui::{self, MenuOption},
+    MaterialSwapper,
 };
 
 // TO flush_next_future METHOD ADD PARAMS FOR PASSING CAMERA DESCRIPTOR SET
@@ -31,7 +33,7 @@ use crate::{
 // }
 
 #[derive(Default, PartialEq)]
-pub enum KeyState {
+enum KeyState {
     Pressed,
     #[default]
     Released,
@@ -40,7 +42,7 @@ pub enum KeyState {
 use KeyState::{Pressed, Released};
 
 #[derive(Default)]
-struct Keys {
+struct InputState {
     a: KeyState,
     w: KeyState,
     s: KeyState,
@@ -49,26 +51,29 @@ struct Keys {
     space: KeyState,
     shift: KeyState,
     escape: KeyState,
+    q_triggered: bool,
+    // esc_triggered: bool,
 }
 
-#[derive(Default, PartialEq, Eq)]
+#[derive(Default, PartialEq, Eq, Clone, Copy)]
 enum GameState {
     #[default]
+    MainMenu,
     Playing,
-    InMenu,
+    Paused,
 }
 
 pub struct App {
     render_loop: RenderLoop,
     renderer: DeferredRenderer,
     resources: ResourceManager,
-    camera: Camera,
-    keys: Keys,
-    world: World,
     transforms: TransformSystem,
+    world: World,
+    camera: Camera,
+    keys: InputState,
     total_seconds: f32,
-    camera_light: TransformID,
     game_state: GameState,
+    last_frame_time: Instant,
 }
 
 impl App {
@@ -78,27 +83,13 @@ impl App {
 
         let init_start_time = Instant::now();
 
-        let mut world = World::default();
-        let mut transforms = TransformSystem::new();
+        let world = World::default();
+        let transforms = TransformSystem::new();
         let render_loop = RenderLoop::new(event_loop);
-        let mut renderer = DeferredRenderer::new(&render_loop.context);
+        let renderer = DeferredRenderer::new(&render_loop.context);
+        let resources = ResourceManager::new(&render_loop.context);
 
         let render_init_elapse = init_start_time.elapsed().as_millis();
-
-        let mut resources = ResourceManager::new(&render_loop.context);
-
-        // draw objects
-        crate::init_ui_test(
-            &mut world,
-            &mut transforms,
-            &mut resources.begin_retrieving(
-                &render_loop.context,
-                &mut renderer.lit_draw_system,
-                &mut renderer.unlit_draw_system,
-            ),
-        );
-
-        let total_elapse = init_start_time.elapsed().as_millis();
 
         println!("[Renderer Info]\nLit shaders:");
         for shader in &renderer.lit_draw_system.shaders {
@@ -110,88 +101,194 @@ impl App {
         }
 
         println!(
-            "[Benchmarking] render init: {} ms, world init: {} ms, total: {} ms",
+            "[Benchmarking] render init: {} ms",
             render_init_elapse,
-            total_elapse - render_init_elapse,
-            total_elapse
+            // total_elapse - render_init_elapse,
+            // total_elapse
         );
-
-        // camera light, will follow camera position on update
-        let camera_light = {
-            let camera_light = transforms.next().unwrap();
-            world.push((
-                camera_light,
-                PointLightComponent {
-                    color: Vector4::new(1., 1., 1., 2.),
-                    half_radius: 4.,
-                },
-            ));
-            camera_light
-        };
-
-        // fps cursor
-        let window = &render_loop.context.window;
-        window.set_cursor_visible(false);
-        window
-            .set_cursor_grab(winit::window::CursorGrabMode::Confined)
-            .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
-            .unwrap();
 
         Self {
             render_loop,
             renderer,
             resources,
             camera: Default::default(),
-            keys: Keys::default(),
+            keys: InputState::default(),
             world,
             transforms,
             total_seconds: 0.,
-            camera_light,
             game_state: Default::default(),
+            last_frame_time: Instant::now(),
         }
     }
 
-    pub fn gui_update(&mut self, event: &WindowEvent) -> bool {
-        self.render_loop.context.gui.update(event)
+    fn load_level(&mut self, id: i32) {
+        if id == 0 {
+            init_world(
+                &mut self.world,
+                &mut self.transforms,
+                &mut self.resources.begin_retrieving(
+                    &self.render_loop.context,
+                    &mut self.renderer.lit_draw_system,
+                    &mut self.renderer.unlit_draw_system,
+                ),
+            );
+        } else if id == 1 {
+            init_ui_test(
+                &mut self.world,
+                &mut self.transforms,
+                &mut self.resources.begin_retrieving(
+                    &self.render_loop.context,
+                    &mut self.renderer.lit_draw_system,
+                    &mut self.renderer.unlit_draw_system,
+                ),
+            );
+        }
+
+        // camera light, will follow camera position on update
+        let camera_light = self.transforms.next().unwrap();
+        self.world.push((
+            camera_light,
+            PointLightComponent {
+                color: Vector4::new(1., 1., 1., 2.),
+                half_radius: 4.,
+            },
+            FollowCamera(Vector3::new(0., 0.01, 0.01)), // light pos cannot = cam pos else the light will glitch
+        ));
+
+        self.game_state = GameState::Playing;
     }
 
-    pub fn update(&mut self, duration_since_last_update: &Duration) -> bool {
-        std::io::stdout()
-            .queue(crossterm::cursor::MoveToPreviousLine(8))
-            .unwrap();
-        let update_start = Instant::now();
+    pub fn handle_winit_event(
+        &mut self,
+        event: Event<()>,
+        control_flow: &mut winit::event_loop::ControlFlow,
+    ) {
+        match (self.game_state, event) {
+            (_, Event::WindowEvent { event, .. }) => {
+                if !self.render_loop.context.gui.update(&event) {
+                    match event {
+                        WindowEvent::CloseRequested => control_flow.set_exit(),
+                        WindowEvent::Resized(_) => self.render_loop.handle_window_resize(),
+                        WindowEvent::KeyboardInput {
+                            input:
+                                KeyboardInput {
+                                    virtual_keycode: Some(code),
+                                    state,
+                                    ..
+                                },
+                            ..
+                        } => self.handle_keyboard_input(code, state),
 
-        // let mut update_result = UpdateResult::None;
-        let mut quit = false;
-
-        if self.game_state == GameState::Playing {
-            let seconds_passed = duration_since_last_update.as_secs_f32();
-            self.total_seconds += seconds_passed;
-            // println!("Current time: {}", seconds_passed);
-
-            // move cam
-            self.update_movement(seconds_passed);
-            self.transforms
-                .get_transform_mut(&self.camera_light)
-                .unwrap()
-                .set_translation(self.camera.position + Vector3::new(0., 0.01, 0.01)); // light pos cannot = cam pos else the light will glitch
-
-            // update rotate
-            let mut query = <(&TransformID, &Rotate)>::query();
-            for (transform_id, rotate) in query.iter(&self.world) {
-                let transform = self.transforms.get_transform_mut(transform_id).unwrap();
-                transform.set_rotation(
-                    Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
-                        * transform.get_local_transform().rotation,
-                );
-                // println!(
-                //     "multiplying {:?} for new rotation of {:?}",
-                //     rotate.0,
-                //     transform.get_transform().rotation
-                // );
+                        _ => {}
+                    }
+                }
             }
+            (_, Event::RedrawRequested(_)) => {
+                std::io::stdout()
+                    .queue(crossterm::cursor::MoveToPreviousLine(8))
+                    .unwrap();
+
+                let update_start = Instant::now();
+                let duration_from_last_frame = update_start - self.last_frame_time;
+
+                // gui
+                let mut gui_result = MenuOption::None;
+                self.render_loop.context.gui.immediate_ui(|gui| {
+                    let ctx = &gui.context();
+
+                    // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
+                    gui_result = match self.game_state {
+                        GameState::MainMenu => ui::main_menu(ctx),
+                        GameState::Paused => ui::pause_menu(ctx),
+                        _ => ui::MenuOption::None,
+                    };
+                });
+                match gui_result {
+                    ui::MenuOption::None => {}
+                    ui::MenuOption::LoadLevel(i) => self.load_level(i),
+                    ui::MenuOption::QuitLevel => {
+                        self.game_state = GameState::MainMenu;
+                        self.world.clear();
+                        self.transforms = TransformSystem::new();
+                        self.camera = Default::default();
+                    }
+                    ui::MenuOption::Quit => control_flow.set_exit(),
+                }
+
+                if self.game_state == GameState::Playing {
+                    self.game_update(duration_from_last_frame.as_secs_f32());
+                }
+
+                println!(
+                    "\rLogic update    {:>4} μs",
+                    update_start.elapsed().as_micros()
+                );
+
+                self.render_update();
+
+                let elapsed = update_start.elapsed().as_micros();
+                println!(
+                    "\rTotal           {:>4} μs ({} fps)    ",
+                    elapsed,
+                    1_000_000 / elapsed
+                );
+
+                self.last_frame_time = update_start;
+            }
+            (_, Event::MainEventsCleared) => self.render_loop.context.window.request_redraw(),
+            (
+                GameState::Playing,
+                Event::DeviceEvent {
+                    event: winit::event::DeviceEvent::MouseMotion { delta },
+                    ..
+                },
+            ) => self.camera.rotate(delta.0 as f32, delta.1 as f32),
+            _ => (),
+        }
+    }
+
+    /// update game logic
+    fn game_update(&mut self, seconds_passed: f32) {
+        self.total_seconds += seconds_passed;
+
+        // move cam
+        self.update_movement(seconds_passed);
+
+        // update camera follower
+        let mut query = <(&TransformID, &FollowCamera)>::query();
+        for (transform_id, &FollowCamera(offset)) in query.iter(&self.world) {
+            self.transforms
+                .get_transform_mut(transform_id)
+                .unwrap()
+                .set_translation(self.camera.position + offset);
         }
 
+        // update rotate
+        let mut query = <(&TransformID, &Rotate)>::query();
+        for (transform_id, rotate) in query.iter(&self.world) {
+            let transform = self.transforms.get_transform_mut(transform_id).unwrap();
+            transform.set_rotation(
+                Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
+                    * transform.get_local_transform().rotation,
+            );
+        }
+
+        // update mat swap
+        if self.keys.q_triggered {
+            let mut query = <(&mut MaterialSwapper, &mut RenderObject<Matrix4<f32>>)>::query();
+
+            query.for_each_mut(&mut self.world, |(swapper, render_object)| {
+                let next_mat = swapper.swap_material();
+                // println!("Swapped mat: {:?}", next_mat);
+                render_object.material = next_mat;
+            });
+
+            self.keys.q_triggered = false;
+        }
+    }
+
+    /// upload render objects and do render loop
+    fn render_update(&mut self) {
         // update render objects
         let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query();
         // println!("==== RENDER OBJECT DATA ====");
@@ -201,26 +298,6 @@ impl App {
             render_object.set_matrix(transfrom_matrix);
             render_object.upload();
         }
-
-        // gui
-        self.render_loop.context.gui.immediate_ui(|gui| {
-            let ctx = &gui.context();
-
-            // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
-            match self.game_state {
-                GameState::InMenu => {
-                    ui::pause_menu(ctx, || {
-                        quit = true;
-                    });
-                }
-                _ => {}
-            }
-        });
-
-        println!(
-            "\rLogic update    {:>4} μs",
-            update_start.elapsed().as_micros()
-        );
 
         // do render loop
         let extends = self.render_loop.context.window.inner_size();
@@ -266,17 +343,9 @@ impl App {
                     .lighting_system
                     .set_ambient_color([0.1, 0.1, 0.1, 1.]);
             });
-
-        let elapsed = update_start.elapsed().as_micros();
-        println!(
-            "\rTotal           {:>4} μs ({} fps)    ",
-            elapsed,
-            1_000_000 / elapsed
-        );
-
-        quit
     }
 
+    /// move camera
     fn update_movement(&mut self, seconds_passed: f32) {
         if self.keys.space == Pressed && self.keys.shift == Released {
             self.camera.move_up(seconds_passed)
@@ -300,17 +369,8 @@ impl App {
         }
     }
 
-    pub fn handle_mouse_input(&mut self, dx: f32, dy: f32) {
-        if self.game_state == GameState::Playing {
-            self.camera.rotate(dx, dy);
-        }
-
-        // println!(
-        //     "[Camera Rotation] x: {}, y: {}, z: {}",
-        //     self.camera.rotation.x.0, self.camera.rotation.y.0, self.camera.rotation.z.0
-        // );
-    }
-    pub fn handle_keyboard_input(&mut self, key_code: VirtualKeyCode, state: ElementState) {
+    /// update key state
+    fn handle_keyboard_input(&mut self, key_code: VirtualKeyCode, state: ElementState) {
         let state = match state {
             ElementState::Pressed => Pressed,
             ElementState::Released => Released,
@@ -318,19 +378,7 @@ impl App {
 
         match key_code {
             VirtualKeyCode::Q => {
-                if self.game_state == GameState::Playing
-                    && state == Pressed
-                    && self.keys.q == Released
-                {
-                    let mut query =
-                        <(&mut MaterialSwapper, &mut RenderObject<Matrix4<f32>>)>::query();
-
-                    query.for_each_mut(&mut self.world, |(swapper, render_object)| {
-                        let next_mat = swapper.swap_material();
-                        // println!("Swapped mat: {:?}", next_mat);
-                        render_object.material = next_mat;
-                    });
-                }
+                self.keys.q_triggered = state == Pressed && self.keys.q == Released;
                 self.keys.q = state;
             }
             VirtualKeyCode::W => self.keys.w = state,
@@ -344,7 +392,7 @@ impl App {
                 if state == Pressed && self.keys.escape == Released {
                     match self.game_state {
                         GameState::Playing => {
-                            self.game_state = GameState::InMenu;
+                            self.game_state = GameState::Paused;
 
                             let window = &self.render_loop.context.window;
                             let window_size = window.inner_size();
@@ -359,7 +407,7 @@ impl App {
                                 .set_cursor_grab(winit::window::CursorGrabMode::None)
                                 .unwrap();
                         }
-                        GameState::InMenu => {
+                        GameState::Paused => {
                             self.game_state = GameState::Playing;
 
                             let window = &self.render_loop.context.window;
@@ -371,37 +419,12 @@ impl App {
                                 })
                                 .unwrap();
                         }
+                        _ => {}
                     }
                 };
                 self.keys.escape = state;
             }
-            _ => {} // KeyCode::KeyQ => {
-                    //     if state == Pressed && self.keys.q == Released {
-                    //         let mut query =
-                    //             <(&mut MaterialSwapper, &mut RenderObject<Matrix4<f32>>)>::query();
-
-                    //         query.for_each_mut(&mut self.world, |(swapper, render_object)| {
-                    //             let next_mat = swapper.swap_material();
-                    //             // println!("Swapped mat: {:?}", next_mat);
-                    //             render_object.material = next_mat;
-                    //         });
-                    //     }
-                    //     self.keys.q = state;
-                    // }
-                    // KeyCode::KeyW => self.keys.w = state,
-                    // KeyCode::KeyA => self.keys.a = state,
-                    // KeyCode::KeyS => self.keys.s = state,
-                    // KeyCode::KeyD => self.keys.d = state,
-                    // KeyCode::Space => self.keys.space = state,
-                    // KeyCode::ShiftLeft => self.keys.shift = state,
-                    // _ => {}
+            _ => {}
         }
-    }
-
-    pub fn handle_window_resize(&mut self) {
-        self.render_loop.handle_window_resize()
-    }
-    pub fn handle_window_wait(&self) {
-        self.render_loop.context.window.request_redraw();
     }
 }

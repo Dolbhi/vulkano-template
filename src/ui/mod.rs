@@ -3,6 +3,7 @@ use egui_winit_vulkano::egui::{self, Color32, Context, FontId, RichText};
 pub enum MenuOption {
     None,
     LoadLevel(i32),
+    QuitLevel,
     Quit,
 }
 
@@ -31,7 +32,7 @@ pub fn main_menu(ctx: &Context) -> MenuOption {
                         )
                         .clicked()
                     {
-                        result = MenuOption::LoadLevel(1);
+                        result = MenuOption::LoadLevel(0);
                     }
                     if ui
                         .button(
@@ -41,7 +42,7 @@ pub fn main_menu(ctx: &Context) -> MenuOption {
                         )
                         .clicked()
                     {
-                        result = MenuOption::LoadLevel(2);
+                        result = MenuOption::LoadLevel(1);
                     }
                     if ui
                         .button(
@@ -59,7 +60,9 @@ pub fn main_menu(ctx: &Context) -> MenuOption {
     result
 }
 
-pub fn pause_menu(ctx: &Context, quit_callback: impl FnOnce() -> ()) {
+pub fn pause_menu(ctx: &Context) -> MenuOption {
+    let mut result = MenuOption::None;
+
     egui::Area::new("Pause Menu")
         .fixed_pos((500., 300.))
         .pivot(egui::Align2::CENTER_CENTER)
@@ -77,17 +80,28 @@ pub fn pause_menu(ctx: &Context, quit_callback: impl FnOnce() -> ()) {
                     );
                     if ui
                         .button(
-                            RichText::new("Quit")
+                            RichText::new("Quit Level")
                                 .font(FontId::proportional(40.0))
                                 .color(Color32::WHITE),
                         )
                         .clicked()
                     {
-                        // ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                        quit_callback();
+                        result = MenuOption::QuitLevel;
+                    }
+                    if ui
+                        .button(
+                            RichText::new("Quit To Desktop")
+                                .font(FontId::proportional(40.0))
+                                .color(Color32::WHITE),
+                        )
+                        .clicked()
+                    {
+                        result = MenuOption::Quit;
                     }
                 });
         });
+
+    result
 }
 
 pub fn test_area(ctx: &Context) {
