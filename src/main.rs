@@ -54,7 +54,9 @@ fn main() {
             let this_frame_time = Instant::now();
             let duration_from_last_frame = this_frame_time - previous_frame_time;
 
-            app.update(&duration_from_last_frame);
+            if app.update(&duration_from_last_frame) {
+                control_flow.set_exit();
+            };
 
             previous_frame_time = this_frame_time;
         }

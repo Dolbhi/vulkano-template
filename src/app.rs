@@ -25,6 +25,11 @@ use crate::{
 
 // TO flush_next_future METHOD ADD PARAMS FOR PASSING CAMERA DESCRIPTOR SET
 
+// pub enum UpdateResult {
+//     None,
+//     Quit,
+// }
+
 #[derive(Default, PartialEq)]
 pub enum KeyState {
     Pressed,
@@ -50,7 +55,7 @@ struct Keys {
 enum GameState {
     #[default]
     Playing,
-    Paused,
+    InMenu,
 }
 
 pub struct App {
@@ -75,7 +80,7 @@ impl App {
 
         let mut world = World::default();
         let mut transforms = TransformSystem::new();
-        let mut render_loop = RenderLoop::new(event_loop);
+        let render_loop = RenderLoop::new(event_loop);
         let mut renderer = DeferredRenderer::new(&render_loop.context);
 
         let render_init_elapse = init_start_time.elapsed().as_millis();
@@ -125,10 +130,6 @@ impl App {
         };
 
         // fps cursor
-        // render_loop.context.gui.begin_frame();
-        // render_loop.context.gui.context().send_viewport_cmd(
-        //     egui_winit_vulkano::egui::ViewportCommand::CursorVisible(false),
-        // );
         let window = &render_loop.context.window;
         window.set_cursor_visible(false);
         window
@@ -154,11 +155,14 @@ impl App {
         self.render_loop.context.gui.update(event)
     }
 
-    pub fn update(&mut self, duration_since_last_update: &Duration) {
+    pub fn update(&mut self, duration_since_last_update: &Duration) -> bool {
         std::io::stdout()
             .queue(crossterm::cursor::MoveToPreviousLine(8))
             .unwrap();
         let update_start = Instant::now();
+
+        // let mut update_result = UpdateResult::None;
+        let mut quit = false;
 
         if self.game_state == GameState::Playing {
             let seconds_passed = duration_since_last_update.as_secs_f32();
@@ -204,8 +208,10 @@ impl App {
 
             // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
             match self.game_state {
-                GameState::Paused => {
-                    ui::pause_menu(ctx);
+                GameState::InMenu => {
+                    ui::pause_menu(ctx, || {
+                        quit = true;
+                    });
                 }
                 _ => {}
             }
@@ -267,6 +273,8 @@ impl App {
             elapsed,
             1_000_000 / elapsed
         );
+
+        quit
     }
 
     fn update_movement(&mut self, seconds_passed: f32) {
@@ -336,7 +344,7 @@ impl App {
                 if state == Pressed && self.keys.escape == Released {
                     match self.game_state {
                         GameState::Playing => {
-                            self.game_state = GameState::Paused;
+                            self.game_state = GameState::InMenu;
 
                             let window = &self.render_loop.context.window;
                             let window_size = window.inner_size();
@@ -351,7 +359,7 @@ impl App {
                                 .set_cursor_grab(winit::window::CursorGrabMode::None)
                                 .unwrap();
                         }
-                        GameState::Paused => {
+                        GameState::InMenu => {
                             self.game_state = GameState::Playing;
 
                             let window = &self.render_loop.context.window;
