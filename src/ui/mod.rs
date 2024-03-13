@@ -1,10 +1,22 @@
-use egui_winit_vulkano::egui::{self, Color32, Context, FontId, RichText};
+use egui_winit_vulkano::egui::{self, Color32, Context, FontId, Layout, RichText, Style};
 
 pub enum MenuOption {
     None,
     LoadLevel(i32),
     QuitLevel,
     Quit,
+}
+
+pub fn set_style(style: &mut Style) {
+    style.spacing.item_spacing = (20.0, 20.0).into();
+    style
+        .text_styles
+        .insert(egui::TextStyle::Heading, FontId::proportional(40.0));
+    style
+        .text_styles
+        .insert(egui::TextStyle::Button, FontId::proportional(30.0));
+
+    // style.visuals.text_color();
 }
 
 pub fn main_menu(ctx: &Context) -> MenuOption {
@@ -19,42 +31,32 @@ pub fn main_menu(ctx: &Context) -> MenuOption {
                 .outer_margin(20.)
                 .rounding(5.)
                 .show(ui, |ui| {
-                    ui.label(
-                        RichText::new("RUSTY RENDERER!!")
-                            .font(FontId::proportional(40.0))
-                            .color(Color32::WHITE),
-                    );
-                    if ui
-                        .button(
-                            RichText::new("Load Level 1")
-                                .font(FontId::proportional(40.0))
-                                .color(Color32::WHITE),
-                        )
-                        .clicked()
-                    {
-                        result = MenuOption::LoadLevel(0);
-                    }
-                    if ui
-                        .button(
-                            RichText::new("Load Level 2")
-                                .font(FontId::proportional(40.0))
-                                .color(Color32::WHITE),
-                        )
-                        .clicked()
-                    {
-                        result = MenuOption::LoadLevel(1);
-                    }
-                    if ui
-                        .button(
-                            RichText::new("Quit")
-                                .font(FontId::proportional(40.0))
-                                .color(Color32::WHITE),
-                        )
-                        .clicked()
-                    {
-                        result = MenuOption::Quit;
-                    }
-                });
+                    ui.allocate_ui_with_layout(
+                        (300.0, 500.0).into(),
+                        Layout::top_down(egui::Align::Center),
+                        |ui| {
+                            ui.heading(RichText::new("RUSTY RENDERER!!").color(Color32::WHITE));
+                            if ui
+                                .button(RichText::new("Load Level 1").color(Color32::WHITE))
+                                .clicked()
+                            {
+                                result = MenuOption::LoadLevel(0);
+                            }
+                            if ui
+                                .button(RichText::new("Load Level 2").color(Color32::WHITE))
+                                .clicked()
+                            {
+                                result = MenuOption::LoadLevel(1);
+                            }
+                            if ui
+                                .button(RichText::new("Quit").color(Color32::WHITE))
+                                .clicked()
+                            {
+                                result = MenuOption::Quit;
+                            }
+                        },
+                    )
+                })
         });
 
     result
@@ -62,6 +64,14 @@ pub fn main_menu(ctx: &Context) -> MenuOption {
 
 pub fn pause_menu(ctx: &Context) -> MenuOption {
     let mut result = MenuOption::None;
+
+    // ctx.style_mut(|style| {
+    //     style.spacing.item_spacing = (20.0, 20.0).into();
+    //     style.text_styles.insert(egui::TextStyle::Heading, FontId::proportional(40.0));
+    //     style.text_styles.insert(egui::TextStyle::Button, FontId::proportional(30.0));
+
+    //     style.visuals.text_color()
+    // });
 
     egui::Area::new("Pause Menu")
         .fixed_pos((500., 300.))
@@ -73,31 +83,25 @@ pub fn pause_menu(ctx: &Context) -> MenuOption {
                 .outer_margin(20.)
                 .rounding(5.)
                 .show(ui, |ui| {
-                    ui.label(
-                        RichText::new("Paused")
-                            .font(FontId::proportional(40.0))
-                            .color(Color32::WHITE),
+                    ui.allocate_ui_with_layout(
+                        (300.0, 500.0).into(),
+                        Layout::top_down(egui::Align::Center),
+                        |ui| {
+                            ui.heading(RichText::new("Paused").color(Color32::WHITE));
+                            if ui
+                                .button(RichText::new("Quit Level").color(Color32::WHITE))
+                                .clicked()
+                            {
+                                result = MenuOption::QuitLevel;
+                            }
+                            if ui
+                                .button(RichText::new("Quit To Desktop").color(Color32::WHITE))
+                                .clicked()
+                            {
+                                result = MenuOption::Quit;
+                            }
+                        },
                     );
-                    if ui
-                        .button(
-                            RichText::new("Quit Level")
-                                .font(FontId::proportional(40.0))
-                                .color(Color32::WHITE),
-                        )
-                        .clicked()
-                    {
-                        result = MenuOption::QuitLevel;
-                    }
-                    if ui
-                        .button(
-                            RichText::new("Quit To Desktop")
-                                .font(FontId::proportional(40.0))
-                                .color(Color32::WHITE),
-                        )
-                        .clicked()
-                    {
-                        result = MenuOption::Quit;
-                    }
                 });
         });
 

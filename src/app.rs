@@ -89,6 +89,8 @@ impl App {
         let renderer = DeferredRenderer::new(&render_loop.context);
         let resources = ResourceManager::new(&render_loop.context);
 
+        render_loop.context.gui.context().style_mut(ui::set_style);
+
         let render_init_elapse = init_start_time.elapsed().as_millis();
 
         println!("[Renderer Info]\nLit shaders:");
