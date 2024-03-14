@@ -1,5 +1,6 @@
 pub mod app;
 pub mod game_objects;
+pub mod profiler;
 pub mod render;
 pub mod shaders;
 pub mod ui;
@@ -7,6 +8,7 @@ mod vertex_data;
 pub mod vulkano_objects;
 
 use cgmath::{Rad, Vector3, Vector4};
+use profiler::Profiler;
 pub use vertex_data::{Vertex2d, Vertex3d, VertexFull};
 
 use crate::{
@@ -21,6 +23,16 @@ use render::{
     RenderSubmit,
 };
 use std::iter::zip;
+
+pub static mut FRAME_PROFILER: Option<Profiler<7, 128>> = Some(Profiler::new([
+    "Logic update",
+    "Pre-render",
+    "Frame cleanup",
+    "Render upload",
+    "Wait last frame",
+    "ComBuf building",
+    "Execute",
+]));
 
 #[cfg(test)]
 mod tests {

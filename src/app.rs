@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use cgmath::{Matrix4, Quaternion, Rotation3, Vector3, Vector4};
-use crossterm::QueueableCommand;
+use crossterm::queue;
 use legion::{IntoQuery, *};
 
 use winit::{
@@ -186,9 +186,12 @@ impl App {
                 }
             }
             (_, Event::RedrawRequested(_)) => {
-                std::io::stdout()
-                    .queue(crossterm::cursor::MoveToPreviousLine(8))
-                    .unwrap();
+                queue!(
+                    std::io::stdout(),
+                    crossterm::cursor::MoveToPreviousLine(8),
+                    // crossterm::terminal::Clear(crossterm::terminal::ClearType::FromCursorDown)
+                )
+                .unwrap();
 
                 let update_start = Instant::now();
                 let duration_from_last_frame = update_start - self.last_frame_time;
@@ -229,7 +232,7 @@ impl App {
                 }
 
                 println!(
-                    "\rLogic update    {:>4} μs",
+                    "Logic update    {:>4} μs",
                     update_start.elapsed().as_micros()
                 );
 
@@ -237,7 +240,7 @@ impl App {
 
                 let elapsed = update_start.elapsed().as_micros();
                 println!(
-                    "\rTotal           {:>4} μs ({} fps)    ",
+                    "Total           {:>4} μs ({} fps)    ",
                     elapsed,
                     1_000_000 / elapsed
                 );

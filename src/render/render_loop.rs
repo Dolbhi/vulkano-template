@@ -71,7 +71,7 @@ impl RenderLoop {
             self.recreate_swapchain = true;
         }
 
-        println!("\rPre-render      {:>4} μs", now.elapsed().as_micros());
+        println!("Pre-render      {:>4} μs", now.elapsed().as_micros());
         let now = std::time::Instant::now();
 
         // wait for upcoming image to be ready (it should be by this point)
@@ -81,13 +81,13 @@ impl RenderLoop {
             image_fence.cleanup_finished();
         }
 
-        println!("\rFrame cleanup   {:>4} μs", now.elapsed().as_micros());
+        println!("Frame cleanup   {:>4} μs", now.elapsed().as_micros());
         let now = std::time::Instant::now();
 
         // let renderer = renderer.upload_data(index);
         upload_render_data(renderer, index);
 
-        println!("\rRender upload   {:>4} μs", now.elapsed().as_micros());
+        println!("Render upload   {:>4} μs", now.elapsed().as_micros());
         let now = std::time::Instant::now();
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
@@ -105,7 +105,7 @@ impl RenderLoop {
             // logic that can use every GPU resource (the GPU is sleeping)
         }
 
-        println!("\rLast frame wait {:>4} μs", now.elapsed().as_micros());
+        println!("Last frame wait {:>4} μs", now.elapsed().as_micros());
         // let now = std::time::Instant::now();
 
         // RENDER

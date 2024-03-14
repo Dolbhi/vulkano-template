@@ -1,5 +1,7 @@
 use egui_winit_vulkano::egui::{self, Align2, Color32, Context, FontId, Layout, RichText, Style};
 
+use crate::FRAME_PROFILER;
+
 pub enum MenuOption {
     None,
     LoadLevel(i32),
@@ -93,6 +95,21 @@ pub fn pause_menu(ctx: &Context, option_selected: &mut MenuOption) {
         });
 }
 
+pub fn profiler(ctx: &Context) {
+    egui::Window::new("Profiler")
+        .resizable(false)
+        .default_pos((50.0, 50.0))
+        .show(ctx, |ui| {
+            let profiler = unsafe { FRAME_PROFILER.take().unwrap() };
+
+            ui.label(profiler.summary());
+
+            unsafe {
+                FRAME_PROFILER = Some(profiler);
+            }
+        });
+}
+
 pub fn test_area(ctx: &Context) {
     egui::Area::new("Pause Menu")
         .default_pos((500., 300.))
@@ -122,7 +139,7 @@ pub fn test_window(ctx: &Context) {
         .title_bar(false)
         .interactable(false)
         .show(ctx, |ui| {
-            ui.label("Test window");
+            ui.label("Test window\nMulti lines\nHow do they work\n\n??  ??  ");
             ui.allocate_space(ui.available_size());
             // ui.allocate_ui((200.0, 200.0).into(), |ui| {
             //     ui.label("Test window");
