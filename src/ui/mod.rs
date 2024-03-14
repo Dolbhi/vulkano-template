@@ -9,14 +9,21 @@ pub enum MenuOption {
     Quit,
 }
 
+fn title_style() -> egui::TextStyle {
+    egui::TextStyle::Name("title".into())
+}
+
 pub fn set_style(style: &mut Style) {
     style.spacing.item_spacing = (20.0, 20.0).into();
-    style
-        .text_styles
-        .insert(egui::TextStyle::Heading, FontId::proportional(40.0));
+    // style
+    //     .text_styles
+    //     .insert(egui::TextStyle::Heading, FontId::proportional(40.0));
     style
         .text_styles
         .insert(egui::TextStyle::Button, FontId::proportional(30.0));
+    style
+        .text_styles
+        .insert(title_style(), FontId::proportional(40.0));
 
     // style.visuals.text_color();
 }
@@ -36,7 +43,11 @@ pub fn main_menu(ctx: &Context, option_selected: &mut MenuOption) {
                         (300.0, 500.0).into(),
                         Layout::top_down(egui::Align::Center),
                         |ui| {
-                            ui.heading(RichText::new("RUSTY RENDERER!!").color(Color32::WHITE));
+                            ui.label(
+                                RichText::new("RUSTY RENDERER!!")
+                                    .text_style(title_style())
+                                    .color(Color32::WHITE),
+                            );
                             if ui
                                 .button(RichText::new("Load Level 1").color(Color32::WHITE))
                                 .clicked()
@@ -76,7 +87,11 @@ pub fn pause_menu(ctx: &Context, option_selected: &mut MenuOption) {
                         (300.0, 500.0).into(),
                         Layout::top_down(egui::Align::Center),
                         |ui| {
-                            ui.heading(RichText::new("Paused").color(Color32::WHITE));
+                            ui.label(
+                                RichText::new("Paused")
+                                    .text_style(title_style())
+                                    .color(Color32::WHITE),
+                            );
                             if ui
                                 .button(RichText::new("Quit Level").color(Color32::WHITE))
                                 .clicked()
@@ -95,14 +110,14 @@ pub fn pause_menu(ctx: &Context, option_selected: &mut MenuOption) {
         });
 }
 
-pub fn profiler(ctx: &Context) {
+pub fn profiler_window(ctx: &Context) {
     egui::Window::new("Profiler")
         .resizable(false)
         .default_pos((50.0, 50.0))
         .show(ctx, |ui| {
             let profiler = unsafe { FRAME_PROFILER.take().unwrap() };
 
-            ui.label(profiler.summary());
+            ui.label(RichText::new(profiler.summary()).monospace());
 
             unsafe {
                 FRAME_PROFILER = Some(profiler);

@@ -41,11 +41,15 @@ impl<const COUNT: usize, const SAMPLES: usize> Profiler<COUNT, SAMPLES> {
             total += ave;
         }
 
-        out + &format!(
-            "Total           {:>4} μs ({} fps)",
-            total,
-            1_000_000 / total
-        )
+        if total == 0 {
+            out + "Total              0 μs (NA fps)"
+        } else {
+            out + &format!(
+                "Total           {:>4} μs ({} fps)",
+                total,
+                1_000_000 / total
+            )
+        }
     }
 }
 

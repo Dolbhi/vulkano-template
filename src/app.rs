@@ -201,7 +201,7 @@ impl App {
                 self.render_loop.context.gui.immediate_ui(|gui| {
                     let ctx = &gui.context();
 
-                    ui::test_window(ctx);
+                    ui::profiler_window(ctx);
 
                     // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
                     match self.game_state {
