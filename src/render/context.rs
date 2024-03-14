@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::vulkano_objects::{self, allocators::Allocators};
+use crate::{
+    vulkano_objects::{self, allocators::Allocators},
+    FRAME_PROFILER,
+};
 use egui_winit_vulkano::{Gui, GuiConfig};
 use vulkano::{
     command_buffer::{self, AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
@@ -222,7 +225,11 @@ impl Context {
 
         build_commands(&mut builder);
 
-        println!("\rComBuf building {:>4} μs", now.elapsed().as_micros());
+        // println!("\rComBuf building {:>4} μs", now.elapsed().as_micros());
+        // let mut profiler = unsafe { FRAME_PROFILER.take().unwrap() };
+
+        // profiler.add_sample(now.elapsed().as_micros() as u32, 5);
+        let combuf_time = now.elapsed().as_micros() as u32;
         let now = std::time::Instant::now();
 
         // Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
@@ -252,10 +259,20 @@ impl Context {
             )
             .then_signal_fence_and_flush();
 
-        println!(
-            "\rExecute ComBuf  {:>4} μs       ",
-            now.elapsed().as_micros()
-        );
+        // println!(
+        //     "\rExecute ComBuf  {:>4} μs       ",
+        //     now.elapsed().as_micros()
+        // );
+        // profiler.add_sample(now.elapsed().as_micros() as u32, 6);
+        let exe_time = now.elapsed().as_micros() as u32;
+        unsafe {
+            let mut profiler = FRAME_PROFILER.take().unwrap();
+
+            profiler.add_sample(combuf_time, 5);
+            profiler.add_sample(exe_time, 6);
+
+            FRAME_PROFILER = Some(profiler);
+        }
 
         result
     }

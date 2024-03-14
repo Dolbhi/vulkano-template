@@ -5,6 +5,8 @@ use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use winit::event_loop::EventLoop;
 
+use crate::FRAME_PROFILER;
+
 use super::renderer::Renderer;
 use super::{context::Context, context::Fence};
 
@@ -71,7 +73,10 @@ impl RenderLoop {
             self.recreate_swapchain = true;
         }
 
-        println!("Pre-render      {:>4} μs", now.elapsed().as_micros());
+        // println!("Pre-render      {:>4} μs", now.elapsed().as_micros());
+        // let mut profiler = unsafe { FRAME_PROFILER.take().unwrap() };
+        // profiler.add_sample(now.elapsed().as_micros() as u32, 1);
+        let pre_ren_time = now.elapsed().as_micros() as u32;
         let now = std::time::Instant::now();
 
         // wait for upcoming image to be ready (it should be by this point)
@@ -81,13 +86,18 @@ impl RenderLoop {
             image_fence.cleanup_finished();
         }
 
-        println!("Frame cleanup   {:>4} μs", now.elapsed().as_micros());
+        // println!("Frame cleanup   {:>4} μs", now.elapsed().as_micros());
+        // profiler.add_sample(now.elapsed().as_micros() as u32, 2);
+        let frame_clean_time = now.elapsed().as_micros() as u32;
         let now = std::time::Instant::now();
 
         // let renderer = renderer.upload_data(index);
         upload_render_data(renderer, index);
 
-        println!("Render upload   {:>4} μs", now.elapsed().as_micros());
+        // println!("Render upload   {:>4} μs", now.elapsed().as_micros());
+        // let mut profiler = unsafe { FRAME_PROFILER.take().unwrap() };
+        // profiler.add_sample(now.elapsed().as_micros() as u32, 3);
+        let ren_up_time = now.elapsed().as_micros() as u32;
         let now = std::time::Instant::now();
 
         // logic that uses the GPU resources that are currently not used (have been waited upon)
@@ -105,8 +115,20 @@ impl RenderLoop {
             // logic that can use every GPU resource (the GPU is sleeping)
         }
 
-        println!("Last frame wait {:>4} μs", now.elapsed().as_micros());
+        // println!("Last frame wait {:>4} μs", now.elapsed().as_micros());
         // let now = std::time::Instant::now();
+        // profiler.add_sample(now.elapsed().as_micros() as u32, 4);
+        let last_f_wait = now.elapsed().as_micros() as u32;
+        unsafe {
+            let mut profiler = FRAME_PROFILER.take().unwrap();
+
+            profiler.add_sample(pre_ren_time, 1);
+            profiler.add_sample(frame_clean_time, 2);
+            profiler.add_sample(ren_up_time, 3);
+            profiler.add_sample(last_f_wait, 4);
+
+            FRAME_PROFILER = Some(profiler);
+        }
 
         // RENDER
         // println!("[Pre-render state] seconds_passed: {}, image_i: {}, window_resized: {}, recreate_swapchain: {}", seconds_passed, image_i, self.window_resized, self.recreate_swapchain);

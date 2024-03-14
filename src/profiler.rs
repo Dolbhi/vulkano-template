@@ -8,8 +8,8 @@ pub struct Profiler<const COUNT: usize, const SAMPLES: usize> {
 
 #[derive(Clone, Copy)]
 struct Profile<const SAMPLES: usize> {
-    sum: i32,
-    micros: [i32; SAMPLES],
+    sum: u32,
+    micros: [u32; SAMPLES],
 }
 
 impl<const COUNT: usize, const SAMPLES: usize> Profiler<COUNT, SAMPLES> {
@@ -24,7 +24,7 @@ impl<const COUNT: usize, const SAMPLES: usize> Profiler<COUNT, SAMPLES> {
         }
     }
 
-    pub fn add_sample(&mut self, micro: i32, profile_i: usize) {
+    pub fn add_sample(&mut self, micro: u32, profile_i: usize) {
         self.profiles[profile_i].add_sample(micro, self.sample_i);
     }
     pub fn end_frame(&mut self) {
@@ -33,7 +33,7 @@ impl<const COUNT: usize, const SAMPLES: usize> Profiler<COUNT, SAMPLES> {
 
     pub fn summary(&self) -> String {
         let mut out = String::new();
-        let mut total: i32 = 0;
+        let mut total: u32 = 0;
 
         for (name, profile) in zip(&self.names, &self.profiles) {
             let ave = profile.average();
@@ -54,15 +54,16 @@ impl<const COUNT: usize, const SAMPLES: usize> Profiler<COUNT, SAMPLES> {
 }
 
 impl<const SAMPLES: usize> Profile<SAMPLES> {
-    fn average(&self) -> i32 {
-        self.sum / (SAMPLES as i32)
+    fn average(&self) -> u32 {
+        self.sum / (SAMPLES as u32)
     }
 
-    pub fn add_sample(&mut self, micro: i32, next_i: usize) {
+    pub fn add_sample(&mut self, micro: u32, next_i: usize) {
         let last = self.micros[next_i];
         self.micros[next_i] = micro;
 
-        self.sum += micro - last;
+        self.sum += micro;
+        self.sum -= last;
     }
 }
 

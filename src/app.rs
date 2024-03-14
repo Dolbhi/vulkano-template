@@ -1,7 +1,6 @@
 use std::time::Instant;
 
 use cgmath::{Matrix4, Quaternion, Rotation3, Vector3, Vector4};
-use crossterm::queue;
 use legion::{IntoQuery, *};
 
 use winit::{
@@ -22,7 +21,7 @@ use crate::{
     },
     shaders::{draw::GPUGlobalData, lighting::DirectionLight},
     ui::{self, MenuOption},
-    MaterialSwapper,
+    MaterialSwapper, FRAME_PROFILER,
 };
 
 // TO flush_next_future METHOD ADD PARAMS FOR PASSING CAMERA DESCRIPTOR SET
@@ -186,12 +185,12 @@ impl App {
                 }
             }
             (_, Event::RedrawRequested(_)) => {
-                queue!(
-                    std::io::stdout(),
-                    crossterm::cursor::MoveToPreviousLine(8),
-                    // crossterm::terminal::Clear(crossterm::terminal::ClearType::FromCursorDown)
-                )
-                .unwrap();
+                // queue!(
+                //     std::io::stdout(),
+                //     crossterm::cursor::MoveToPreviousLine(8),
+                //     // crossterm::terminal::Clear(crossterm::terminal::ClearType::FromCursorDown)
+                // )
+                // .unwrap();
 
                 let update_start = Instant::now();
                 let duration_from_last_frame = update_start - self.last_frame_time;
@@ -231,19 +230,29 @@ impl App {
                     self.update_game(duration_from_last_frame.as_secs_f32());
                 }
 
-                println!(
-                    "Logic update    {:>4} μs",
-                    update_start.elapsed().as_micros()
-                );
+                unsafe {
+                    let mut profiler = FRAME_PROFILER.take().unwrap();
+                    profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
+                    FRAME_PROFILER = Some(profiler);
+                }
+                // println!(
+                //     "Logic update    {:>4} μs",
+                //     update_start.elapsed().as_micros()
+                // );
 
                 self.update_render();
 
-                let elapsed = update_start.elapsed().as_micros();
-                println!(
-                    "Total           {:>4} μs ({} fps)    ",
-                    elapsed,
-                    1_000_000 / elapsed
-                );
+                unsafe {
+                    let mut profiler = FRAME_PROFILER.take().unwrap();
+                    profiler.end_frame();
+                    FRAME_PROFILER = Some(profiler);
+                }
+                // let elapsed = update_start.elapsed().as_micros();
+                // println!(
+                //     "Total           {:>4} μs ({} fps)    ",
+                //     elapsed,
+                //     1_000_000 / elapsed
+                // );
 
                 self.last_frame_time = update_start;
             }
