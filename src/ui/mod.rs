@@ -30,8 +30,7 @@ pub fn set_style(style: &mut Style) {
 
 pub fn main_menu(ctx: &Context, option_selected: &mut MenuOption) {
     egui::Area::new("Pause Menu")
-        .fixed_pos((500., 300.))
-        .pivot(egui::Align2::CENTER_CENTER)
+        .anchor(egui::Align2::CENTER_CENTER, (0., 0.))
         .show(ctx, |ui| {
             egui::Frame::none()
                 .fill(Color32::from_gray(50))
@@ -74,8 +73,7 @@ pub fn main_menu(ctx: &Context, option_selected: &mut MenuOption) {
 
 pub fn pause_menu(ctx: &Context, option_selected: &mut MenuOption) {
     egui::Area::new("Pause Menu")
-        .fixed_pos((500., 300.))
-        .pivot(egui::Align2::CENTER_CENTER)
+        .anchor(egui::Align2::CENTER_CENTER, (0., 0.))
         .show(ctx, |ui| {
             egui::Frame::none()
                 .fill(Color32::from_gray(50))
@@ -113,7 +111,7 @@ pub fn pause_menu(ctx: &Context, option_selected: &mut MenuOption) {
 pub fn profiler_window(ctx: &Context) {
     egui::Window::new("Profiler")
         .resizable(false)
-        .default_pos((50.0, 50.0))
+        .default_pos((20.0, 20.0))
         .show(ctx, |ui| {
             let profiler = unsafe { FRAME_PROFILER.take().unwrap() };
 
