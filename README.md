@@ -15,7 +15,6 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 	- [ ] Mesh, material and scene loading from files (with universal IDs)
 	- [ ] Conversion into fast loading format
 	- [ ] Loading objects/scenes from file (with auto loading of dependencies)
-- [ ] GUI
 - [ ] Transparency
 - [ ] Dynamic meshes
 - [ ] Anti-aliasing (MSAA)
@@ -27,6 +26,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 	- [x] Point light range and volumes
 	- [x] Unlit shaders
 	- [x] Multiple lighting materials
+- [x] GUI
 - [x] Light data streaming
 - [x] Multiple subpasses
 - [x] Lighting (Deferred rendering)
@@ -43,5 +43,5 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [x] Textures
 
 ### Issues
-- [x] Crashes when minimised
 - [ ] Crashes when closed after resize?
+- [x] Crashes when moving to 2nd monitor with loaded level

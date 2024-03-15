@@ -16,7 +16,7 @@ use vulkano::{
     device::{Device, Queue},
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     pipeline::graphics::vertex_input::Vertex,
-    sync::{future::NowFuture, GpuFuture},
+    sync::{future::NowFuture, AccessConflict, GpuFuture, HostAccessError},
     DeviceSize,
 };
 
@@ -396,20 +396,51 @@ pub fn write_to_storage_buffer<T: BufferContents>(
     writes: impl Iterator<Item = impl Into<T>>,
     offset: usize,
 ) -> Option<usize> {
-    let mut contents = buffer
-        .write()
-        .unwrap_or_else(|e| panic!("Failed to write to storage buffer\n{}", e));
+    let contents = buffer.write();
+    // .unwrap_or_else(|e| panic!("Failed to write to storage buffer\n{}", e));
     let mut last = if offset == 0 { None } else { Some(offset) };
-    for (i, write) in writes.enumerate() {
-        contents[i + offset] = write.into();
-        last = Some(i + offset);
+
+    match contents {
+        Ok(mut guard) => {
+            for (i, write) in writes.enumerate() {
+                guard[i + offset] = write.into();
+                last = Some(i + offset);
+            }
+        }
+        Err(HostAccessError::AccessConflict(AccessConflict::DeviceRead)) => {
+            println!("[Error] Storage buffer write blocked by GPU read")
+        }
+        Err(HostAccessError::AccessConflict(AccessConflict::DeviceWrite)) => {
+            println!("[Error] Storage buffer write blocked by GPU write")
+        }
+        Err(HostAccessError::AccessConflict(AccessConflict::HostRead)) => {
+            println!("[Error] Storage buffer write blocked by CPU read")
+        }
+        Err(HostAccessError::AccessConflict(AccessConflict::HostWrite)) => {
+            println!("[Error] Storage buffer write blocked by CPU write")
+        }
+        Err(e) => println!("[Error] Failed to write to storage buffer, {}", e),
     }
     last
 }
 
 pub fn write_to_buffer<T: BufferContents>(buffer: &Subbuffer<T>, data: impl Into<T>) {
-    let mut contents = buffer
-        .write()
-        .unwrap_or_else(|e| panic!("Failed to write to buffer\n{}", e));
-    *contents = data.into();
+    let contents = buffer.write();
+    // .unwrap_or_else(|e| panic!("Failed to write to buffer\n{}", e));
+    match contents {
+        Ok(mut guard) => *guard = data.into(),
+        Err(HostAccessError::AccessConflict(AccessConflict::DeviceRead)) => {
+            println!("[Error] Buffer write blocked by GPU read")
+        }
+        Err(HostAccessError::AccessConflict(AccessConflict::DeviceWrite)) => {
+            println!("[Error] Buffer write blocked by GPU write")
+        }
+        Err(HostAccessError::AccessConflict(AccessConflict::HostRead)) => {
+            println!("[Error] Buffer write blocked by CPU read")
+        }
+        Err(HostAccessError::AccessConflict(AccessConflict::HostWrite)) => {
+            println!("[Error] Buffer write blocked by CPU write")
+        }
+        Err(e) => println!("[Error] Failed to write to buffer, {}", e),
+    }
 }

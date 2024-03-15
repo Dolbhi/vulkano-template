@@ -123,6 +123,8 @@ impl App {
     }
 
     fn load_level(&mut self, id: i32) {
+        let load_start = Instant::now();
+
         if id == 0 {
             init_world(
                 &mut self.world,
@@ -156,6 +158,11 @@ impl App {
             FollowCamera(Vector3::new(0., 0.01, 0.01)), // light pos cannot = cam pos else the light will glitch
         ));
 
+        println!(
+            "[Benchmarking] level load time: {} ms",
+            load_start.elapsed().as_millis(),
+        );
+
         self.game_state = GameState::Playing;
     }
 
@@ -185,13 +192,6 @@ impl App {
                 }
             }
             (_, Event::RedrawRequested(_)) => {
-                // queue!(
-                //     std::io::stdout(),
-                //     crossterm::cursor::MoveToPreviousLine(8),
-                //     // crossterm::terminal::Clear(crossterm::terminal::ClearType::FromCursorDown)
-                // )
-                // .unwrap();
-
                 let update_start = Instant::now();
                 let duration_from_last_frame = update_start - self.last_frame_time;
 
@@ -235,10 +235,6 @@ impl App {
                     profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
                     FRAME_PROFILER = Some(profiler);
                 }
-                // println!(
-                //     "Logic update    {:>4} μs",
-                //     update_start.elapsed().as_micros()
-                // );
 
                 self.update_render();
 
@@ -247,12 +243,6 @@ impl App {
                     profiler.end_frame();
                     FRAME_PROFILER = Some(profiler);
                 }
-                // let elapsed = update_start.elapsed().as_micros();
-                // println!(
-                //     "Total           {:>4} μs ({} fps)    ",
-                //     elapsed,
-                //     1_000_000 / elapsed
-                // );
 
                 self.last_frame_time = update_start;
             }

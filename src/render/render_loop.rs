@@ -82,7 +82,7 @@ impl RenderLoop {
         // wait for upcoming image to be ready (it should be by this point)
         let index = image_i as usize;
         if let Some(image_fence) = &mut self.fences[index] {
-            // image_fence.wait(None).unwrap();
+            image_fence.wait(None).unwrap();
             image_fence.cleanup_finished();
         }
 
