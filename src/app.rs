@@ -15,7 +15,7 @@ use crate::{
         transform::{TransformID, TransformSystem},
         Camera, FollowCamera, Rotate,
     },
-    init_ui_test, init_world,
+    init_phys_test, init_ui_test, init_world,
     render::{
         renderer::DeferredRenderer, resource_manager::ResourceManager, RenderLoop, RenderObject,
     },
@@ -124,46 +124,43 @@ impl App {
 
     fn load_level(&mut self, id: i32) {
         let load_start = Instant::now();
-
-        if id == 0 {
-            init_world(
-                &mut self.world,
-                &mut self.transforms,
-                &mut self.resources.begin_retrieving(
-                    &self.render_loop.context,
-                    &mut self.renderer.lit_draw_system,
-                    &mut self.renderer.unlit_draw_system,
-                ),
-            );
-        } else if id == 1 {
-            init_ui_test(
-                &mut self.world,
-                &mut self.transforms,
-                &mut self.resources.begin_retrieving(
-                    &self.render_loop.context,
-                    &mut self.renderer.lit_draw_system,
-                    &mut self.renderer.unlit_draw_system,
-                ),
-            );
-        }
-
-        // camera light, will follow camera position on update
-        let camera_light = self.transforms.next().unwrap();
-        self.world.push((
-            camera_light,
-            PointLightComponent {
-                color: Vector4::new(1., 1., 1., 2.),
-                half_radius: 4.,
-            },
-            FollowCamera(Vector3::new(0., 0.01, 0.01)), // light pos cannot = cam pos else the light will glitch
-        ));
-
-        println!(
-            "[Benchmarking] level load time: {} ms",
-            load_start.elapsed().as_millis(),
+        let resources = &mut self.resources.begin_retrieving(
+            &self.render_loop.context,
+            &mut self.renderer.lit_draw_system,
+            &mut self.renderer.unlit_draw_system,
         );
 
-        self.game_state = GameState::Playing;
+        let mut valid = true;
+
+        match id {
+            0 => init_world(&mut self.world, &mut self.transforms, resources),
+            1 => init_ui_test(&mut self.world, &mut self.transforms, resources),
+            2 => init_phys_test(&mut self.world, &mut self.transforms, resources),
+            _ => {
+                println!("[Error] Tried to load invalid level id: {id}");
+                valid = false;
+            }
+        }
+
+        if valid {
+            // camera light, will follow camera position on update
+            let camera_light = self.transforms.next().unwrap();
+            self.world.push((
+                camera_light,
+                PointLightComponent {
+                    color: Vector4::new(1., 1., 1., 2.),
+                    half_radius: 4.,
+                },
+                FollowCamera(Vector3::new(0., 0.01, 0.01)), // light pos cannot = cam pos else the light will glitch
+            ));
+
+            println!(
+                "[Benchmarking] level load time: {} ms",
+                load_start.elapsed().as_millis(),
+            );
+
+            self.game_state = GameState::Playing;
+        }
     }
 
     pub fn handle_winit_event(

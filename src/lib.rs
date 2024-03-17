@@ -7,7 +7,7 @@ pub mod ui;
 mod vertex_data;
 pub mod vulkano_objects;
 
-use cgmath::{Rad, Vector3, Vector4};
+use cgmath::{Quaternion, Rad, Rotation3, Vector3, Vector4};
 use profiler::Profiler;
 pub use vertex_data::{Vertex2d, Vertex3d, VertexFull};
 
@@ -22,7 +22,7 @@ use render::{
     resource_manager::{MaterialID, MeshID, ResourceRetriever, TextureID},
     RenderSubmit,
 };
-use std::iter::zip;
+use std::{f32::consts::PI, iter::zip};
 
 pub static mut FRAME_PROFILER: Option<Profiler<7, 128>> = Some(Profiler::new([
     "Logic update",
@@ -45,7 +45,6 @@ mod tests {
 
 type Mesh = std::sync::Arc<vulkano_objects::buffers::Buffers<VertexFull>>;
 
-#[allow(dead_code)]
 fn init_world(
     world: &mut World,
     transform_sys: &mut TransformSystem,
@@ -207,7 +206,6 @@ fn init_world(
     }
 }
 
-#[allow(dead_code)]
 /// Empty scene with just the lost empire map
 fn init_ui_test(
     world: &mut World,
@@ -229,6 +227,30 @@ fn init_ui_test(
         let le_obj = RenderObject::new(mesh, le_mat.clone());
         world.push((transform_id, le_obj));
     }
+}
+
+/// Large plane + cube
+fn init_phys_test(
+    world: &mut World,
+    transform_sys: &mut TransformSystem,
+    resources: &mut ResourceRetriever,
+) {
+    let plane_mesh = resources.get_mesh(MeshID::Square);
+    let cube_mesh = resources.get_mesh(MeshID::Cube);
+
+    let yellow_mat = resources.get_material(MaterialID::Color([255, 255, 0, 255]), true);
+    let green_mat = resources.get_material(MaterialID::Color([0, 255, 0, 255]), true);
+
+    let plane_trans = transform_sys.add_transform(TransformCreateInfo {
+        rotation: Quaternion::from_axis_angle([1., 0., 0.].into(), Rad(-PI / 2.)),
+        scale: [10., 10., 1.].into(),
+        ..Default::default()
+    });
+    world.push((plane_trans, RenderObject::new(plane_mesh, yellow_mat)));
+
+    let cube_trans =
+        transform_sys.add_transform(TransformCreateInfo::default().set_translation([0., 1., 0.]));
+    world.push((cube_trans, RenderObject::new(cube_mesh, green_mat)));
 }
 
 pub struct MaterialSwapper {

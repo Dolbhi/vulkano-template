@@ -82,6 +82,20 @@ pub struct TransformCreateInfo {
     pub rotation: Quaternion<f32>,
     pub scale: Vector3<f32>,
 }
+impl TransformCreateInfo {
+    pub fn set_translation(mut self, translation: impl Into<Vector3<f32>>) -> Self {
+        self.translation = translation.into();
+        self
+    }
+    pub fn set_rotation(mut self, rotation: impl Into<Quaternion<f32>>) -> Self {
+        self.rotation = rotation.into();
+        self
+    }
+    pub fn set_scale(mut self, scale: impl Into<Vector3<f32>>) -> Self {
+        self.scale = scale.into();
+        self
+    }
+}
 impl Into<Transform> for TransformCreateInfo {
     fn into(self) -> Transform {
         Transform {

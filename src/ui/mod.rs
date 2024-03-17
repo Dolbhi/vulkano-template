@@ -48,16 +48,22 @@ pub fn main_menu(ctx: &Context, option_selected: &mut MenuOption) {
                                     .color(Color32::WHITE),
                             );
                             if ui
-                                .button(RichText::new("Load Level 1").color(Color32::WHITE))
+                                .button(RichText::new("Load Full Level").color(Color32::WHITE))
                                 .clicked()
                             {
                                 *option_selected = MenuOption::LoadLevel(0);
                             }
                             if ui
-                                .button(RichText::new("Load Level 2").color(Color32::WHITE))
+                                .button(RichText::new("Load Reduced Level").color(Color32::WHITE))
                                 .clicked()
                             {
                                 *option_selected = MenuOption::LoadLevel(1);
+                            }
+                            if ui
+                                .button(RichText::new("Load Phys Test").color(Color32::WHITE))
+                                .clicked()
+                            {
+                                *option_selected = MenuOption::LoadLevel(2);
                             }
                             if ui
                                 .button(RichText::new("Quit").color(Color32::WHITE))
