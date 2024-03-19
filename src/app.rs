@@ -122,7 +122,7 @@ impl App {
         }
     }
 
-    fn load_level(&mut self, id: i32) {
+    fn load_level(&mut self, id: i32) -> Result<(), String> {
         let load_start = Instant::now();
         let resources = &mut self.resources.begin_retrieving(
             &self.render_loop.context,
@@ -130,37 +130,31 @@ impl App {
             &mut self.renderer.unlit_draw_system,
         );
 
-        let mut valid = true;
-
         match id {
             0 => init_world(&mut self.world, &mut self.transforms, resources),
             1 => init_ui_test(&mut self.world, &mut self.transforms, resources),
             2 => init_phys_test(&mut self.world, &mut self.transforms, resources),
             _ => {
-                println!("[Error] Tried to load invalid level id: {id}");
-                valid = false;
+                return Err(format!("Tried to load invalid level id: {id}"));
             }
         }
+        // camera light, will follow camera position on update
+        let camera_light = self.transforms.next().unwrap();
+        self.world.push((
+            camera_light,
+            PointLightComponent {
+                color: Vector4::new(1., 1., 1., 2.),
+                half_radius: 4.,
+            },
+            FollowCamera(Vector3::new(0., 0.01, 0.01)), // light pos cannot = cam pos else the light will glitch
+        ));
 
-        if valid {
-            // camera light, will follow camera position on update
-            let camera_light = self.transforms.next().unwrap();
-            self.world.push((
-                camera_light,
-                PointLightComponent {
-                    color: Vector4::new(1., 1., 1., 2.),
-                    half_radius: 4.,
-                },
-                FollowCamera(Vector3::new(0., 0.01, 0.01)), // light pos cannot = cam pos else the light will glitch
-            ));
+        println!(
+            "[Benchmarking] level load time: {} ms",
+            load_start.elapsed().as_millis(),
+        );
 
-            println!(
-                "[Benchmarking] level load time: {} ms",
-                load_start.elapsed().as_millis(),
-            );
-
-            self.game_state = GameState::Playing;
-        }
+        Ok(())
     }
 
     pub fn handle_winit_event(
@@ -208,14 +202,17 @@ impl App {
                 });
                 match gui_result {
                     ui::MenuOption::None => {}
-                    ui::MenuOption::LoadLevel(i) => {
-                        self.lock_cursor();
-                        self.load_level(i);
-                    }
+                    ui::MenuOption::LoadLevel(i) => match self.load_level(i) {
+                        Ok(()) => {
+                            self.game_state = GameState::Playing;
+                            self.lock_cursor();
+                        }
+                        Err(e) => println!("[Error] {e}"),
+                    },
                     ui::MenuOption::QuitLevel => {
-                        self.unlock_cursor();
-
                         self.game_state = GameState::MainMenu;
+                        // self.unlock_cursor();
+
                         self.world.clear();
                         self.transforms = TransformSystem::new();
                         self.camera = Default::default();
@@ -227,6 +224,7 @@ impl App {
                     self.update_game(duration_from_last_frame.as_secs_f32());
                 }
 
+                // profile logic update
                 unsafe {
                     let mut profiler = FRAME_PROFILER.take().unwrap();
                     profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
@@ -401,12 +399,10 @@ impl App {
                     match self.game_state {
                         GameState::Playing => {
                             self.game_state = GameState::Paused;
-
                             self.unlock_cursor();
                         }
                         GameState::Paused => {
                             self.game_state = GameState::Playing;
-
                             self.lock_cursor();
                         }
                         _ => {}

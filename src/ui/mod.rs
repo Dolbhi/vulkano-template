@@ -115,6 +115,9 @@ pub fn pause_menu(ctx: &Context, option_selected: &mut MenuOption) {
 }
 
 pub fn profiler_window(ctx: &Context) {
+    let old_spaceing = ctx.style().spacing.item_spacing;
+    ctx.style_mut(|style| style.spacing.item_spacing = (5.0, 5.0).into());
+
     egui::Window::new("Profiler")
         .resizable(false)
         .default_pos((20.0, 20.0))
@@ -127,6 +130,8 @@ pub fn profiler_window(ctx: &Context) {
                 FRAME_PROFILER = Some(profiler);
             }
         });
+
+    ctx.style_mut(|style| style.spacing.item_spacing = old_spaceing);
 }
 
 pub fn test_area(ctx: &Context) {
