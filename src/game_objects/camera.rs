@@ -1,22 +1,26 @@
 use std::f32::consts::PI;
 
-use cgmath::{num_traits::clamp, Euler, Matrix3, Matrix4, Rad, Vector3};
+use cgmath::{
+    num_traits::clamp, Angle, Matrix4, One, Quaternion, Rad, Rotation, Rotation3, Vector3,
+};
 
 const CAM_SPEED: f32 = 2.;
 const MOUSE_SENSITIVITY: f32 = 0.01;
 
 pub struct Camera {
     pub fov: Rad<f32>,
-    pub rotation: Euler<Rad<f32>>,
+    pub rotation: Quaternion<f32>,
     pub position: Vector3<f32>,
 }
 
 impl Camera {
     fn forward_vector(&self) -> Vector3<f32> {
-        Matrix3::from_angle_y(self.rotation.y) * Vector3::new(0., 0., -1.)
+        self.right_vector().cross((0., -1., 0.).into())
+        // Matrix3::from_angle_y(self.rotation.y) * Vector3::new(0., 0., -1.)
     }
     fn right_vector(&self) -> Vector3<f32> {
-        Matrix3::from_angle_y(self.rotation.y) * Vector3::new(1., 0., 0.)
+        self.rotation.conjugate().rotate_vector((1., 0., 0.).into())
+        // Matrix3::from_angle_y(self.rotation.y) * Vector3::new(1., 0., 0.)
     }
 
     pub fn move_up(&mut self, seconds_passed: f32) {
@@ -41,17 +45,20 @@ impl Camera {
     }
 
     pub fn rotate(&mut self, dx: f32, dy: f32) {
-        self.rotation.x = Rad(clamp(
-            self.rotation.x.0 - dy * MOUSE_SENSITIVITY,
-            -PI / 2.,
-            PI / 2.,
-        ));
-        self.rotation.y += Rad(-dx * MOUSE_SENSITIVITY);
+        let old_pitch = Rad::atan(self.rotation.v.x / self.rotation.s);
+        let delta_pitch = clamp(
+            Rad(dy * MOUSE_SENSITIVITY),
+            Rad(-PI / 4.) - old_pitch,
+            Rad(PI / 4.) - old_pitch,
+        );
+
+        self.rotation = Quaternion::from_angle_x(delta_pitch)
+            * self.rotation
+            * Quaternion::from_angle_y(Rad(dx * MOUSE_SENSITIVITY));
     }
 
     pub fn view_matrix(&self) -> Matrix4<f32> {
-        Matrix4::from(Euler::new(-self.rotation.x, -self.rotation.y, Rad(0.)))
-            * Matrix4::from_translation(-self.position)
+        Matrix4::from(self.rotation) * Matrix4::from_translation(-self.position)
     }
     pub fn projection_matrix(&self, aspect: f32) -> Matrix4<f32> {
         let mut projection = cgmath::perspective(self.fov, aspect, 0.1, 200.);
@@ -64,7 +71,7 @@ impl Default for Camera {
     fn default() -> Self {
         Self {
             fov: Rad(1.2),
-            rotation: Euler::new(Rad(0.), Rad(0.), Rad(0.)),
+            rotation: Quaternion::one(),
             position: Vector3 {
                 x: 0.,
                 y: 0.,

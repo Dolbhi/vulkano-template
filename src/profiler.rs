@@ -6,12 +6,6 @@ pub struct Profiler<const COUNT: usize, const SAMPLES: usize> {
     profiles: [Profile<SAMPLES>; COUNT],
 }
 
-#[derive(Clone, Copy)]
-struct Profile<const SAMPLES: usize> {
-    sum: u32,
-    micros: [u32; SAMPLES],
-}
-
 impl<const COUNT: usize, const SAMPLES: usize> Profiler<COUNT, SAMPLES> {
     pub const fn new(names: [&'static str; COUNT]) -> Self {
         Self {
@@ -51,6 +45,12 @@ impl<const COUNT: usize, const SAMPLES: usize> Profiler<COUNT, SAMPLES> {
             )
         }
     }
+}
+
+#[derive(Clone, Copy)]
+struct Profile<const SAMPLES: usize> {
+    sum: u32,
+    micros: [u32; SAMPLES],
 }
 
 impl<const SAMPLES: usize> Profile<SAMPLES> {

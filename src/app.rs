@@ -54,6 +54,32 @@ struct InputState {
     // esc_triggered: bool,
 }
 
+impl InputState {
+    /// move camera based on inputs
+    fn move_camera(&self, camera: &mut Camera, seconds_passed: f32) {
+        if self.space == Pressed && self.shift == Released {
+            camera.move_up(seconds_passed)
+        }
+        if self.shift == Pressed && self.space == Released {
+            camera.move_down(seconds_passed)
+        }
+
+        if self.w == Pressed && self.s == Released {
+            camera.move_forward(seconds_passed)
+        }
+        if self.s == Pressed && self.w == Released {
+            camera.move_back(seconds_passed)
+        }
+
+        if self.a == Pressed && self.d == Released {
+            camera.move_left(seconds_passed)
+        }
+        if self.d == Pressed && self.a == Released {
+            camera.move_right(seconds_passed)
+        }
+    }
+}
+
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
 enum GameState {
     #[default]
@@ -254,11 +280,13 @@ impl App {
     }
 
     /// update game logic
+    ///
+    /// Requires keys, camera, world and transform
     fn update_game(&mut self, seconds_passed: f32) {
         self.total_seconds += seconds_passed;
 
         // move cam
-        self.update_movement(seconds_passed);
+        self.keys.move_camera(&mut self.camera, seconds_passed);
 
         // update camera follower
         let mut query = <(&TransformID, &FollowCamera)>::query();
@@ -349,30 +377,6 @@ impl App {
                     .lighting_system
                     .set_ambient_color([0.1, 0.1, 0.1, 1.]);
             });
-    }
-
-    /// move camera
-    fn update_movement(&mut self, seconds_passed: f32) {
-        if self.keys.space == Pressed && self.keys.shift == Released {
-            self.camera.move_up(seconds_passed)
-        }
-        if self.keys.shift == Pressed && self.keys.space == Released {
-            self.camera.move_down(seconds_passed)
-        }
-
-        if self.keys.w == Pressed && self.keys.s == Released {
-            self.camera.move_forward(seconds_passed)
-        }
-        if self.keys.s == Pressed && self.keys.w == Released {
-            self.camera.move_back(seconds_passed)
-        }
-
-        if self.keys.a == Pressed && self.keys.d == Released {
-            self.camera.move_left(seconds_passed)
-        }
-        if self.keys.d == Pressed && self.keys.a == Released {
-            self.camera.move_right(seconds_passed)
-        }
     }
 
     /// update key state
