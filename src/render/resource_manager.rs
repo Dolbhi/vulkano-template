@@ -38,6 +38,7 @@ pub enum MaterialID {
     Color([u8; 4]),
     UV,
     Gradient,
+    Billboard,
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
@@ -211,7 +212,7 @@ impl<'a> ResourceRetriever<'a> {
                                 MaterialID::UV => {
                                     system.add_shader(
                                         &self.context,
-                                        MaterialID::UV,
+                                        id,
                                         draw::load_basic_vs(self.context.device.clone())
                                             .expect("failed to create uv shader module"),
                                         draw::load_uv_fs(self.context.device.clone())
@@ -221,13 +222,21 @@ impl<'a> ResourceRetriever<'a> {
                                 MaterialID::Gradient => {
                                     system.add_shader(
                                         &self.context,
-                                        MaterialID::Gradient,
+                                        id,
                                         draw::load_basic_vs(self.context.device.clone())
                                             .expect("failed to create grad shader module"),
                                         draw::load_grad_fs(self.context.device.clone())
                                             .expect("failed to create grad shader module"),
                                     );
                                 }
+                                MaterialID::Billboard => system.add_shader(
+                                    &self.context,
+                                    id,
+                                    draw::load_billboard_vs(self.context.device.clone())
+                                        .expect("failed to create billboard shader module"),
+                                    draw::load_solid_fs(self.context.device.clone())
+                                        .expect("failed to create billboard shader module"),
+                                ),
                             };
                             system.find_shader(id).unwrap()
                         }
@@ -253,6 +262,20 @@ impl<'a> ResourceRetriever<'a> {
                             &self.context,
                             draw::SolidData {
                                 color: color.map(|v| (v as f32) / (u8::MAX as f32)),
+                            },
+                            vulkano::buffer::BufferUsage::empty(),
+                        );
+                        init_material(
+                            &self.context,
+                            shader,
+                            [WriteDescriptorSet::buffer(0, color_buffer)],
+                        )
+                    }
+                    MaterialID::Billboard => {
+                        let color_buffer = create_material_buffer(
+                            &self.context,
+                            draw::SolidData {
+                                color: [1.0, 0.0, 1.0, 1.0],
                             },
                             vulkano::buffer::BufferUsage::empty(),
                         );

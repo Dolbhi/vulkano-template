@@ -6,6 +6,10 @@ vulkano_shaders::shader! {
             ty: "vertex",
             path: "src/shaders/draw/basic/vertex.vert",
         },
+        billboard_vs: {
+            ty: "vertex",
+            path: "src/shaders/draw/billboard.vert",
+        },
         basic_fs: {
             ty: "fragment",
             path: "src/shaders/draw/basic/fragment.frag",
@@ -36,12 +40,16 @@ impl From<Matrix4<f32>> for GPUObjectData {
     }
 }
 
-use crate::game_objects::Camera;
+use crate::game_objects::{transform::TransformView, Camera};
 impl GPUGlobalData {
-    pub fn from_camera(camera: &Camera, extends: PhysicalSize<u32>) -> Self {
+    pub fn from_camera(
+        camera: &Camera,
+        transform: TransformView,
+        extends: PhysicalSize<u32>,
+    ) -> Self {
         let aspect = extends.width as f32 / extends.height as f32;
         let proj = camera.projection_matrix(aspect);
-        let view = camera.view_matrix();
+        let view = camera.view_matrix(transform);
         let view_proj = proj * view;
         let inv_view_proj = view_proj.inverse_transform().unwrap();
 
