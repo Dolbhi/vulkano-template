@@ -344,15 +344,6 @@ impl App {
             seconds_passed,
         );
 
-        // // update camera follower
-        // let mut query = <(&TransformID, &FollowCamera)>::query();
-        // for (transform_id, &FollowCamera(offset)) in query.iter(&self.world) {
-        //     self.transforms
-        //         .get_transform_mut(transform_id)
-        //         .unwrap()
-        //         .set_translation(self.camera.position + offset);
-        // }
-
         // update rotate
         let mut query = <(&TransformID, &Rotate)>::query();
         for (transform_id, rotate) in query.iter(&self.world) {
@@ -362,7 +353,10 @@ impl App {
                     * transform.get_local_transform().rotation,
             );
         }
+    }
 
+    /// upload render objects and do render loop
+    fn update_render(&mut self) {
         // update mat swap
         if self.keys.q_triggered {
             let mut query = <(&mut MaterialSwapper, &mut RenderObject<Matrix4<f32>>)>::query();
@@ -375,10 +369,7 @@ impl App {
 
             self.keys.q_triggered = false;
         }
-    }
 
-    /// upload render objects and do render loop
-    fn update_render(&mut self) {
         // update render objects
         let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query();
         // println!("==== RENDER OBJECT DATA ====");
