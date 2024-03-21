@@ -43,6 +43,15 @@ impl Transform {
         }
     }
 
+    pub fn mutate(
+        &mut self,
+        modification: impl FnOnce(&mut Vector3<f32>, &mut Quaternion<f32>, &mut Vector3<f32>),
+    ) {
+        modification(&mut self.translation, &mut self.rotation, &mut self.scale);
+        self.local_model = None;
+        self.global_model = None;
+    }
+
     pub fn get_local_transform(&self) -> TransformView {
         TransformView {
             translation: &self.translation,
@@ -83,6 +92,10 @@ pub struct TransformCreateInfo {
     pub scale: Vector3<f32>,
 }
 impl TransformCreateInfo {
+    pub fn set_parent(mut self, parent: Option<TransformID>) -> Self {
+        self.parent = parent;
+        self
+    }
     pub fn set_translation(mut self, translation: impl Into<Vector3<f32>>) -> Self {
         self.translation = translation.into();
         self
