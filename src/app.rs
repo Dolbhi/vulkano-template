@@ -3,8 +3,8 @@ use std::{
     time::Instant,
 };
 
-use cgmath::{InnerSpace, Matrix4, Quaternion, Rad, Rotation, Rotation3, Vector3, Vector4, Zero};
-use legion::{IntoQuery, *};
+use cgmath::{Matrix4, Vector4};
+use legion::IntoQuery;
 
 use winit::{
     dpi::PhysicalPosition,
@@ -15,8 +15,8 @@ use winit::{
 use crate::{
     game_objects::{
         light::PointLightComponent,
-        transform::{Transform, TransformCreateInfo, TransformID, TransformSystem},
-        Camera, GameWorld, Rotate,
+        transform::{TransformCreateInfo, TransformID},
+        GameWorld,
     },
     init_phys_test, init_ui_test, init_world,
     render::{
