@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use cgmath::{Matrix4, Quaternion, Rotation3, Vector3, Vector4};
+use cgmath::{InnerSpace, Matrix4, Quaternion, Rad, Rotation, Rotation3, Vector3, Vector4, Zero};
 use legion::{IntoQuery, *};
 
 use winit::{
@@ -12,8 +12,8 @@ use winit::{
 use crate::{
     game_objects::{
         light::PointLightComponent,
-        transform::{TransformID, TransformSystem},
-        Camera, FollowCamera, Rotate,
+        transform::{Transform, TransformCreateInfo, TransformID, TransformSystem},
+        Camera, Rotate,
     },
     init_phys_test, init_ui_test, init_world,
     render::{
@@ -55,28 +55,59 @@ struct InputState {
 }
 
 impl InputState {
-    /// move camera based on inputs
-    fn move_camera(&self, camera: &mut Camera, seconds_passed: f32) {
-        if self.space == Pressed && self.shift == Released {
-            camera.move_up(seconds_passed)
+    // /// move camera based on inputs
+    // fn move_camera(&self, camera: &mut Camera, seconds_passed: f32) {
+    //     if self.space == Pressed && self.shift == Released {
+    //         camera.move_up(seconds_passed)
+    //     }
+    //     if self.shift == Pressed && self.space == Released {
+    //         camera.move_down(seconds_passed)
+    //     }
+
+    //     if self.w == Pressed && self.s == Released {
+    //         camera.move_forward(seconds_passed)
+    //     }
+    //     if self.s == Pressed && self.w == Released {
+    //         camera.move_back(seconds_passed)
+    //     }
+
+    //     if self.a == Pressed && self.d == Released {
+    //         camera.move_left(seconds_passed)
+    //     }
+    //     if self.d == Pressed && self.a == Released {
+    //         camera.move_right(seconds_passed)
+    //     }
+    // }
+
+    fn move_transform(&self, transform: &mut Transform, seconds_passed: f32) {
+        let mut movement = Vector3::zero();
+        let view = transform.get_local_transform();
+
+        if self.w == Pressed {
+            movement.z -= 1.; // forward
+        } else if self.s == Pressed {
+            movement.z += 1.; // backwards
         }
-        if self.shift == Pressed && self.space == Released {
-            camera.move_down(seconds_passed)
+        if self.a == Pressed {
+            movement.x -= 1.; // left
+        } else if self.d == Pressed {
+            movement.x += 1.; // right
         }
 
-        if self.w == Pressed && self.s == Released {
-            camera.move_forward(seconds_passed)
-        }
-        if self.s == Pressed && self.w == Released {
-            camera.move_back(seconds_passed)
+        movement = view.rotation.rotate_vector(movement);
+        movement.y = 0.;
+        if movement != Vector3::zero() {
+            movement = movement.normalize();
         }
 
-        if self.a == Pressed && self.d == Released {
-            camera.move_left(seconds_passed)
+        if self.space == Pressed {
+            movement.y += 1.;
+        } else if self.shift == Pressed {
+            movement.y -= 1.;
         }
-        if self.d == Pressed && self.a == Released {
-            camera.move_right(seconds_passed)
-        }
+
+        // apply movement
+        transform.set_translation(view.translation + movement * 2. * seconds_passed);
     }
 }
 
@@ -109,7 +140,7 @@ impl App {
         let init_start_time = Instant::now();
 
         let world = World::default();
-        let transforms = TransformSystem::new();
+        let mut transforms = TransformSystem::new();
         let render_loop = RenderLoop::new(event_loop);
         let renderer = DeferredRenderer::new(&render_loop.context);
         let resources = ResourceManager::new(&render_loop.context);
@@ -138,7 +169,10 @@ impl App {
             render_loop,
             renderer,
             resources,
-            camera: Default::default(),
+            camera: Camera {
+                fov: Rad(1.2),
+                transform: transforms.next().unwrap(),
+            },
             keys: InputState::default(),
             world,
             transforms,
@@ -164,15 +198,19 @@ impl App {
                 return Err(format!("Tried to load invalid level id: {id}"));
             }
         }
-        // camera light, will follow camera position on update
-        let camera_light = self.transforms.next().unwrap();
+        // camera light, child of the camera
+        let camera_light = self.transforms.add_transform(
+            TransformCreateInfo::default()
+                .set_parent(Some(self.camera.transform))
+                .set_translation((0., 0., -0.1)), // light pos cannot = cam pos else the light will glitch
+        );
+
         self.world.push((
             camera_light,
             PointLightComponent {
                 color: Vector4::new(1., 1., 1., 2.),
                 half_radius: 4.,
             },
-            FollowCamera(Vector3::new(0., 0.01, 0.01)), // light pos cannot = cam pos else the light will glitch
         ));
 
         println!(
@@ -241,7 +279,10 @@ impl App {
 
                         self.world.clear();
                         self.transforms = TransformSystem::new();
-                        self.camera = Default::default();
+                        self.camera = Camera {
+                            fov: Rad(1.2),
+                            transform: self.transforms.next().unwrap(),
+                        };
                     }
                     ui::MenuOption::Quit => control_flow.set_exit(),
                 }
@@ -274,7 +315,17 @@ impl App {
                     event: winit::event::DeviceEvent::MouseMotion { delta },
                     ..
                 },
-            ) => self.camera.rotate(delta.0 as f32, delta.1 as f32),
+            ) => {
+                let transform = self
+                    .transforms
+                    .get_transform_mut(&self.camera.transform)
+                    .unwrap();
+                transform.set_rotation(self.camera.rotate(
+                    transform.get_local_transform().rotation,
+                    delta.0 as f32,
+                    delta.1 as f32,
+                ));
+            }
             _ => (),
         }
     }
@@ -286,16 +337,21 @@ impl App {
         self.total_seconds += seconds_passed;
 
         // move cam
-        self.keys.move_camera(&mut self.camera, seconds_passed);
-
-        // update camera follower
-        let mut query = <(&TransformID, &FollowCamera)>::query();
-        for (transform_id, &FollowCamera(offset)) in query.iter(&self.world) {
+        self.keys.move_transform(
             self.transforms
-                .get_transform_mut(transform_id)
-                .unwrap()
-                .set_translation(self.camera.position + offset);
-        }
+                .get_transform_mut(&self.camera.transform)
+                .unwrap(),
+            seconds_passed,
+        );
+
+        // // update camera follower
+        // let mut query = <(&TransformID, &FollowCamera)>::query();
+        // for (transform_id, &FollowCamera(offset)) in query.iter(&self.world) {
+        //     self.transforms
+        //         .get_transform_mut(transform_id)
+        //         .unwrap()
+        //         .set_translation(self.camera.position + offset);
+        // }
 
         // update rotate
         let mut query = <(&TransformID, &Rotate)>::query();
@@ -338,7 +394,13 @@ impl App {
         self.render_loop
             .update(&mut self.renderer, |renderer, image_i| {
                 // camera data
-                let global_data = GPUGlobalData::from_camera(&self.camera, extends);
+                let cam_transform = self
+                    .transforms
+                    .get_transform(&self.camera.transform)
+                    .unwrap()
+                    .get_local_transform();
+                // println!("[debug] cam transform: {cam_transform:?}");
+                let global_data = GPUGlobalData::from_camera(&self.camera, cam_transform, extends);
 
                 // upload draw data
                 let frame = renderer
