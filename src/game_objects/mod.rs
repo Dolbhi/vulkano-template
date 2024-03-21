@@ -3,8 +3,10 @@ pub mod light;
 mod scene;
 pub mod transform;
 
+use std::time::Instant;
+
 pub use camera::Camera;
-use cgmath::{InnerSpace, Quaternion, Rad, Rotation, Rotation3, Vector3, Zero};
+use cgmath::{InnerSpace, Matrix4, One, Quaternion, Rad, Rotation, Rotation3, Vector3, Zero};
 
 use self::transform::{Transform, TransformID, TransformSystem};
 use legion::*;
@@ -14,6 +16,8 @@ use legion::*;
 pub struct NameComponent(pub String);
 
 pub struct Rotate(pub Vector3<f32>, pub Rad<f32>);
+
+pub struct LastModel(pub Matrix4<f32>);
 
 pub struct Inputs {
     pub movement: Vector3<f32>,
@@ -62,30 +66,40 @@ pub struct GameWorld {
     pub transforms: TransformSystem,
     pub world: World,
     pub camera: Camera,
-    pub total_seconds: f32,
+    pub fixed_seconds: f32,
     pub inputs: Inputs,
+    pub last_update: Instant,
 }
 
 impl GameWorld {
     pub fn new() -> Self {
         let mut transforms = TransformSystem::new();
+        let mut world = World::default();
         let camera = Camera {
             fov: Rad(1.2),
             transform: transforms.next().unwrap(),
         };
+        world.push((camera.transform, LastModel(Matrix4::one())));
 
         Self {
             transforms,
-            world: World::default(),
+            world,
             camera,
-            total_seconds: 0.,
+            fixed_seconds: 0.,
             inputs: Inputs::default(),
+            last_update: Instant::now(),
         }
     }
 
     /// update world logic with a time step
     pub fn update(&mut self, seconds_passed: f32) {
-        self.total_seconds += seconds_passed;
+        self.fixed_seconds += seconds_passed;
+
+        // update interpolation models
+        let mut query = <(&TransformID, &mut LastModel)>::query();
+        for (transform_id, last_model) in query.iter_mut(&mut self.world) {
+            *last_model = LastModel(self.transforms.get_global_model(transform_id).unwrap());
+        }
 
         // move cam
         self.inputs.move_transform(

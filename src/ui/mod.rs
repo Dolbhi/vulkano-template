@@ -1,6 +1,6 @@
 use egui_winit_vulkano::egui::{self, Align2, Color32, Context, FontId, Layout, RichText, Style};
 
-use crate::FRAME_PROFILER;
+use crate::RENDER_PROFILER;
 
 pub enum MenuOption {
     None,
@@ -122,12 +122,12 @@ pub fn profiler_window(ctx: &Context) {
         .resizable(false)
         .default_pos((20.0, 20.0))
         .show(ctx, |ui| {
-            let profiler = unsafe { FRAME_PROFILER.take().unwrap() };
+            let profiler = unsafe { RENDER_PROFILER.take().unwrap() };
 
             ui.label(RichText::new(profiler.summary()).monospace());
 
             unsafe {
-                FRAME_PROFILER = Some(profiler);
+                RENDER_PROFILER = Some(profiler);
             }
         });
 

@@ -1,10 +1,11 @@
 use std::{
-    sync::{Arc, Mutex},
-    time::Instant,
+    sync::{atomic::AtomicBool, Arc, Mutex},
+    thread::{self, JoinHandle},
+    time::{Duration, Instant},
 };
 
 use cgmath::{Matrix4, Vector3, Vector4};
-use legion::IntoQuery;
+use legion::{component, IntoQuery};
 
 use winit::{
     dpi::PhysicalPosition,
@@ -16,7 +17,7 @@ use crate::{
     game_objects::{
         light::PointLightComponent,
         transform::{TransformCreateInfo, TransformID},
-        GameWorld,
+        GameWorld, LastModel,
     },
     init_phys_test, init_ui_test, init_world,
     render::{
@@ -24,7 +25,7 @@ use crate::{
     },
     shaders::{draw::GPUGlobalData, lighting::DirectionLight},
     ui::{self, MenuOption},
-    MaterialSwapper, FRAME_PROFILER,
+    MaterialSwapper, RENDER_PROFILER,
 };
 
 // TO flush_next_future METHOD ADD PARAMS FOR PASSING CAMERA DESCRIPTOR SET
@@ -95,6 +96,7 @@ pub struct App {
     renderer: DeferredRenderer,
     resources: ResourceManager,
     world: Arc<Mutex<GameWorld>>,
+    game_thread: GameWorldThread,
     inputs: InputState,
     game_state: GameState,
     last_frame_time: Instant,
@@ -126,6 +128,10 @@ impl App {
         //     println!("{}", shader);
         // }
 
+        let world = Arc::new(Mutex::new(GameWorld::new()));
+        let game_thread = GameWorldThread::new(world.clone());
+        game_thread.set_paused(true);
+
         println!(
             "[Benchmarking] render init: {} ms",
             render_init_elapse,
@@ -138,7 +144,8 @@ impl App {
             renderer,
             resources,
             inputs: InputState::default(),
-            world: Arc::new(Mutex::new(GameWorld::new())),
+            world,
+            game_thread,
             game_state: Default::default(),
             last_frame_time: Instant::now(),
         }
@@ -222,7 +229,7 @@ impl App {
             }
             Event::RedrawRequested(_) => {
                 let update_start = Instant::now();
-                let duration_from_last_frame = update_start - self.last_frame_time;
+                // let duration_from_last_frame = update_start - self.last_frame_time;
 
                 // gui
                 let mut gui_result = MenuOption::None;
@@ -244,6 +251,7 @@ impl App {
                         Ok(()) => {
                             self.game_state = GameState::Playing;
                             self.lock_cursor();
+                            self.game_thread.set_paused(false);
                         }
                         Err(e) => println!("[Error] {e}"),
                     },
@@ -257,25 +265,19 @@ impl App {
                     ui::MenuOption::Quit => control_flow.set_exit(),
                 }
 
-                if self.game_state == GameState::Playing {
-                    let mut world = self.world.lock().unwrap();
-                    world.inputs.movement = self.inputs.get_move();
-                    world.update(duration_from_last_frame.as_secs_f32());
-                }
-
                 // profile logic update
                 unsafe {
-                    let mut profiler = FRAME_PROFILER.take().unwrap();
+                    let mut profiler = RENDER_PROFILER.take().unwrap();
                     profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
-                    FRAME_PROFILER = Some(profiler);
+                    RENDER_PROFILER = Some(profiler);
                 }
 
                 self.update_render();
 
                 unsafe {
-                    let mut profiler = FRAME_PROFILER.take().unwrap();
+                    let mut profiler = RENDER_PROFILER.take().unwrap();
                     profiler.end_frame();
-                    FRAME_PROFILER = Some(profiler);
+                    RENDER_PROFILER = Some(profiler);
                 }
 
                 self.last_frame_time = update_start;
@@ -301,8 +303,15 @@ impl App {
                 world,
                 transforms,
                 camera,
+                inputs,
                 ..
             } = &mut *self.world.lock().unwrap();
+
+            // sync inputs
+            if self.game_state == GameState::Playing {
+                inputs.movement = self.inputs.get_move();
+                // world.update(duration_from_last_frame.as_secs_f32());
+            }
 
             // update mat swap
             if self.inputs.q_triggered {
@@ -319,6 +328,7 @@ impl App {
 
             // update render objects
             let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query();
+            // .filter(!component::<LastModel>());
             // println!("==== RENDER OBJECT DATA ====");
             for (transform_id, render_object) in query.iter_mut(world) {
                 let transfrom_matrix = transforms.get_global_model(transform_id).unwrap();
@@ -347,7 +357,7 @@ impl App {
                     world,
                     transforms,
                     camera,
-                    total_seconds,
+                    fixed_seconds: total_seconds,
                     ..
                 } = &mut *self.world.lock().unwrap();
 
@@ -423,10 +433,12 @@ impl App {
                         GameState::Playing => {
                             self.game_state = GameState::Paused;
                             self.unlock_cursor();
+                            self.game_thread.set_paused(true);
                         }
                         GameState::Paused => {
                             self.game_state = GameState::Playing;
                             self.lock_cursor();
+                            self.game_thread.set_paused(false);
                         }
                         _ => {}
                     }
@@ -458,5 +470,75 @@ impl App {
         window
             .set_cursor_grab(winit::window::CursorGrabMode::None)
             .unwrap();
+    }
+}
+
+const FIXED_DELTA_TIME: f32 = 0.02;
+
+struct GameWorldThread {
+    thread: JoinHandle<()>,
+    // delta_time: Duration,
+    paused: Arc<AtomicBool>,
+}
+
+impl GameWorldThread {
+    fn new(game_world: Arc<Mutex<GameWorld>>) -> Self {
+        let paused = Arc::new(AtomicBool::new(false));
+        let paused_2 = paused.clone();
+
+        let thread = thread::spawn(move || {
+            let update_period = Duration::from_secs_f32(FIXED_DELTA_TIME);
+            // let mut last_update = Instant::now();
+            loop {
+                if !paused_2.load(std::sync::atomic::Ordering::Acquire) {
+                    let wait = {
+                        let update_start = Instant::now();
+                        let mut world = game_world.lock().unwrap();
+                        world.last_update = update_start.clone();
+                        // let lock_wait = update_start.elapsed().as_millis();
+
+                        // let pre_update = Instant::now();
+                        world.update(FIXED_DELTA_TIME);
+                        // let update_time = pre_update.elapsed().as_millis();
+
+                        // skip frames if update took too long
+                        let elapsed = update_start.elapsed();
+                        let mut wait = update_period;
+                        let mut frames_skipped = 0;
+                        while elapsed > wait {
+                            wait += update_period;
+                            frames_skipped += 1;
+                        }
+                        wait -= elapsed;
+                        if frames_skipped > 0 {
+                            println!("[Warning] Skipped {frames_skipped} frames");
+                        }
+                        // println!(
+                        //     "[Debug] Lock wait: {:>4}, Update time: {:>4}",
+                        //     lock_wait, update_time,
+                        // );
+
+                        wait
+                    };
+
+                    thread::sleep(wait)
+                } else {
+                    thread::park();
+                };
+            }
+        });
+
+        Self { thread, paused }
+    }
+
+    fn set_paused(&self, paused: bool) {
+        if paused {
+            self.paused
+                .store(true, std::sync::atomic::Ordering::Release);
+        } else {
+            self.paused
+                .store(false, std::sync::atomic::Ordering::Release);
+            self.thread.thread().unpark();
+        }
     }
 }

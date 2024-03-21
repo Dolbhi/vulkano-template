@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     vulkano_objects::{self, allocators::Allocators},
-    FRAME_PROFILER,
+    RENDER_PROFILER,
 };
 use egui_winit_vulkano::{Gui, GuiConfig};
 use vulkano::{
@@ -266,12 +266,12 @@ impl Context {
         // profiler.add_sample(now.elapsed().as_micros() as u32, 6);
         let exe_time = now.elapsed().as_micros() as u32;
         unsafe {
-            let mut profiler = FRAME_PROFILER.take().unwrap();
+            let mut profiler = RENDER_PROFILER.take().unwrap();
 
             profiler.add_sample(combuf_time, 5);
             profiler.add_sample(exe_time, 6);
 
-            FRAME_PROFILER = Some(profiler);
+            RENDER_PROFILER = Some(profiler);
         }
 
         result

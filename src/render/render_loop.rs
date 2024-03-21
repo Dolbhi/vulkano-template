@@ -5,7 +5,7 @@ use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
 use winit::event_loop::EventLoop;
 
-use crate::FRAME_PROFILER;
+use crate::RENDER_PROFILER;
 
 use super::renderer::Renderer;
 use super::{context::Context, context::Fence};
@@ -120,14 +120,14 @@ impl RenderLoop {
         // profiler.add_sample(now.elapsed().as_micros() as u32, 4);
         let last_f_wait = now.elapsed().as_micros() as u32;
         unsafe {
-            let mut profiler = FRAME_PROFILER.take().unwrap();
+            let mut profiler = RENDER_PROFILER.take().unwrap();
 
             profiler.add_sample(pre_ren_time, 1);
             profiler.add_sample(frame_clean_time, 2);
             profiler.add_sample(ren_up_time, 3);
             profiler.add_sample(last_f_wait, 4);
 
-            FRAME_PROFILER = Some(profiler);
+            RENDER_PROFILER = Some(profiler);
         }
 
         // RENDER

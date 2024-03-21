@@ -24,8 +24,8 @@ use render::{
 };
 use std::{f32::consts::PI, iter::zip};
 
-pub static mut FRAME_PROFILER: Option<Profiler<7, 128>> = Some(Profiler::new([
-    "Logic update",
+pub static mut RENDER_PROFILER: Option<Profiler<7, 128>> = Some(Profiler::new([
+    "GUI and inputs",
     "Pre-render",
     "Frame cleanup",
     "Render upload",
@@ -33,6 +33,8 @@ pub static mut FRAME_PROFILER: Option<Profiler<7, 128>> = Some(Profiler::new([
     "ComBuf building",
     "Execute",
 ]));
+pub static mut LOGIC_PROFILER: Option<Profiler<2, 128>> =
+    Some(Profiler::new(["Lock wait", "Logic update"]));
 
 #[cfg(test)]
 mod tests {
