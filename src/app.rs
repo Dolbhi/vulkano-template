@@ -3,7 +3,7 @@ use std::{
     time::Instant,
 };
 
-use cgmath::{Matrix4, Vector4};
+use cgmath::{Matrix4, Vector3, Vector4};
 use legion::IntoQuery;
 
 use winit::{
@@ -59,62 +59,52 @@ struct InputState {
     // esc_triggered: bool,
 }
 
-// impl InputState {
-//     // /// move camera based on inputs
-//     // fn move_camera(&self, camera: &mut Camera, seconds_passed: f32) {
-//     //     if self.space == Pressed && self.shift == Released {
-//     //         camera.move_up(seconds_passed)
-//     //     }
-//     //     if self.shift == Pressed && self.space == Released {
-//     //         camera.move_down(seconds_passed)
-//     //     }
+impl InputState {
+    //     // /// move camera based on inputs
+    //     // fn move_camera(&self, camera: &mut Camera, seconds_passed: f32) {
+    //     //     if self.space == Pressed && self.shift == Released {
+    //     //         camera.move_up(seconds_passed)
+    //     //     }
+    //     //     if self.shift == Pressed && self.space == Released {
+    //     //         camera.move_down(seconds_passed)
+    //     //     }
 
-//     //     if self.w == Pressed && self.s == Released {
-//     //         camera.move_forward(seconds_passed)
-//     //     }
-//     //     if self.s == Pressed && self.w == Released {
-//     //         camera.move_back(seconds_passed)
-//     //     }
+    //     //     if self.w == Pressed && self.s == Released {
+    //     //         camera.move_forward(seconds_passed)
+    //     //     }
+    //     //     if self.s == Pressed && self.w == Released {
+    //     //         camera.move_back(seconds_passed)
+    //     //     }
 
-//     //     if self.a == Pressed && self.d == Released {
-//     //         camera.move_left(seconds_passed)
-//     //     }
-//     //     if self.d == Pressed && self.a == Released {
-//     //         camera.move_right(seconds_passed)
-//     //     }
-//     // }
+    //     //     if self.a == Pressed && self.d == Released {
+    //     //         camera.move_left(seconds_passed)
+    //     //     }
+    //     //     if self.d == Pressed && self.a == Released {
+    //     //         camera.move_right(seconds_passed)
+    //     //     }
+    //     // }
 
-//     fn move_transform(&self, transform: &mut Transform, seconds_passed: f32) {
-//         let mut movement = Vector3::zero();
-//         let view = transform.get_local_transform();
+    fn get_move(&self) -> Vector3<f32> {
+        let mut movement = <Vector3<f32> as cgmath::Zero>::zero();
+        if self.w == Pressed {
+            movement.z -= 1.; // forward
+        } else if self.s == Pressed {
+            movement.z += 1.; // backwards
+        }
+        if self.a == Pressed {
+            movement.x -= 1.; // left
+        } else if self.d == Pressed {
+            movement.x += 1.; // right
+        }
+        if self.space == Pressed {
+            movement.y += 1.;
+        } else if self.shift == Pressed {
+            movement.y -= 1.;
+        }
 
-//         if self.w == Pressed {
-//             movement.z -= 1.; // forward
-//         } else if self.s == Pressed {
-//             movement.z += 1.; // backwards
-//         }
-//         if self.a == Pressed {
-//             movement.x -= 1.; // left
-//         } else if self.d == Pressed {
-//             movement.x += 1.; // right
-//         }
-
-//         movement = view.rotation.rotate_vector(movement);
-//         movement.y = 0.;
-//         if movement != Vector3::zero() {
-//             movement = movement.normalize();
-//         }
-
-//         if self.space == Pressed {
-//             movement.y += 1.;
-//         } else if self.shift == Pressed {
-//             movement.y -= 1.;
-//         }
-
-//         // apply movement
-//         transform.set_translation(view.translation + movement * 2. * seconds_passed);
-//     }
-// }
+        movement
+    }
+}
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
 enum GameState {
@@ -294,6 +284,7 @@ impl App {
                 if self.game_state == GameState::Playing {
                     let mut world = self.world.lock().unwrap();
                     world.update(duration_from_last_frame.as_secs_f32());
+                    world.inputs.movement = self.inputs.get_move();
                 }
 
                 // profile logic update
@@ -323,44 +314,10 @@ impl App {
             ) => {
                 self.inputs.mouse_dx += delta.0 as f32;
                 self.inputs.mouse_dy += delta.1 as f32;
-                // let transform = self
-                //     .transforms
-                //     .get_transform_mut(&self.camera.transform)
-                //     .unwrap();
-                // transform.set_rotation(self.camera.rotate(
-                //     transform.get_local_transform().rotation,
-                //     delta.0 as f32,
-                //     delta.1 as f32,
-                // ));
             }
             _ => (),
         }
     }
-
-    // /// update game logic
-    // ///
-    // /// Requires keys, camera, world and transform
-    // fn update_game(&mut self, seconds_passed: f32) {
-    //     self.total_seconds += seconds_passed;
-
-    //     // move cam
-    //     self.inputs.move_transform(
-    //         self.transforms
-    //             .get_transform_mut(&self.camera.transform)
-    //             .unwrap(),
-    //         seconds_passed,
-    //     );
-
-    //     // update rotate
-    //     let mut query = <(&TransformID, &Rotate)>::query();
-    //     for (transform_id, rotate) in query.iter(&self.world) {
-    //         let transform = self.transforms.get_transform_mut(transform_id).unwrap();
-    //         transform.set_rotation(
-    //             Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
-    //                 * transform.get_local_transform().rotation,
-    //         );
-    //     }
-    // }
 
     /// upload render objects and do render loop
     fn update_render(&mut self) {
@@ -368,7 +325,7 @@ impl App {
             let GameWorld {
                 world,
                 transforms,
-                // camera,
+                camera,
                 ..
             } = &mut *self.world.lock().unwrap();
 
@@ -394,6 +351,17 @@ impl App {
                 render_object.set_matrix(transfrom_matrix);
                 render_object.upload();
             }
+
+            // rotate camera
+            let transform = transforms.get_transform_mut(&camera.transform).unwrap();
+            transform.set_rotation(camera.rotate(
+                transform.get_local_transform().rotation,
+                self.inputs.mouse_dx,
+                self.inputs.mouse_dy,
+            ));
+
+            self.inputs.mouse_dx = 0.;
+            self.inputs.mouse_dy = 0.;
         }
 
         // do render loop
