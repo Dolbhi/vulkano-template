@@ -83,7 +83,7 @@ impl GameWorld {
         }
     }
 
-    /// update world logic
+    /// update world logic with a time step
     pub fn update(&mut self, seconds_passed: f32) {
         self.total_seconds += seconds_passed;
 

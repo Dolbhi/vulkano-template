@@ -60,30 +60,6 @@ struct InputState {
 }
 
 impl InputState {
-    //     // /// move camera based on inputs
-    //     // fn move_camera(&self, camera: &mut Camera, seconds_passed: f32) {
-    //     //     if self.space == Pressed && self.shift == Released {
-    //     //         camera.move_up(seconds_passed)
-    //     //     }
-    //     //     if self.shift == Pressed && self.space == Released {
-    //     //         camera.move_down(seconds_passed)
-    //     //     }
-
-    //     //     if self.w == Pressed && self.s == Released {
-    //     //         camera.move_forward(seconds_passed)
-    //     //     }
-    //     //     if self.s == Pressed && self.w == Released {
-    //     //         camera.move_back(seconds_passed)
-    //     //     }
-
-    //     //     if self.a == Pressed && self.d == Released {
-    //     //         camera.move_left(seconds_passed)
-    //     //     }
-    //     //     if self.d == Pressed && self.a == Released {
-    //     //         camera.move_right(seconds_passed)
-    //     //     }
-    //     // }
-
     fn get_move(&self) -> Vector3<f32> {
         let mut movement = <Vector3<f32> as cgmath::Zero>::zero();
         if self.w == Pressed {
@@ -224,8 +200,8 @@ impl App {
         event: Event<()>,
         control_flow: &mut winit::event_loop::ControlFlow,
     ) {
-        match (self.game_state, event) {
-            (_, Event::WindowEvent { event, .. }) => {
+        match event {
+            Event::WindowEvent { event, .. } => {
                 if !self.render_loop.context.gui.update(&event) {
                     match event {
                         WindowEvent::CloseRequested => control_flow.set_exit(),
@@ -244,7 +220,7 @@ impl App {
                     }
                 }
             }
-            (_, Event::RedrawRequested(_)) => {
+            Event::RedrawRequested(_) => {
                 let update_start = Instant::now();
                 let duration_from_last_frame = update_start - self.last_frame_time;
 
@@ -283,8 +259,8 @@ impl App {
 
                 if self.game_state == GameState::Playing {
                     let mut world = self.world.lock().unwrap();
-                    world.update(duration_from_last_frame.as_secs_f32());
                     world.inputs.movement = self.inputs.get_move();
+                    world.update(duration_from_last_frame.as_secs_f32());
                 }
 
                 // profile logic update
@@ -304,16 +280,15 @@ impl App {
 
                 self.last_frame_time = update_start;
             }
-            (_, Event::MainEventsCleared) => self.render_loop.context.window.request_redraw(),
-            (
-                GameState::Playing,
-                Event::DeviceEvent {
-                    event: winit::event::DeviceEvent::MouseMotion { delta },
-                    ..
-                },
-            ) => {
-                self.inputs.mouse_dx += delta.0 as f32;
-                self.inputs.mouse_dy += delta.1 as f32;
+            Event::MainEventsCleared => self.render_loop.context.window.request_redraw(),
+            Event::DeviceEvent {
+                event: winit::event::DeviceEvent::MouseMotion { delta },
+                ..
+            } => {
+                if self.game_state == GameState::Playing {
+                    self.inputs.mouse_dx += delta.0 as f32;
+                    self.inputs.mouse_dy += delta.1 as f32;
+                }
             }
             _ => (),
         }
