@@ -5,7 +5,7 @@ use std::{
 };
 
 use cgmath::{Matrix4, Vector3, Vector4};
-use legion::{component, IntoQuery};
+use legion::*;
 
 use winit::{
     dpi::PhysicalPosition,
@@ -17,7 +17,7 @@ use crate::{
     game_objects::{
         light::PointLightComponent,
         transform::{TransformCreateInfo, TransformID},
-        GameWorld, LastModel,
+        GameWorld, InterpolateTransform,
     },
     init_phys_test, init_ui_test, init_world,
     render::{
@@ -298,12 +298,14 @@ impl App {
 
     /// upload render objects and do render loop
     fn update_render(&mut self) {
+        let mut interpolation = 0.0;
         {
             let GameWorld {
                 world,
                 transforms,
                 camera,
                 inputs,
+                last_update,
                 ..
             } = &mut *self.world.lock().unwrap();
 
@@ -327,12 +329,28 @@ impl App {
             }
 
             // update render objects
-            let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query();
-            // .filter(!component::<LastModel>());
+            let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query()
+                .filter(!component::<InterpolateTransform>());
             // println!("==== RENDER OBJECT DATA ====");
             for (transform_id, render_object) in query.iter_mut(world) {
                 let transfrom_matrix = transforms.get_global_model(transform_id).unwrap();
                 // println!("Obj {:?}: {:?}", transform_id, obj);
+                render_object.set_matrix(transfrom_matrix);
+                render_object.upload();
+            }
+
+            // interpolate models
+            interpolation = (last_update.elapsed().as_secs_f32() / FIXED_DELTA_TIME).min(1.);
+            println!("[debug] interpolation: {}", interpolation);
+            let mut query = <(
+                &TransformID,
+                &mut RenderObject<Matrix4<f32>>,
+                &InterpolateTransform,
+            )>::query();
+            for (transform_id, render_object, _) in query.iter_mut(world) {
+                let transfrom_matrix = transforms
+                    .get_lerp_model(transform_id, interpolation)
+                    .unwrap();
                 render_object.set_matrix(transfrom_matrix);
                 render_object.upload();
             }
@@ -362,12 +380,15 @@ impl App {
                 } = &mut *self.world.lock().unwrap();
 
                 // camera data
-                let cam_transform = transforms
-                    .get_transform(&camera.transform)
-                    .unwrap()
-                    .get_local_transform();
+                // let cam_transform = transforms
+                //     .get_transform(&camera.transform)
+                //     .unwrap()
+                //     .get_local_transform();
                 // println!("[debug] cam transform: {cam_transform:?}");
-                let global_data = GPUGlobalData::from_camera(camera, cam_transform, extends);
+                let cam_model = transforms
+                    .get_lerp_model(&camera.transform, interpolation)
+                    .unwrap();
+                let global_data = GPUGlobalData::from_camera(camera, cam_model, extends);
 
                 // upload draw data
                 let frame = renderer
@@ -488,12 +509,14 @@ impl GameWorldThread {
 
         let thread = thread::spawn(move || {
             let update_period = Duration::from_secs_f32(FIXED_DELTA_TIME);
+            let mut next_time = Instant::now() + update_period;
             // let mut last_update = Instant::now();
             loop {
                 if !paused_2.load(std::sync::atomic::Ordering::Acquire) {
                     let wait = {
                         let update_start = Instant::now();
                         let mut world = game_world.lock().unwrap();
+                        // let time_since_update = world.last_update.elapsed().as_millis();
                         world.last_update = update_start.clone();
                         // let lock_wait = update_start.elapsed().as_millis();
 
@@ -502,25 +525,23 @@ impl GameWorldThread {
                         // let update_time = pre_update.elapsed().as_millis();
 
                         // skip frames if update took too long
-                        let elapsed = update_start.elapsed();
-                        let mut wait = update_period;
+                        let now = Instant::now();
                         let mut frames_skipped = 0;
-                        while elapsed > wait {
-                            wait += update_period;
+                        while next_time < now {
+                            next_time += update_period;
                             frames_skipped += 1;
                         }
-                        wait -= elapsed;
                         if frames_skipped > 0 {
                             println!("[Warning] Skipped {frames_skipped} frames");
                         }
                         // println!(
-                        //     "[Debug] Lock wait: {:>4}, Update time: {:>4}",
-                        //     lock_wait, update_time,
+                        //     "[Debug] Wait since last update: {:>4} ms, Set wait till next: {:>4} ms",
+                        //     time_since_update, (next_time - now).as_millis()
                         // );
 
-                        wait
+                        next_time - now
                     };
-
+                    next_time += update_period;
                     thread::sleep(wait)
                 } else {
                     thread::park();

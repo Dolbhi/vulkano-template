@@ -6,7 +6,7 @@ pub mod transform;
 use std::time::Instant;
 
 pub use camera::Camera;
-use cgmath::{InnerSpace, Matrix4, One, Quaternion, Rad, Rotation, Rotation3, Vector3, Zero};
+use cgmath::{InnerSpace, Quaternion, Rad, Rotation, Rotation3, Vector3, Zero};
 
 use self::transform::{Transform, TransformID, TransformSystem};
 use legion::*;
@@ -17,7 +17,7 @@ pub struct NameComponent(pub String);
 
 pub struct Rotate(pub Vector3<f32>, pub Rad<f32>);
 
-pub struct LastModel(pub Matrix4<f32>);
+pub struct InterpolateTransform;
 
 pub struct Inputs {
     pub movement: Vector3<f32>,
@@ -79,7 +79,7 @@ impl GameWorld {
             fov: Rad(1.2),
             transform: transforms.next().unwrap(),
         };
-        world.push((camera.transform, LastModel(Matrix4::one())));
+        world.push((camera.transform, InterpolateTransform));
 
         Self {
             transforms,
@@ -96,9 +96,13 @@ impl GameWorld {
         self.fixed_seconds += seconds_passed;
 
         // update interpolation models
-        let mut query = <(&TransformID, &mut LastModel)>::query();
-        for (transform_id, last_model) in query.iter_mut(&mut self.world) {
-            *last_model = LastModel(self.transforms.get_global_model(transform_id).unwrap());
+        let mut query = <(&TransformID, &InterpolateTransform)>::query();
+        for (transform_id, _) in query.iter(&self.world) {
+            // *last_model =
+            //     InterpolateTransform(self.transforms.get_global_model(transform_id).unwrap());
+            if let Err(_) = self.transforms.store_last_model(transform_id) {
+                println!("[Error] Failed to find transform of interpolated object");
+            }
         }
 
         // move cam

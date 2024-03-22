@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use cgmath::{Matrix4, One, Quaternion, SquareMatrix, Vector3, Zero};
+use cgmath::{Matrix4, One, Quaternion, SquareMatrix, Vector3, VectorSpace, Zero};
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct TransformID(u32);
@@ -14,7 +14,7 @@ pub struct Transform {
     translation: Vector3<f32>,
     rotation: Quaternion<f32>,
     scale: Vector3<f32>,
-    // last_models: [Matrix4<f32>; 2],
+    last_model: Option<Matrix4<f32>>,
 }
 impl Transform {
     fn get_local_model(&mut self) -> Matrix4<f32> {
@@ -120,7 +120,7 @@ impl Into<Transform> for TransformCreateInfo {
             translation: self.translation,
             rotation: self.rotation,
             scale: self.scale,
-            // last_models: [Matrix4::one(), Matrix4::one()],
+            last_model: None,
         }
     }
 }
@@ -150,8 +150,6 @@ pub struct TransformSystem {
     root: HashSet<TransformID>,
     transforms: HashMap<TransformID, Transform>,
     next_id: u32,
-    // last_fixed_updates: [Instant; 2],
-    // last_interpolation_i: i32,
 }
 impl TransformSystem {
     pub fn new() -> Self {
@@ -159,8 +157,6 @@ impl TransformSystem {
             root: HashSet::new(),
             transforms: HashMap::new(),
             next_id: 0,
-            // last_fixed_updates: [Instant::now(), Instant::now()],
-            // last_interpolation_i: 0,
         }
     }
 
@@ -186,6 +182,26 @@ impl TransformSystem {
         } else {
             Ok(Matrix4::identity())
         }
+    }
+
+    pub fn store_last_model(&mut self, id: &TransformID) -> Result<(), TransformError> {
+        let model = self.get_global_model(id)?;
+        self.transforms.get_mut(id).unwrap().last_model = Some(model);
+        Ok(())
+    }
+    pub fn get_lerp_model(
+        &mut self,
+        id: &TransformID,
+        interpolation: f32,
+    ) -> Result<Matrix4<f32>, TransformError> {
+        let now_model = self.get_global_model(id)?;
+        let last_model = self.transforms.get_mut(id).unwrap().last_model;
+        let model = match last_model {
+            None => now_model,
+            Some(last_model) => last_model.lerp(now_model, interpolation),
+        };
+
+        Ok(model)
     }
 
     /// Get corresponding transform's position in global space
