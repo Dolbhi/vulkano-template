@@ -318,7 +318,7 @@ impl App {
                 }
 
                 // camera data
-                let cam_model = transforms.get_lerp_model(&camera.transform).unwrap();
+                let cam_model = transforms.get_slerp_model(&camera.transform).unwrap();
                 let global_data = GPUGlobalData::from_camera(camera, cam_model, extends);
 
                 // update render objects
