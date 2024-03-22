@@ -253,7 +253,7 @@ impl TransformSystem {
                 .into();
                 let last_pos = last_model[3].truncate() / last_model[3][3];
 
-                let lerp_rot = last_rot.nlerp(*view.rotation, self.interpolation);
+                let lerp_rot = last_rot.slerp(*view.rotation, self.interpolation);
                 let lerp_pos = last_pos.lerp(*view.translation, self.interpolation);
 
                 parent_model * Matrix4::from_translation(lerp_pos) * Matrix4::from(lerp_rot)
