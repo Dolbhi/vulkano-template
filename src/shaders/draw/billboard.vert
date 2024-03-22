@@ -32,7 +32,7 @@ void main() {
     // vec3 offset_forward = position.z * vec3(global_data.view[0][2], global_data.view[1][2], global_data.view[2][2]);
 
     GPUObjectData object = objectBuffer.objects[gl_InstanceIndex];
-    vec4 object_position = object.render_matrix * vec4(0, 0, 0, 1);
+    vec4 object_position = object.render_matrix[3];
 
     // float light_radius = 4.0;
     float light_radius = 4.0;
