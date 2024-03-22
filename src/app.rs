@@ -28,13 +28,6 @@ use crate::{
     MaterialSwapper, RENDER_PROFILER,
 };
 
-// TO flush_next_future METHOD ADD PARAMS FOR PASSING CAMERA DESCRIPTOR SET
-
-// pub enum UpdateResult {
-//     None,
-//     Quit,
-// }
-
 #[derive(Default, PartialEq)]
 enum KeyState {
     Pressed,
@@ -109,8 +102,6 @@ impl App {
 
         let init_start_time = Instant::now();
 
-        // let world = World::default();
-        // let mut transforms = TransformSystem::new();
         let render_loop = RenderLoop::new(event_loop);
         let renderer = DeferredRenderer::new(&render_loop.context);
         let resources = ResourceManager::new(&render_loop.context);
@@ -119,25 +110,11 @@ impl App {
 
         let render_init_elapse = init_start_time.elapsed().as_millis();
 
-        // println!("[Renderer Info]\nLit shaders:");
-        // for shader in &renderer.lit_draw_system.shaders {
-        //     println!("{}", shader);
-        // }
-        // println!("Unlit shaders:");
-        // for shader in &renderer.unlit_draw_system.shaders {
-        //     println!("{}", shader);
-        // }
-
         let world = Arc::new(Mutex::new(GameWorld::new()));
         let game_thread = GameWorldThread::new(world.clone());
         game_thread.set_paused(true);
 
-        println!(
-            "[Benchmarking] render init: {} ms",
-            render_init_elapse,
-            // total_elapse - render_init_elapse,
-            // total_elapse
-        );
+        println!("[Benchmarking] render init: {} ms", render_init_elapse,);
 
         Self {
             render_loop,
@@ -183,7 +160,7 @@ impl App {
         let camera_light = transforms.add_transform(
             TransformCreateInfo::default()
                 .set_parent(Some(camera.transform))
-                .set_translation((0., 0., -0.1)), // light pos cannot = cam pos else the light will glitch
+                .set_translation((0., 0., 0.2)), // light pos cannot = cam pos else the light will glitch
         );
 
         world.push((
@@ -192,35 +169,6 @@ impl App {
                 color: Vector4::new(1., 1., 1., 2.),
                 half_radius: 4.,
             },
-            // RenderObject::new(square, bill),
-        ));
-
-        let camera_child_1 = transforms.add_transform(
-            TransformCreateInfo::default()
-                .set_parent(Some(camera.transform))
-                .set_translation((0., 0., -4.)), // light pos cannot = cam pos else the light will glitch
-        );
-
-        let camera_child_2 = transforms.add_transform(
-            TransformCreateInfo::default()
-                .set_parent(Some(camera.transform))
-                .set_translation((0., 1., -4.)), // light pos cannot = cam pos else the light will glitch
-        );
-
-        let square = resources.get_mesh(crate::render::resource_manager::MeshID::Square);
-        let red = resources.get_material(
-            crate::render::resource_manager::MaterialID::Color([255, 0, 0, 255]),
-            true,
-        );
-        let blue = resources.get_material(
-            crate::render::resource_manager::MaterialID::Color([0, 0, 255, 255]),
-            true,
-        );
-        world.push((camera_child_1, RenderObject::new(square.clone(), blue)));
-        world.push((
-            camera_child_2,
-            RenderObject::new(square.clone(), red),
-            DisabledLERP,
         ));
 
         println!(
@@ -327,71 +275,6 @@ impl App {
 
     /// upload render objects and do render loop
     fn update_render(&mut self) {
-        {
-            let GameWorld {
-                world,
-                transforms,
-                camera,
-                inputs,
-                ..
-            } = &mut *self.world.lock().unwrap();
-
-            // sync inputs
-            if self.game_state == GameState::Playing {
-                inputs.movement = self.inputs.get_move();
-                // world.update(duration_from_last_frame.as_secs_f32());
-            }
-
-            println!(
-                "[debug] interpolation: {}",
-                transforms.update_interpolation()
-            );
-
-            // update mat swap
-            if self.inputs.q_triggered {
-                let mut query = <(&mut MaterialSwapper, &mut RenderObject<Matrix4<f32>>)>::query();
-
-                query.for_each_mut(world, |(swapper, render_object)| {
-                    let next_mat = swapper.swap_material();
-                    // println!("Swapped mat: {:?}", next_mat);
-                    render_object.material = next_mat;
-                });
-
-                self.inputs.q_triggered = false;
-            }
-
-            // update render objects
-            let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query()
-                .filter(!component::<DisabledLERP>());
-            // println!("==== RENDER OBJECT DATA ====");
-            for (transform_id, render_object) in query.iter_mut(world) {
-                let transfrom_matrix = transforms.get_lerp_model(transform_id).unwrap();
-                // println!("Obj {:?}: {:?}", transform_id, obj);
-                render_object.set_matrix(transfrom_matrix);
-                render_object.upload();
-            }
-
-            // do not interpolate models
-            let mut query =
-                <(&TransformID, &mut RenderObject<Matrix4<f32>>, &DisabledLERP)>::query();
-            for (transform_id, render_object, _) in query.iter_mut(world) {
-                let transfrom_matrix = transforms.get_global_model(transform_id).unwrap();
-                render_object.set_matrix(transfrom_matrix);
-                render_object.upload();
-            }
-
-            // rotate camera
-            let transform = transforms.get_transform_mut(&camera.transform).unwrap();
-            transform.set_rotation(camera.rotate(
-                transform.get_local_transform().rotation,
-                self.inputs.mouse_dx,
-                self.inputs.mouse_dy,
-            ));
-
-            self.inputs.mouse_dx = 0.;
-            self.inputs.mouse_dy = 0.;
-        }
-
         // do render loop
         let extends = self.render_loop.context.window.inner_size();
         self.render_loop
@@ -400,18 +283,54 @@ impl App {
                     world,
                     transforms,
                     camera,
-                    fixed_seconds: total_seconds,
+                    fixed_seconds,
+                    inputs,
                     ..
                 } = &mut *self.world.lock().unwrap();
+                transforms.update_interpolation();
+
+                // sync inputs
+                if self.game_state == GameState::Playing {
+                    inputs.movement = self.inputs.get_move();
+                }
+                // rotate camera
+                let transform = transforms.get_transform_mut(&camera.transform).unwrap();
+                transform.set_rotation(camera.rotate(
+                    transform.get_local_transform().rotation,
+                    self.inputs.mouse_dx,
+                    self.inputs.mouse_dy,
+                ));
+                self.inputs.mouse_dx = 0.;
+                self.inputs.mouse_dy = 0.;
+
+                // update mat swap
+                if self.inputs.q_triggered {
+                    let mut query =
+                        <(&mut MaterialSwapper, &mut RenderObject<Matrix4<f32>>)>::query();
+
+                    query.for_each_mut(world, |(swapper, render_object)| {
+                        let next_mat = swapper.swap_material();
+                        // println!("Swapped mat: {:?}", next_mat);
+                        render_object.material = next_mat;
+                    });
+
+                    self.inputs.q_triggered = false;
+                }
 
                 // camera data
-                // let cam_transform = transforms
-                //     .get_transform(&camera.transform)
-                //     .unwrap()
-                //     .get_local_transform();
-                // println!("[debug] cam transform: {cam_transform:?}");
                 let cam_model = transforms.get_lerp_model(&camera.transform).unwrap();
                 let global_data = GPUGlobalData::from_camera(camera, cam_model, extends);
+
+                // update render objects
+                let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query()
+                    .filter(!component::<DisabledLERP>());
+                // println!("==== RENDER OBJECT DATA ====");
+                for (transform_id, render_object) in query.iter_mut(world) {
+                    let transfrom_matrix = transforms.get_lerp_model(transform_id).unwrap();
+                    // println!("Obj {:?}: {:?}", transform_id, obj);
+                    render_object.set_matrix(transfrom_matrix);
+                    render_object.upload();
+                }
 
                 // upload draw data
                 let frame = renderer
@@ -420,7 +339,6 @@ impl App {
                     .expect("Renderer should have a frame for every swapchain image");
 
                 frame.update_global_data(global_data);
-
                 frame.update_objects_data(
                     &mut renderer.lit_draw_system,
                     &mut renderer.unlit_draw_system,
@@ -436,7 +354,7 @@ impl App {
 
                 // directional lights
                 // let mut dl_query = <(&TransformID, &DirectionalLightComponent)>::query();
-                let angle = *total_seconds / 4.;
+                let angle = *fixed_seconds / 4.;
                 let direction =
                     cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
                 let dir = DirectionLight {
@@ -517,7 +435,7 @@ impl App {
     }
 }
 
-pub const FIXED_DELTA_TIME: f32 = 0.1;
+pub const FIXED_DELTA_TIME: f32 = 0.02;
 
 struct GameWorldThread {
     thread: JoinHandle<()>,
@@ -537,7 +455,7 @@ impl GameWorldThread {
             loop {
                 if !paused_2.load(std::sync::atomic::Ordering::Acquire) {
                     let wait = {
-                        let update_start = Instant::now();
+                        // let update_start = Instant::now();
                         let mut world = game_world.lock().unwrap();
                         // let lock_wait = update_start.elapsed().as_millis();
 
