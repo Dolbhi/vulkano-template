@@ -7,7 +7,7 @@ pub mod ui;
 mod vertex_data;
 pub mod vulkano_objects;
 
-use cgmath::{Quaternion, Rad, Rotation3, Vector3, Vector4};
+use cgmath::{InnerSpace, Quaternion, Rad, Rotation3, Vector3, Vector4};
 use profiler::Profiler;
 pub use vertex_data::{Vertex2d, Vertex3d, VertexFull};
 
@@ -95,7 +95,7 @@ fn init_world(
     //      Suzanne
     let suzanne = transform_sys.next().unwrap();
     let suzanne_obj = RenderObject::new(suzanne_mesh.clone(), uv_mat.clone());
-    let rotate = Rotate([0., 1., 0.].into(), Rad(1.0));
+    let rotate = Rotate(Vector3::new(1.0, 1.0, 0.0).normalize(), Rad(5.0));
     world.push((suzanne, suzanne_obj, rotate));
 
     //      Spam Suzanne

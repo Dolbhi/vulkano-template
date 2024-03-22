@@ -66,11 +66,6 @@ impl Transform {
         }
     }
 
-    // fn get_global_translation(&self, parent_matrix: &Matrix4<f32>) -> Vector3<f32> {
-    //     let pos = parent_matrix * self.translation.extend(1.0);
-    //     [pos.x, pos.y, pos.z].map(|v| v / pos.w).into()
-    // }
-
     pub fn set_translation(&mut self, translation: impl Into<Vector3<f32>>) -> &mut Self {
         self.translation = translation.into();
         self.local_model = None;
@@ -207,6 +202,13 @@ impl TransformSystem {
         self.transforms.get_mut(id).unwrap().last_model = Some(model / model[3][3]);
         Ok(())
     }
+    pub fn clear_last_model(&mut self, id: &TransformID) -> Result<(), TransformError> {
+        self.transforms
+            .get_mut(id)
+            .ok_or(TransformError::IDNotFound)?
+            .last_model = None;
+        Ok(())
+    }
     pub fn get_lerp_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
         let now_model = self.get_global_model(id)?;
         let last_model = self.transforms.get_mut(id).unwrap().last_model;
@@ -217,56 +219,16 @@ impl TransformSystem {
 
         Ok(model)
 
-        // let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
-        // let last_model = transform.last_model.clone();
-
-        // let parent_model = match transform.parent {
-        //     Some(parent_id) => self.get_lerp_model(&parent_id)?,
-        //     None => Matrix4::identity(),
-        // };
-        // let now_model = parent_model * self.transforms.get_mut(id).unwrap().get_local_model();
-
-        // let lerp_model = match last_model {
-        //     None => now_model,
-        //     Some(last_model) => last_model.lerp(now_model, self.interpolation),
-        // };
-
-        // Ok(lerp_model)
+        //     if let Some(last_model) = last_model {
+        //         let old = last_model[3].truncate();
+        //         // let new = now_model[3].truncate() / now_model[3][3];
+        //         let lerp = model[3].truncate() / model[3][3];
+        //         println!(
+        //             "[debug] old: {:?}, lerp: {:?}, lerp_v: {:?}",
+        //             old.x, lerp.x, self.interpolation
+        //         );
+        //     }
     }
-
-    // pub fn debug_lerp(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
-    //     let now_model = self.get_global_model(id)?;
-    //     let last_model = self.transforms.get_mut(id).unwrap().last_model;
-    //     let model = match last_model {
-    //         None => now_model,
-    //         Some(last_model) => last_model.lerp(now_model / now_model[3][3], self.interpolation),
-    //     };
-
-    //     if let Some(last_model) = last_model {
-    //         let old = last_model[3].truncate();
-    //         // let new = now_model[3].truncate() / now_model[3][3];
-    //         let lerp = model[3].truncate() / model[3][3];
-
-    //         println!(
-    //             "[debug] old: {:?}, lerp: {:?}, lerp_v: {:?}",
-    //             old.x, lerp.x, self.interpolation
-    //         );
-    //     }
-
-    //     Ok(model)
-    // }
-
-    /// Get corresponding transform's position in global space
-    // pub fn get_global_position(
-    //     &mut self,
-    //     id: &TransformID,
-    // ) -> Result<Vector3<f32>, TransformError> {
-    //     let parent_model = self.get_parent_model(id)?;
-    //     Ok(self
-    //         .get_transform(id)
-    //         .ok_or(TransformError::IDNotFound)?
-    //         .get_global_translation(&parent_model))
-    // }
 
     /// Flag the global model of the corresponding transform and all its children as dirty
     ///

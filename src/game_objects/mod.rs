@@ -74,7 +74,7 @@ impl GameWorld {
             fov: Rad(1.2),
             transform: transforms.next().unwrap(),
         };
-        world.push((camera.transform,));
+        world.push((camera.transform, Rotate((0., 1., 0.).into(), Rad(1.))));
 
         Self {
             transforms,
@@ -127,5 +127,7 @@ impl GameWorld {
             fov: Rad(1.2),
             transform: self.transforms.next().unwrap(),
         };
+        self.world
+            .push((self.camera.transform, Rotate((0., 1., 0.).into(), Rad(1.))));
     }
 }
