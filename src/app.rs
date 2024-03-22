@@ -17,7 +17,7 @@ use crate::{
     game_objects::{
         light::PointLightComponent,
         transform::{TransformCreateInfo, TransformID},
-        GameWorld, InterpolateTransform,
+        DisabledLERP, GameWorld,
     },
     init_phys_test, init_ui_test, init_world,
     render::{
@@ -192,6 +192,35 @@ impl App {
                 color: Vector4::new(1., 1., 1., 2.),
                 half_radius: 4.,
             },
+            // RenderObject::new(square, bill),
+        ));
+
+        let camera_child_1 = transforms.add_transform(
+            TransformCreateInfo::default()
+                .set_parent(Some(camera.transform))
+                .set_translation((0., 0., -4.)), // light pos cannot = cam pos else the light will glitch
+        );
+
+        let camera_child_2 = transforms.add_transform(
+            TransformCreateInfo::default()
+                .set_parent(Some(camera.transform))
+                .set_translation((0., 1., -4.)), // light pos cannot = cam pos else the light will glitch
+        );
+
+        let square = resources.get_mesh(crate::render::resource_manager::MeshID::Square);
+        let red = resources.get_material(
+            crate::render::resource_manager::MaterialID::Color([255, 0, 0, 255]),
+            true,
+        );
+        let blue = resources.get_material(
+            crate::render::resource_manager::MaterialID::Color([0, 0, 255, 255]),
+            true,
+        );
+        world.push((camera_child_1, RenderObject::new(square.clone(), blue)));
+        world.push((
+            camera_child_2,
+            RenderObject::new(square.clone(), red),
+            DisabledLERP,
         ));
 
         println!(
@@ -298,14 +327,12 @@ impl App {
 
     /// upload render objects and do render loop
     fn update_render(&mut self) {
-        let mut interpolation = 0.0;
         {
             let GameWorld {
                 world,
                 transforms,
                 camera,
                 inputs,
-                last_update,
                 ..
             } = &mut *self.world.lock().unwrap();
 
@@ -314,6 +341,11 @@ impl App {
                 inputs.movement = self.inputs.get_move();
                 // world.update(duration_from_last_frame.as_secs_f32());
             }
+
+            println!(
+                "[debug] interpolation: {}",
+                transforms.update_interpolation()
+            );
 
             // update mat swap
             if self.inputs.q_triggered {
@@ -330,27 +362,20 @@ impl App {
 
             // update render objects
             let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query()
-                .filter(!component::<InterpolateTransform>());
+                .filter(!component::<DisabledLERP>());
             // println!("==== RENDER OBJECT DATA ====");
             for (transform_id, render_object) in query.iter_mut(world) {
-                let transfrom_matrix = transforms.get_global_model(transform_id).unwrap();
+                let transfrom_matrix = transforms.get_lerp_model(transform_id).unwrap();
                 // println!("Obj {:?}: {:?}", transform_id, obj);
                 render_object.set_matrix(transfrom_matrix);
                 render_object.upload();
             }
 
-            // interpolate models
-            interpolation = (last_update.elapsed().as_secs_f32() / FIXED_DELTA_TIME).min(1.);
-            println!("[debug] interpolation: {}", interpolation);
-            let mut query = <(
-                &TransformID,
-                &mut RenderObject<Matrix4<f32>>,
-                &InterpolateTransform,
-            )>::query();
+            // do not interpolate models
+            let mut query =
+                <(&TransformID, &mut RenderObject<Matrix4<f32>>, &DisabledLERP)>::query();
             for (transform_id, render_object, _) in query.iter_mut(world) {
-                let transfrom_matrix = transforms
-                    .get_lerp_model(transform_id, interpolation)
-                    .unwrap();
+                let transfrom_matrix = transforms.get_global_model(transform_id).unwrap();
                 render_object.set_matrix(transfrom_matrix);
                 render_object.upload();
             }
@@ -385,9 +410,7 @@ impl App {
                 //     .unwrap()
                 //     .get_local_transform();
                 // println!("[debug] cam transform: {cam_transform:?}");
-                let cam_model = transforms
-                    .get_lerp_model(&camera.transform, interpolation)
-                    .unwrap();
+                let cam_model = transforms.get_lerp_model(&camera.transform).unwrap();
                 let global_data = GPUGlobalData::from_camera(camera, cam_model, extends);
 
                 // upload draw data
@@ -406,8 +429,8 @@ impl App {
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();
                 let point_lights = point_query.iter(world).map(|(t, pl)| {
-                    pl.clone()
-                        .into_light(transforms.get_global_position(t).unwrap())
+                    let pos = transforms.get_lerp_model(t).unwrap()[3];
+                    pl.clone().into_light(pos.truncate() / pos.w)
                 });
                 frame.update_point_lights(point_lights);
 
@@ -494,7 +517,7 @@ impl App {
     }
 }
 
-const FIXED_DELTA_TIME: f32 = 0.02;
+pub const FIXED_DELTA_TIME: f32 = 0.1;
 
 struct GameWorldThread {
     thread: JoinHandle<()>,
@@ -516,8 +539,6 @@ impl GameWorldThread {
                     let wait = {
                         let update_start = Instant::now();
                         let mut world = game_world.lock().unwrap();
-                        // let time_since_update = world.last_update.elapsed().as_millis();
-                        world.last_update = update_start.clone();
                         // let lock_wait = update_start.elapsed().as_millis();
 
                         // let pre_update = Instant::now();

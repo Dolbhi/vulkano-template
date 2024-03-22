@@ -1,6 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Instant,
+};
 
 use cgmath::{Matrix4, One, Quaternion, SquareMatrix, Vector3, VectorSpace, Zero};
+
+use crate::app::FIXED_DELTA_TIME;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct TransformID(u32);
@@ -61,10 +66,10 @@ impl Transform {
         }
     }
 
-    fn get_global_translation(&self, parent_matrix: &Matrix4<f32>) -> Vector3<f32> {
-        let pos = parent_matrix * self.translation.extend(1.0);
-        [pos.x, pos.y, pos.z].map(|v| v / pos.w).into()
-    }
+    // fn get_global_translation(&self, parent_matrix: &Matrix4<f32>) -> Vector3<f32> {
+    //     let pos = parent_matrix * self.translation.extend(1.0);
+    //     [pos.x, pos.y, pos.z].map(|v| v / pos.w).into()
+    // }
 
     pub fn set_translation(&mut self, translation: impl Into<Vector3<f32>>) -> &mut Self {
         self.translation = translation.into();
@@ -150,6 +155,8 @@ pub struct TransformSystem {
     root: HashSet<TransformID>,
     transforms: HashMap<TransformID, Transform>,
     next_id: u32,
+    last_fixed_time: Instant,
+    interpolation: f32,
 }
 impl TransformSystem {
     pub fn new() -> Self {
@@ -157,7 +164,18 @@ impl TransformSystem {
             root: HashSet::new(),
             transforms: HashMap::new(),
             next_id: 0,
+            last_fixed_time: Instant::now(),
+            interpolation: 0.0,
         }
+    }
+
+    pub fn update_last_fixed(&mut self) {
+        self.last_fixed_time = Instant::now();
+    }
+    pub fn update_interpolation(&mut self) -> f32 {
+        self.interpolation =
+            (self.last_fixed_time.elapsed().as_secs_f32() / FIXED_DELTA_TIME).min(1.);
+        self.interpolation
     }
 
     pub fn get_global_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
@@ -175,46 +193,74 @@ impl TransformSystem {
                 Ok(self.transforms.get_mut(id).unwrap().clean(&parent_model))
             })
     }
-    pub fn get_parent_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
-        let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
-        if let Some(id) = transform.parent {
-            self.get_global_model(&id)
-        } else {
-            Ok(Matrix4::identity())
-        }
-    }
+    // pub fn get_parent_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
+    //     let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
+    //     if let Some(id) = transform.parent {
+    //         self.get_global_model(&id)
+    //     } else {
+    //         Ok(Matrix4::identity())
+    //     }
+    // }
 
     pub fn store_last_model(&mut self, id: &TransformID) -> Result<(), TransformError> {
         let model = self.get_global_model(id)?;
         self.transforms.get_mut(id).unwrap().last_model = Some(model);
         Ok(())
     }
-    pub fn get_lerp_model(
-        &mut self,
-        id: &TransformID,
-        interpolation: f32,
-    ) -> Result<Matrix4<f32>, TransformError> {
-        let now_model = self.get_global_model(id)?;
-        let last_model = self.transforms.get_mut(id).unwrap().last_model;
-        let model = match last_model {
-            None => now_model,
-            Some(last_model) => last_model.lerp(now_model, interpolation),
-        };
+    pub fn get_lerp_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
+        // let now_model = self.get_global_model(id)?;
+        // let last_model = self.transforms.get_mut(id).unwrap().last_model;
+        // let model = match last_model {
+        //     None => now_model,
+        //     Some(last_model) => last_model.lerp(now_model, self.interpolation),
+        // };
 
-        Ok(model)
+        // Ok(model)
+
+        let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
+        let last_model = transform.last_model.clone();
+
+        // let parent_model = match transform.parent {
+        //     Some(parent_id) => self.get_lerp_model(&parent_id)?,
+        //     None => Matrix4::identity(),
+        // };
+        // let now_model = parent_model * self.transforms.get_mut(id).unwrap().get_local_model();
+
+        // let lerp_model = match last_model {
+        //     None => now_model,
+        //     Some(last_model) => last_model.lerp(now_model, self.interpolation),
+        // };
+
+        // Ok(lerp_model)
+
+        transform
+            .global_model
+            .ok_or(TransformError::IDNotFound)
+            .or({
+                let parent_model = match transform.parent {
+                    Some(parent_id) => self.get_global_model(&parent_id)?,
+                    None => Matrix4::identity(),
+                };
+
+                Ok(self.transforms.get_mut(id).unwrap().clean(&parent_model))
+            })
+            .map(|now_model| match last_model {
+                None => now_model,
+                Some(last_model) => last_model.lerp(now_model, self.interpolation),
+            })
     }
 
     /// Get corresponding transform's position in global space
-    pub fn get_global_position(
-        &mut self,
-        id: &TransformID,
-    ) -> Result<Vector3<f32>, TransformError> {
-        let parent_model = self.get_parent_model(id)?;
-        Ok(self
-            .get_transform(id)
-            .ok_or(TransformError::IDNotFound)?
-            .get_global_translation(&parent_model))
-    }
+    // pub fn get_global_position(
+    //     &mut self,
+    //     id: &TransformID,
+    // ) -> Result<Vector3<f32>, TransformError> {
+    //     let parent_model = self.get_parent_model(id)?;
+    //     Ok(self
+    //         .get_transform(id)
+    //         .ok_or(TransformError::IDNotFound)?
+    //         .get_global_translation(&parent_model))
+    // }
 
     /// Flag the global model of the corresponding transform and all its children as dirty
     ///
