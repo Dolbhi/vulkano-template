@@ -13,7 +13,7 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn rotate(&mut self, rotation: &Quaternion<f32>, dx: f32, dy: f32) -> Quaternion<f32> {
+    pub fn rotate(rotation: &Quaternion<f32>, dx: f32, dy: f32) -> Quaternion<f32> {
         let old_pitch = Rad::atan(rotation.v.x / rotation.s);
         let delta_pitch = clamp(
             Rad(-dy * MOUSE_SENSITIVITY),
