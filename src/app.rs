@@ -1,5 +1,8 @@
 use std::{
-    sync::{atomic::AtomicBool, Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, AtomicU64},
+        Arc, Mutex,
+    },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
@@ -440,33 +443,39 @@ pub const FIXED_DELTA_TIME: f32 = 0.02;
 
 struct GameWorldThread {
     thread: JoinHandle<()>,
-    // delta_time: Duration,
+    delta_micros: Arc<AtomicU64>,
     paused: Arc<AtomicBool>,
 }
 
 impl GameWorldThread {
     fn new(game_world: Arc<Mutex<GameWorld>>) -> Self {
         let paused = Arc::new(AtomicBool::new(false));
-        let paused_2 = paused.clone();
+        let thread_paused = paused.clone();
+
+        let mircos = (FIXED_DELTA_TIME * 1_000_000.0) as u64;
+        let delta_micros = Arc::new(AtomicU64::new(mircos));
+        let thread_micros = delta_micros.clone();
 
         let thread = thread::spawn(move || {
-            let update_period = Duration::from_secs_f32(FIXED_DELTA_TIME);
+            let mut update_period = Duration::from_micros(mircos);
             let mut next_time = Instant::now() + update_period;
             // let mut last_update = Instant::now();
             loop {
-                if !paused_2.load(std::sync::atomic::Ordering::Acquire) {
-                    let wait = {
+                if !thread_paused.load(std::sync::atomic::Ordering::Relaxed) {
+                    {
                         // let update_start = Instant::now();
+                        let new_micros = thread_micros.load(std::sync::atomic::Ordering::Relaxed);
                         let mut world = game_world.lock().unwrap();
                         // let lock_wait = update_start.elapsed().as_millis();
 
                         // let pre_update = Instant::now();
-                        world.update(FIXED_DELTA_TIME);
+                        world.update(update_period.as_secs_f32());
+                        update_period = Duration::from_micros(new_micros);
                         // let update_time = pre_update.elapsed().as_millis();
 
                         // skip frames if update took too long
                         let now = Instant::now();
-                        let mut frames_skipped = 0;
+                        let mut frames_skipped = 0u32;
                         while next_time < now {
                             next_time += update_period;
                             frames_skipped += 1;
@@ -478,28 +487,34 @@ impl GameWorldThread {
                         //     "[Debug] Wait since last update: {:>4} ms, Set wait till next: {:>4} ms",
                         //     time_since_update, (next_time - now).as_millis()
                         // );
-
-                        next_time - now
                     };
+                    thread::sleep(next_time - Instant::now());
                     next_time += update_period;
-                    thread::sleep(wait)
                 } else {
                     thread::park();
+                    next_time = Instant::now();
                 };
             }
         });
 
-        Self { thread, paused }
+        Self {
+            thread,
+            delta_micros,
+            paused,
+        }
     }
 
     fn set_paused(&self, paused: bool) {
-        if paused {
-            self.paused
-                .store(true, std::sync::atomic::Ordering::Release);
-        } else {
-            self.paused
-                .store(false, std::sync::atomic::Ordering::Release);
+        self.paused
+            .store(paused, std::sync::atomic::Ordering::Relaxed);
+        if !paused {
             self.thread.thread().unpark();
         }
+    }
+
+    #[allow(dead_code)]
+    fn set_delta_time(&self, micros: u64) {
+        self.delta_micros
+            .store(micros, std::sync::atomic::Ordering::Relaxed);
     }
 }
