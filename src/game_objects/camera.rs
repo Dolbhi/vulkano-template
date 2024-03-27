@@ -61,7 +61,7 @@ impl Camera {
             rotation: Quaternion::one(),
             smooth_pos: Vector3::zero(),
             transform,
-            damper: VectorDamp::new(30.),
+            damper: VectorDamp::new(40.),
         }
     }
 }

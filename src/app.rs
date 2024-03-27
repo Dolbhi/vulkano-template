@@ -293,20 +293,11 @@ impl App {
                 // sync inputs
                 if self.game_state == GameState::Playing {
                     inputs.movement = self.inputs.get_move();
-
                     camera.rotate(self.inputs.mouse_dx, self.inputs.mouse_dy);
-                    camera.sync_transform(transforms);
-
-                    // rotate camera
-                    // let transform = transforms.get_transform_mut(&camera.transform).unwrap();
-                    // transform.set_rotation(crate::game_objects::Camera::rotate(
-                    //     transform.get_local_transform().rotation,
-                    //     self.inputs.mouse_dx,
-                    //     self.inputs.mouse_dy,
-                    // ));
+                    self.inputs.mouse_dx = 0.;
+                    self.inputs.mouse_dy = 0.;
                 }
-                self.inputs.mouse_dx = 0.;
-                self.inputs.mouse_dy = 0.;
+                camera.sync_transform(transforms);
 
                 // update mat swap
                 if self.inputs.q_triggered {
