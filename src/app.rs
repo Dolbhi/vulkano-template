@@ -20,13 +20,13 @@ use crate::{
     game_objects::{
         light::PointLightComponent,
         transform::{TransformCreateInfo, TransformID},
-        DisabledLERP, GameWorld,
+        DisabledLERP, GameWorld, MaterialSwapper,
     },
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
     shaders::{draw::GPUGlobalData, lighting::DirectionLight},
     ui::{self, MenuOption},
-    MaterialSwapper, RENDER_PROFILER,
+    RENDER_PROFILER,
 };
 
 #[derive(Default, PartialEq)]
@@ -444,7 +444,6 @@ struct GameWorldThread {
     delta_micros: Arc<AtomicU64>,
     paused: Arc<AtomicBool>,
 }
-
 impl GameWorldThread {
     fn new(game_world: Arc<Mutex<GameWorld>>) -> Self {
         let paused = Arc::new(AtomicBool::new(false));

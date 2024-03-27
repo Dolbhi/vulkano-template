@@ -5,8 +5,9 @@ use legion::World;
 
 use crate::{
     game_objects::{
-        light::PointLightComponent, transform::TransformCreateInfo, transform::TransformSystem,
-        Rotate,
+        light::PointLightComponent,
+        transform::{TransformCreateInfo, TransformSystem},
+        MaterialSwapper, Rotate,
     },
     render::{
         resource_manager::{MaterialID, MeshID, ResourceRetriever, TextureID},
@@ -123,7 +124,7 @@ pub fn init_world(
             ..Default::default()
         });
 
-        let mat_swapper = crate::MaterialSwapper::new([
+        let mat_swapper = MaterialSwapper::new([
             le_mat.clone(),
             le_mat_unlit.clone(),
             uv_mat.clone(),
