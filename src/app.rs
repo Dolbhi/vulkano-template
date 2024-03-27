@@ -22,10 +22,8 @@ use crate::{
         transform::{TransformCreateInfo, TransformID},
         DisabledLERP, GameWorld,
     },
-    init_phys_test, init_ui_test, init_world,
-    render::{
-        renderer::DeferredRenderer, resource_manager::ResourceManager, RenderLoop, RenderObject,
-    },
+    prefabs::{init_phys_test, init_ui_test, init_world},
+    render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
     shaders::{draw::GPUGlobalData, lighting::DirectionLight},
     ui::{self, MenuOption},
     MaterialSwapper, RENDER_PROFILER,
@@ -202,7 +200,6 @@ impl App {
                                 },
                             ..
                         } => self.handle_keyboard_input(code, state),
-
                         _ => {}
                     }
                 }

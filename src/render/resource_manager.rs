@@ -13,7 +13,8 @@ use super::{
         material::Shader,
         texture::{create_sampler, load_texture},
     },
-    Context, DrawSystem, RenderSubmit,
+    renderer::systems::DrawSystem,
+    Context, RenderSubmit,
 };
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -50,6 +51,9 @@ pub enum TextureID {
     LostEmpire,
 }
 
+/// Stores currently loaded resources of the renderer
+///
+/// Call `begin_retrieving` to retrieve resources
 pub struct ResourceManager {
     loaded_meshes: HashMap<MeshID, Arc<Buffers<VertexFull>>>,
     loaded_materials: HashMap<(MaterialID, bool), RenderSubmit>,
