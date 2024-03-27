@@ -42,10 +42,10 @@ impl From<Matrix4<f32>> for GPUObjectData {
 
 use crate::game_objects::Camera;
 impl GPUGlobalData {
-    pub fn from_camera(camera: &Camera, model: Matrix4<f32>, extends: PhysicalSize<u32>) -> Self {
+    pub fn from_camera(camera: &Camera, extends: PhysicalSize<u32>) -> Self {
         let aspect = extends.width as f32 / extends.height as f32;
         let proj = camera.projection_matrix(aspect);
-        let view = model.inverse_transform().unwrap(); //camera.view_matrix(transform);
+        let view = camera.view_matrix(); //model.inverse_transform().unwrap();
         let view_proj = proj * view;
         let inv_view_proj = view_proj.inverse_transform().unwrap();
 

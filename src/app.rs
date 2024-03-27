@@ -294,13 +294,16 @@ impl App {
                 if self.game_state == GameState::Playing {
                     inputs.movement = self.inputs.get_move();
 
+                    camera.rotate(self.inputs.mouse_dx, self.inputs.mouse_dy);
+                    camera.sync_transform(transforms);
+
                     // rotate camera
-                    let transform = transforms.get_transform_mut(&camera.transform).unwrap();
-                    transform.set_rotation(crate::game_objects::Camera::rotate(
-                        transform.get_local_transform().rotation,
-                        self.inputs.mouse_dx,
-                        self.inputs.mouse_dy,
-                    ));
+                    // let transform = transforms.get_transform_mut(&camera.transform).unwrap();
+                    // transform.set_rotation(crate::game_objects::Camera::rotate(
+                    //     transform.get_local_transform().rotation,
+                    //     self.inputs.mouse_dx,
+                    //     self.inputs.mouse_dy,
+                    // ));
                 }
                 self.inputs.mouse_dx = 0.;
                 self.inputs.mouse_dy = 0.;
@@ -320,8 +323,8 @@ impl App {
                 }
 
                 // camera data
-                let cam_model = transforms.get_slerp_model(&camera.transform).unwrap();
-                let global_data = GPUGlobalData::from_camera(camera, cam_model, extends);
+                // let cam_model = transforms.get_slerp_model(&camera.transform).unwrap();
+                let global_data = GPUGlobalData::from_camera(camera, extends);
 
                 // update render objects
                 let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query()

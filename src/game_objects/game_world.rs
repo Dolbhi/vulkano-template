@@ -1,4 +1,4 @@
-use cgmath::{InnerSpace, Quaternion, Rad, Rotation, Rotation3, Vector3, Zero};
+use cgmath::{InnerSpace, Quaternion, Rotation, Rotation3, Vector3, Zero};
 
 use super::{
     transform::{Transform, TransformID, TransformSystem},
@@ -62,10 +62,7 @@ impl GameWorld {
     pub fn new() -> Self {
         let mut transforms = TransformSystem::new();
         let mut world = World::default();
-        let camera = Camera {
-            fov: Rad(1.2),
-            transform: transforms.next().unwrap(),
-        };
+        let camera = Camera::from_transform(transforms.next().unwrap());
         world.push((camera.transform,));
 
         Self {
@@ -117,10 +114,7 @@ impl GameWorld {
     pub fn clear(&mut self) {
         self.world.clear();
         self.transforms = TransformSystem::new();
-        self.camera = Camera {
-            fov: Rad(1.2),
-            transform: self.transforms.next().unwrap(),
-        };
+        self.camera = Camera::from_transform(self.transforms.next().unwrap());
         self.world.push((self.camera.transform,));
     }
 }

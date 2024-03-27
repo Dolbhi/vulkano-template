@@ -3,7 +3,7 @@ use std::{
     time::Instant,
 };
 
-use cgmath::{Matrix3, Matrix4, One, Quaternion, SquareMatrix, Vector3, VectorSpace, Zero};
+use cgmath::{Matrix4, One, Quaternion, SquareMatrix, Vector3, VectorSpace, Zero};
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct TransformID(u32);
@@ -226,39 +226,39 @@ impl TransformSystem {
         //         );
         //     }
     }
-    pub fn get_slerp_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
-        let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
-        let last_model = transform.last_model;
-        let parent_model = match transform.parent {
-            Some(parent_id) => self.get_global_model(&parent_id)?,
-            None => Matrix4::identity(),
-        };
-        let model = match last_model {
-            None => self
-                .transforms
-                .get_mut(id)
-                .ok_or(TransformError::IDNotFound)?
-                .clean(&parent_model),
-            Some(last_model) => {
-                let view = self.transforms.get(id).unwrap().get_local_transform();
+    // pub fn get_slerp_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
+    //     let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
+    //     let last_model = transform.last_model;
+    //     let parent_model = match transform.parent {
+    //         Some(parent_id) => self.get_global_model(&parent_id)?,
+    //         None => Matrix4::identity(),
+    //     };
+    //     let model = match last_model {
+    //         None => self
+    //             .transforms
+    //             .get_mut(id)
+    //             .ok_or(TransformError::IDNotFound)?
+    //             .clean(&parent_model),
+    //         Some(last_model) => {
+    //             let view = self.transforms.get(id).unwrap().get_local_transform();
 
-                let last_rot: Quaternion<f32> = Matrix3::from_cols(
-                    last_model[0].truncate(),
-                    last_model[1].truncate(),
-                    last_model[2].truncate(),
-                )
-                .into();
-                let last_pos = last_model[3].truncate() / last_model[3][3];
+    //             let last_rot: Quaternion<f32> = Matrix3::from_cols(
+    //                 last_model[0].truncate(),
+    //                 last_model[1].truncate(),
+    //                 last_model[2].truncate(),
+    //             )
+    //             .into();
+    //             let last_pos = last_model[3].truncate() / last_model[3][3];
 
-                let lerp_rot = last_rot.slerp(*view.rotation, self.interpolation);
-                let lerp_pos = last_pos.lerp(*view.translation, self.interpolation);
+    //             let lerp_rot = last_rot.slerp(*view.rotation, self.interpolation);
+    //             let lerp_pos = last_pos.lerp(*view.translation, self.interpolation);
 
-                parent_model * Matrix4::from_translation(lerp_pos) * Matrix4::from(lerp_rot)
-            }
-        };
+    //             parent_model * Matrix4::from_translation(lerp_pos) * Matrix4::from(lerp_rot)
+    //         }
+    //     };
 
-        Ok(model)
-    }
+    //     Ok(model)
+    // }
 
     /// Flag the global model of the corresponding transform and all its children as dirty
     ///
