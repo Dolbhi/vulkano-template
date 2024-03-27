@@ -169,6 +169,9 @@ impl TransformSystem {
         self.interpolation = (self.last_fixed_time.elapsed().as_secs_f32() / delta_time).min(1.);
         self.interpolation
     }
+    pub fn interpolation(&self) -> f32 {
+        self.interpolation
+    }
 
     pub fn get_global_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
         let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
