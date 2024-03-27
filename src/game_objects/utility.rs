@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use cgmath::{Vector3, Zero};
+use cgmath::{InnerSpace, Vector3, Zero};
 
 pub struct VectorDamp {
     last_time: Instant,
@@ -19,12 +19,15 @@ impl VectorDamp {
     pub fn smooth_follow(&mut self, current: Vector3<f32>, target: Vector3<f32>) -> Vector3<f32> {
         let difference = current - target;
 
-        self.current_velocity -=
-            self.strength * (2. * self.current_velocity + self.strength * difference);
-
         let elapsed_time = self.last_time.elapsed().as_secs_f32();
         self.last_time = Instant::now();
 
-        current + self.current_velocity * elapsed_time
+        self.current_velocity -= self.strength
+            * (2. * self.current_velocity + self.strength * difference)
+            * elapsed_time;
+
+        let delta_pos = self.current_velocity * elapsed_time;
+
+        current + delta_pos
     }
 }
