@@ -5,8 +5,6 @@ use std::{
 
 use cgmath::{Matrix3, Matrix4, One, Quaternion, SquareMatrix, Vector3, VectorSpace, Zero};
 
-use crate::app::FIXED_DELTA_TIME;
-
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct TransformID(u32);
 
@@ -167,9 +165,8 @@ impl TransformSystem {
     pub fn update_last_fixed(&mut self) {
         self.last_fixed_time = Instant::now();
     }
-    pub fn update_interpolation(&mut self) -> f32 {
-        self.interpolation =
-            (self.last_fixed_time.elapsed().as_secs_f32() / FIXED_DELTA_TIME).min(1.);
+    pub fn update_interpolation(&mut self, delta_time: f32) -> f32 {
+        self.interpolation = (self.last_fixed_time.elapsed().as_secs_f32() / delta_time).min(1.);
         self.interpolation
     }
 

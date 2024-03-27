@@ -54,6 +54,7 @@ pub struct GameWorld {
     pub world: World,
     pub camera: Camera,
     pub fixed_seconds: f32,
+    pub last_delta_time: f32,
     pub inputs: Inputs,
 }
 
@@ -72,12 +73,14 @@ impl GameWorld {
             world,
             camera,
             fixed_seconds: 0.,
+            last_delta_time: 0.,
             inputs: Inputs::default(),
         }
     }
 
     /// update world logic with a time step
     pub fn update(&mut self, seconds_passed: f32) {
+        self.last_delta_time = seconds_passed;
         self.fixed_seconds += seconds_passed;
 
         // update interpolation models

@@ -287,10 +287,11 @@ impl App {
                     transforms,
                     camera,
                     fixed_seconds,
+                    last_delta_time,
                     inputs,
                     ..
                 } = &mut *self.world.lock().unwrap();
-                transforms.update_interpolation();
+                transforms.update_interpolation(*last_delta_time);
 
                 // sync inputs
                 if self.game_state == GameState::Playing {
@@ -439,7 +440,7 @@ impl App {
     }
 }
 
-pub const FIXED_DELTA_TIME: f32 = 0.02;
+const FIXED_DELTA_TIME: f32 = 0.02;
 
 struct GameWorldThread {
     thread: JoinHandle<()>,
