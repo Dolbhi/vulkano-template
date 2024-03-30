@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{collections::VecDeque, time::Instant};
 
 use cgmath::{Vector3, Zero};
 
@@ -53,5 +53,49 @@ impl VectorDamp {
     pub fn reset_last_time(&mut self) {
         self.last_time = Instant::now();
         self.velocity = Vector3::zero();
+    }
+}
+
+pub struct IDCollection<T> {
+    collection: Vec<T>,
+    missing: VecDeque<usize>,
+    next_id: usize,
+}
+impl<T> IDCollection<T> {
+    pub fn new() -> Self {
+        Self {
+            collection: vec![],
+            missing: VecDeque::new(),
+            next_id: 0,
+        }
+    }
+
+    pub fn push(&mut self, item: impl Into<T>) -> usize {
+        match self.missing.pop_front() {
+            Some(id) => {
+                *self.collection.get_mut(id).unwrap() = item.into();
+                id
+            }
+            None => {
+                self.collection.push(item.into());
+                self.next_id += 1;
+                self.next_id - 1
+            }
+        }
+    }
+    pub fn remove(&mut self, id: usize) {
+        self.missing.push_back(id);
+    }
+
+    pub fn get(&self, id: usize) -> &T {
+        &self.collection[id]
+    }
+    pub fn get_mut(&mut self, id: usize) -> &mut T {
+        &mut self.collection[id]
+    }
+}
+impl<T: Default> IDCollection<T> {
+    pub fn push_default(&mut self) -> usize {
+        self.push(T::default())
     }
 }

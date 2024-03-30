@@ -45,6 +45,7 @@ struct InputState {
     s: KeyState,
     d: KeyState,
     q: KeyState,
+    r: KeyState,
     space: KeyState,
     shift: KeyState,
     escape: KeyState,
@@ -94,6 +95,7 @@ pub struct App {
     inputs: InputState,
     game_state: GameState,
     last_frame_time: Instant,
+    current_level: i32,
 }
 
 impl App {
@@ -126,37 +128,43 @@ impl App {
             game_thread,
             game_state: Default::default(),
             last_frame_time: Instant::now(),
+            current_level: -1,
         }
     }
 
     fn load_level(&mut self, id: i32) -> Result<(), String> {
+        // let load_start = Instant::now();
+
+        // println!(
+        //     "[Benchmarking] retrived world lock:    {} ms",
+        //     load_start.elapsed().as_millis(),
+        // );
         let load_start = Instant::now();
+
+        let loader = match id {
+            0 => init_world,
+            1 => init_ui_test,
+            2 => init_phys_test,
+            _ => {
+                return Err(format!("Tried to load invalid level id: {id}"));
+            }
+        };
+
+        let world = &mut *self.world.lock().unwrap();
+        world.clear();
         let resources = &mut self.resources.begin_retrieving(
             &self.render_loop.context,
             &mut self.renderer.lit_draw_system,
             &mut self.renderer.unlit_draw_system,
         );
-
         let GameWorld {
             world,
             transforms,
             camera,
             ..
-        } = &mut *self.world.lock().unwrap();
-        println!(
-            "[Benchmarking] retrived world lock:    {} ms",
-            load_start.elapsed().as_millis(),
-        );
-        let load_start = Instant::now();
+        } = world;
+        loader(world, transforms, resources);
 
-        match id {
-            0 => init_world(world, transforms, resources),
-            1 => init_ui_test(world, transforms, resources),
-            2 => init_phys_test(world, transforms, resources),
-            _ => {
-                return Err(format!("Tried to load invalid level id: {id}"));
-            }
-        }
         // camera light, child of the camera
         let camera_light = transforms.add_transform(
             TransformCreateInfo::default()
@@ -171,6 +179,8 @@ impl App {
                 half_radius: 4.,
             },
         ));
+
+        self.current_level = id;
 
         println!(
             "[Benchmarking] level load time:        {} ms",
@@ -377,6 +387,14 @@ impl App {
             VirtualKeyCode::Q => {
                 self.inputs.q_triggered = state == Pressed && self.inputs.q == Released;
                 self.inputs.q = state;
+            }
+            VirtualKeyCode::R => {
+                if state == Pressed && self.inputs.r == Released {
+                    if self.game_state == GameState::Playing {
+                        let _ = self.load_level(self.current_level);
+                    }
+                }
+                self.inputs.r = state;
             }
             VirtualKeyCode::W => self.inputs.w = state,
             VirtualKeyCode::A => self.inputs.a = state,

@@ -1,3 +1,4 @@
+mod collider;
 mod geo_alg;
 // mod geo_alg_com;
 
