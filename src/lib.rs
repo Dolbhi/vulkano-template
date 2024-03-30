@@ -1,5 +1,6 @@
 pub mod app;
 pub mod game_objects;
+mod physics;
 pub mod prefabs;
 pub mod profiler;
 pub mod render;

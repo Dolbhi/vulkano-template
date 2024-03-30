@@ -1,5 +1,7 @@
 use cgmath::{InnerSpace, Quaternion, Rotation, Rotation3, Vector3, Zero};
 
+use crate::physics::RigidBody;
+
 use super::{
     transform::{Transform, TransformID, TransformSystem},
     Camera, Rotate,
@@ -79,6 +81,15 @@ impl GameWorld {
     pub fn update(&mut self, seconds_passed: f32) {
         self.last_delta_time = seconds_passed;
         self.fixed_seconds += seconds_passed;
+
+        // physics update
+        let mut query = <(&TransformID, &mut RigidBody)>::query();
+        for (transfrom, rigid_body) in query.iter_mut(&mut self.world) {
+            rigid_body.update(
+                self.transforms.get_transform_mut(transfrom).unwrap(),
+                seconds_passed,
+            );
+        }
 
         // update interpolation models
         let mut query = <&TransformID>::query();

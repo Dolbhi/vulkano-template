@@ -9,6 +9,7 @@ use crate::{
         transform::{TransformCreateInfo, TransformSystem},
         MaterialSwapper, Rotate,
     },
+    physics::RigidBody,
     render::{
         resource_manager::{MaterialID, MeshID, ResourceRetriever, TextureID},
         RenderObject,
@@ -223,5 +224,13 @@ pub fn init_phys_test(
 
     let cube_trans =
         transform_sys.add_transform(TransformCreateInfo::default().set_translation([0., 1., 0.]));
-    world.push((cube_trans, RenderObject::new(cube_mesh, green_mat)));
+    let rigid_body = RigidBody {
+        velocity: (1.0, 10.0, 0.0).into(),
+        bivelocity: (0.0, 0.0, -5.0).into(),
+    };
+    world.push((
+        cube_trans,
+        RenderObject::new(cube_mesh, green_mat),
+        rigid_body,
+    ));
 }
