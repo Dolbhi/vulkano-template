@@ -47,6 +47,10 @@ impl Transform {
         }
     }
 
+    pub fn is_dirty(&self) -> bool {
+        self.global_model == None
+    }
+
     pub fn mutate(
         &mut self,
         modification: impl FnOnce(&mut Vector3<f32>, &mut Quaternion<f32>, &mut Vector3<f32>),
