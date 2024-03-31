@@ -13,12 +13,39 @@ use super::Vector;
 
 #[cfg(test)]
 mod coll_tests {
-    use crate::game_objects::transform::TransformSystem;
+    use crate::{game_objects::transform::TransformSystem, physics::collider::remove};
 
-    use super::ColliderSystem;
+    use super::{ColliderSystem, Node};
+
+    fn validate_tree(node: &Node, right_child: bool) -> Result<i32, String> {
+        match node {
+            Node::None => Ok(0),
+            Node::Leaf(leaf) => {
+                let leaf_lock = leaf.lock().unwrap();
+                if leaf_lock.right_child != right_child {
+                    return Err("Right child flag set incorrectly".to_string());
+                }
+                Ok(0)
+            }
+            Node::Branch(branch) => {
+                let branch_lock = branch.lock().unwrap();
+                let left_depth = validate_tree(&branch_lock.left.1, false)?;
+                let right_depth = validate_tree(&branch_lock.right.1, true)?;
+
+                if branch_lock.balance != right_depth - left_depth {
+                    return Err("Balance set incorrectly".to_string());
+                }
+                if branch_lock.right_child != right_child {
+                    return Err("Right child flag set incorrectly".to_string());
+                }
+
+                Ok(right_depth.max(left_depth + 1))
+            }
+        }
+    }
 
     #[test]
-    fn single_collider() {
+    fn insert_test() {
         let mut trans = TransformSystem::new();
         let mut colls = ColliderSystem {
             collider_root: super::Node::None,
@@ -33,20 +60,71 @@ mod coll_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        let first = colls.insert(super::CuboidCollider {
+        colls.insert(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
         });
-        let second = colls.insert(super::CuboidCollider {
+        colls.insert(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
         });
-        let third = colls.insert(super::CuboidCollider {
+        colls.insert(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
         });
 
-        assert_eq!(1, 2, "{:#?}", colls.collider_root);
+        let validation = validate_tree(&colls.collider_root, true);
+
+        assert_eq!(
+            validation,
+            Ok(2),
+            "Validation Result: {:?}, Tree: \n{:#?}",
+            validation,
+            colls.collider_root
+        );
+        assert_eq!("ALL", "GOOD", "Tree: \n{:#?}", colls.collider_root);
+    }
+    #[test]
+    fn remove_test() {
+        let mut trans = TransformSystem::new();
+        let mut colls = ColliderSystem {
+            collider_root: super::Node::None,
+        };
+
+        let crap_box = super::BoundingBox {
+            max: (1.0, 1.0, 1.0).into(),
+            min: (0.0, 0.0, 0.0).into(),
+        };
+        let box_2 = super::BoundingBox {
+            max: (2.0, 2.0, 2.0).into(),
+            min: (1.0, 1.0, 1.0).into(),
+        };
+
+        colls.insert(super::CuboidCollider {
+            transform: trans.next().unwrap(),
+            bounding_box: crap_box,
+        });
+        let to_remove = colls.insert(super::CuboidCollider {
+            transform: trans.next().unwrap(),
+            bounding_box: box_2,
+        });
+        colls.insert(super::CuboidCollider {
+            transform: trans.next().unwrap(),
+            bounding_box: box_2,
+        });
+
+        remove(&to_remove);
+
+        let validation = validate_tree(&colls.collider_root, true);
+
+        assert_eq!(
+            validation,
+            Ok(1),
+            "Validation Result: {:?}, Tree: \n{:#?}",
+            validation,
+            colls.collider_root
+        );
+        assert_eq!("ALL", "GOOD", "Tree: \n{:#?}", colls.collider_root);
     }
 }
 
@@ -193,11 +271,18 @@ impl Debug for Node {
     }
 }
 
-#[derive(Debug)]
 struct Leaf {
     parent: Weak<Mutex<Branch>>,
     right_child: bool,
     collider: CuboidCollider,
+}
+impl Debug for Leaf {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Leaf")
+            .field("right_child", &self.right_child)
+            .field("collider", &self.collider)
+            .finish()
+    }
 }
 
 struct Branch {
@@ -236,11 +321,10 @@ impl Branch {
 impl Debug for Branch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Branch")
-            .field("parent", &self.parent)
             .field("right_child", &self.right_child)
+            .field("balance", &self.balance)
             .field("left", &self.left.1)
             .field("right", &self.right.1)
-            .field("balance", &self.balance)
             .finish()
     }
 }
@@ -320,11 +404,15 @@ fn insert_branch(branch: &mut Branch, collider: CuboidCollider) -> Arc<Mutex<Lea
 fn remove(leaf: &Arc<Mutex<Leaf>>) -> Option<Node> {
     let leaf_lock = leaf.lock().unwrap();
     if let Some(parent) = leaf_lock.parent.upgrade() {
-        let parent = Arc::into_inner(parent).unwrap().into_inner().unwrap();
+        let mut parent = parent.lock().unwrap();
         let sibling = if leaf_lock.right_child {
-            parent.right
+            let bounds = parent.right.0;
+            let node = std::mem::take(&mut parent.right.1);
+            (bounds, node)
         } else {
-            parent.left
+            let bounds = parent.left.0;
+            let node = std::mem::take(&mut parent.left.1);
+            (bounds, node)
         };
 
         if let Some(grandparent) = parent.parent.upgrade() {
