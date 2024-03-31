@@ -7,6 +7,11 @@ use cgmath::{Matrix4, One, Quaternion, SquareMatrix, Vector3, VectorSpace, Zero}
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct TransformID(u32);
+impl TransformID {
+    pub fn id(&self) -> u32 {
+        self.0
+    }
+}
 
 #[derive(Clone)]
 pub struct Transform {
