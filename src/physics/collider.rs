@@ -15,28 +15,24 @@ use super::Vector;
 mod coll_tests {
     use crate::{game_objects::transform::TransformSystem, physics::collider::remove};
 
-    use super::{ColliderSystem, Node};
+    use super::{BoundingBox, ColliderSystem, Node};
 
-    fn validate_tree(node: &Node, right_child: bool) -> Result<i32, String> {
-        match node {
+    fn validate_tree(child: &(BoundingBox, Node)) -> Result<i32, String> {
+        match &child.1 {
             Node::None => Ok(0),
-            Node::Leaf(leaf) => {
-                let leaf_lock = leaf.lock().unwrap();
-                if leaf_lock.right_child != right_child {
-                    return Err("Right child flag set incorrectly".to_string());
-                }
-                Ok(0)
-            }
+            Node::Leaf(_) => Ok(0),
             Node::Branch(branch) => {
                 let branch_lock = branch.lock().unwrap();
-                let left_depth = validate_tree(&branch_lock.left.1, false)?;
-                let right_depth = validate_tree(&branch_lock.right.1, true)?;
+
+                if child.0 != branch_lock.bounds() {
+                    return Err("Bounds set incorrectly".to_string());
+                }
+
+                let left_depth = validate_tree(&branch_lock.left)?;
+                let right_depth = validate_tree(&branch_lock.right)?;
 
                 if branch_lock.balance != right_depth - left_depth {
                     return Err("Balance set incorrectly".to_string());
-                }
-                if branch_lock.right_child != right_child {
-                    return Err("Right child flag set incorrectly".to_string());
                 }
 
                 Ok(right_depth.max(left_depth + 1))
@@ -47,9 +43,7 @@ mod coll_tests {
     #[test]
     fn insert_test() {
         let mut trans = TransformSystem::new();
-        let mut colls = ColliderSystem {
-            collider_root: super::Node::None,
-        };
+        let mut colls = ColliderSystem::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -73,23 +67,15 @@ mod coll_tests {
             bounding_box: box_2,
         });
 
-        let validation = validate_tree(&colls.collider_root, true);
-
-        assert_eq!(
-            validation,
-            Ok(2),
-            "Validation Result: {:?}, Tree: \n{:#?}",
-            validation,
-            colls.collider_root
-        );
-        assert_eq!("ALL", "GOOD", "Tree: \n{:#?}", colls.collider_root);
+        let validate_start = (crap_box.join(box_2), colls.collider_root);
+        let validation = validate_tree(&validate_start);
+        assert_eq!(validation, Ok(2), "Tree: \n{:#?}", validate_start.1);
+        assert_eq!("ALL", "GOOD", "Tree: \n{:#?}", validate_start.1);
     }
     #[test]
     fn remove_test() {
         let mut trans = TransformSystem::new();
-        let mut colls = ColliderSystem {
-            collider_root: super::Node::None,
-        };
+        let mut colls = ColliderSystem::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -115,20 +101,14 @@ mod coll_tests {
 
         remove(&to_remove);
 
-        let validation = validate_tree(&colls.collider_root, true);
-
-        assert_eq!(
-            validation,
-            Ok(1),
-            "Validation Result: {:?}, Tree: \n{:#?}",
-            validation,
-            colls.collider_root
-        );
-        assert_eq!("ALL", "GOOD", "Tree: \n{:#?}", colls.collider_root);
+        let validate_start = (crap_box.join(box_2), colls.collider_root);
+        let validation = validate_tree(&validate_start);
+        assert_eq!(validation, Ok(1), "Tree: \n{:#?}", validate_start.1);
+        assert_eq!("ALL", "GOOD", "Tree: \n{:#?}", validate_start.1);
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct BoundingBox {
     pub max: Vector,
     pub min: Vector,
@@ -225,18 +205,24 @@ pub struct ColliderSystem {
     collider_root: Node,
 }
 impl ColliderSystem {
+    pub fn new() -> Self {
+        Self {
+            collider_root: Node::None,
+        }
+    }
+
     pub fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
         let (new_root, new_leaf) = match std::mem::take(&mut self.collider_root) {
             Node::None => {
                 let new_leaf = Arc::new(Mutex::new(Leaf {
                     parent: Weak::new(),
-                    right_child: true,
+                    // right_child: true,
                     collider,
                 }));
                 (Node::Leaf(new_leaf.clone()), new_leaf)
             }
             Node::Leaf(leaf) => {
-                let (new_branch, new_leaf) = insert_leaf(leaf, collider, true);
+                let (new_branch, new_leaf) = insert_leaf(leaf, collider); //right: bool
                 (Node::Branch(new_branch), new_leaf)
             }
             Node::Branch(branch) => {
@@ -254,12 +240,36 @@ impl ColliderSystem {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 enum Node {
     #[default]
     None,
     Leaf(Arc<Mutex<Leaf>>),
     Branch(Arc<Mutex<Branch>>),
+}
+impl Node {
+    fn ptr_eq(&self, other: &Node) -> bool {
+        match (self, other) {
+            (Node::None, Node::None) => true,
+            (Node::Leaf(a), Node::Leaf(b)) => Arc::ptr_eq(a, b),
+            (Node::Branch(a), Node::Branch(b)) => Arc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+    fn leaf_eq(&self, other: &Arc<Mutex<Leaf>>) -> bool {
+        if let Node::Leaf(this) = self {
+            Arc::ptr_eq(this, other)
+        } else {
+            false
+        }
+    }
+    fn branch_eq(&self, other: &Arc<Mutex<Branch>>) -> bool {
+        if let Node::Branch(this) = self {
+            Arc::ptr_eq(this, other)
+        } else {
+            false
+        }
+    }
 }
 impl Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -273,13 +283,13 @@ impl Debug for Node {
 
 struct Leaf {
     parent: Weak<Mutex<Branch>>,
-    right_child: bool,
+    // right_child: bool,
     collider: CuboidCollider,
 }
 impl Debug for Leaf {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Leaf")
-            .field("right_child", &self.right_child)
+            // .field("right_child", &self.right_child)
             .field("collider", &self.collider)
             .finish()
     }
@@ -287,7 +297,7 @@ impl Debug for Leaf {
 
 struct Branch {
     parent: Weak<Mutex<Branch>>,
-    right_child: bool,
+    // right_child: bool,
     left: (BoundingBox, Node),
     right: (BoundingBox, Node),
     balance: i32,
@@ -298,30 +308,58 @@ impl Branch {
     }
 
     /// update bounds and balance of parents of removed child
-    fn update_removal(&mut self, bounds: BoundingBox, right_child: bool) {
-        self.mut_child(right_child).0 = bounds;
-        self.balance -= if right_child { 1 } else { -1 };
+    fn update_removal(
+        parent: &Arc<Mutex<Branch>>,
+        bounds: BoundingBox,
+        removed_origin: &Arc<Mutex<Branch>>,
+    ) {
+        let mut lock = parent.lock().unwrap();
 
-        if let Some(parent) = self.parent.upgrade() {
-            parent
-                .lock()
-                .unwrap()
-                .update_removal(self.bounds(), self.right_child);
-        }
-    }
-
-    fn mut_child(&mut self, right_child: bool) -> &mut (BoundingBox, Node) {
-        if right_child {
-            &mut self.right
+        // update child and self
+        if lock.right.1.branch_eq(removed_origin) {
+            lock.right.0 = bounds;
+            lock.balance -= 1;
         } else {
-            &mut self.left
+            lock.left.0 = bounds;
+            lock.balance += 1;
+        }
+
+        // propergate to parent if it exists
+        if let Some(next_parent) = lock.parent.upgrade() {
+            Self::update_removal(&next_parent, lock.bounds(), parent);
         }
     }
+    /// update bounds and balance of parents of removed child
+    fn update_removal_bool(parent: &Arc<Mutex<Branch>>, bounds: BoundingBox, removed_origin: bool) {
+        let mut lock = parent.lock().unwrap();
+
+        // update child and self
+        if removed_origin {
+            lock.right.0 = bounds;
+            lock.balance -= 1;
+        } else {
+            lock.left.0 = bounds;
+            lock.balance += 1;
+        }
+
+        // propergate to parent if it exists
+        if let Some(next_parent) = lock.parent.upgrade() {
+            Self::update_removal(&next_parent, lock.bounds(), parent);
+        }
+    }
+
+    // fn mut_child(&mut self, right_child: bool) -> &mut (BoundingBox, Node) {
+    //     if right_child {
+    //         &mut self.right
+    //     } else {
+    //         &mut self.left
+    //     }
+    // }
 }
 impl Debug for Branch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Branch")
-            .field("right_child", &self.right_child)
+            // .field("right_child", &self.right_child)
             .field("balance", &self.balance)
             .field("left", &self.left.1)
             .field("right", &self.right.1)
@@ -332,13 +370,13 @@ impl Debug for Branch {
 fn insert_leaf(
     leaf: Arc<Mutex<Leaf>>,
     collider: CuboidCollider,
-    right_child: bool,
+    // right_child: bool,
 ) -> (Arc<Mutex<Branch>>, Arc<Mutex<Leaf>>) {
     let mut new_leaf: Option<Arc<Mutex<Leaf>>> = None;
 
     let new_branch = Arc::new_cyclic(|new_parent| {
         let mut leaf_lock = leaf.lock().unwrap();
-        leaf_lock.right_child = true;
+        // leaf_lock.right_child = true;
         let parent = std::mem::replace(&mut leaf_lock.parent, new_parent.clone());
         let bounding_box = leaf_lock.collider.bounding_box;
         drop(leaf_lock);
@@ -346,14 +384,14 @@ fn insert_leaf(
         let new_bounds = collider.bounding_box;
         let leaf_node = Arc::new(Mutex::new(Leaf {
             parent: new_parent.clone(),
-            right_child: false,
+            // right_child: false,
             collider,
         }));
         new_leaf = Some(leaf_node.clone());
 
         Mutex::new(Branch {
             parent,
-            right_child,
+            // right_child,
             left: (new_bounds, Node::Leaf(leaf_node)),
             right: (bounding_box, Node::Leaf(leaf)),
             balance: 0,
@@ -374,7 +412,7 @@ fn insert_branch(branch: &mut Branch, collider: CuboidCollider) -> Arc<Mutex<Lea
         branch.balance -= 1;
         match std::mem::take(&mut branch.left.1) {
             Node::Leaf(leaf) => {
-                let (new_branch, new_leaf) = insert_leaf(leaf, collider, false);
+                let (new_branch, new_leaf) = insert_leaf(leaf, collider); //right: false
                 branch.left.1 = Node::Branch(new_branch);
                 new_leaf
             }
@@ -388,7 +426,7 @@ fn insert_branch(branch: &mut Branch, collider: CuboidCollider) -> Arc<Mutex<Lea
         branch.balance += 1;
         match std::mem::take(&mut branch.right.1) {
             Node::Leaf(leaf) => {
-                let (new_branch, new_leaf) = insert_leaf(leaf, collider, true);
+                let (new_branch, new_leaf) = insert_leaf(leaf, collider); //right: true
                 branch.right.1 = Node::Branch(new_branch);
                 new_leaf
             }
@@ -404,27 +442,32 @@ fn insert_branch(branch: &mut Branch, collider: CuboidCollider) -> Arc<Mutex<Lea
 fn remove(leaf: &Arc<Mutex<Leaf>>) -> Option<Node> {
     let leaf_lock = leaf.lock().unwrap();
     if let Some(parent) = leaf_lock.parent.upgrade() {
-        let mut parent = parent.lock().unwrap();
-        let sibling = if leaf_lock.right_child {
-            let bounds = parent.right.0;
-            let node = std::mem::take(&mut parent.right.1);
-            (bounds, node)
+        let parent_lock = parent.lock().unwrap();
+        // get sibling of removed
+        let (bounds, sibling) = if parent_lock.right.1.leaf_eq(leaf) {
+            parent_lock.right.clone()
         } else {
-            let bounds = parent.left.0;
-            let node = std::mem::take(&mut parent.left.1);
-            (bounds, node)
+            parent_lock.left.clone()
         };
 
-        if let Some(grandparent) = parent.parent.upgrade() {
+        if let Some(grandparent) = parent_lock.parent.upgrade() {
             let mut grand_lock = grandparent.lock().unwrap();
-            *grand_lock.mut_child(parent.right_child) = sibling;
-            grand_lock.balance -= if parent.right_child { 1 } else { -1 };
-            let bounds = grand_lock.right.0.join(grand_lock.left.0);
-            grand_lock.update_removal(bounds, parent.right_child);
+
+            // find parent to replace
+            let right = grand_lock.right.1.branch_eq(&parent);
+            if right {
+                grand_lock.right = (bounds, sibling);
+            } else {
+                grand_lock.left = (bounds, sibling);
+            }
+
+            drop(grand_lock);
+
+            Branch::update_removal_bool(&grandparent, bounds, right);
 
             None
         } else {
-            Some(sibling.1)
+            Some(sibling)
         }
     } else {
         Some(Node::None)
