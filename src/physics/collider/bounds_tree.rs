@@ -333,7 +333,7 @@ impl BoundsTree {
     }
 }
 
-trait Node: Debug {
+trait Node: Debug + Send + Sync {
     fn parent(&self) -> &Weak<Mutex<Branch>>;
     fn right_child(&self) -> ChildSide;
     fn set_parent(&mut self, parent: Weak<Mutex<Branch>>, right_child: ChildSide);

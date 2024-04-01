@@ -1,6 +1,6 @@
 use cgmath::{InnerSpace, Quaternion, Rotation, Rotation3, Vector3, Zero};
 
-use crate::physics::RigidBody;
+use crate::physics::{ColliderSystem, RigidBody};
 
 use super::{
     transform::{Transform, TransformID, TransformSystem},
@@ -53,6 +53,7 @@ impl Inputs {
 
 pub struct GameWorld {
     pub transforms: TransformSystem,
+    pub colliders: ColliderSystem,
     pub world: World,
     pub camera: Camera,
     pub fixed_seconds: f32,
@@ -63,12 +64,16 @@ pub struct GameWorld {
 impl GameWorld {
     pub fn new() -> Self {
         let mut transforms = TransformSystem::new();
+        let colliders = ColliderSystem::new();
         let mut world = World::default();
         let camera = Camera::from_transform(transforms.next().unwrap());
         world.push((camera.transform,));
 
+        // colliders.
+
         Self {
             transforms,
+            colliders,
             world,
             camera,
             fixed_seconds: 0.,
@@ -123,9 +128,10 @@ impl GameWorld {
 
     /// clear the world and transforms and reset the camera
     pub fn clear(&mut self) {
-        self.world.clear();
-        self.transforms = TransformSystem::new();
-        self.camera = Camera::from_transform(self.transforms.next().unwrap());
-        self.world.push((self.camera.transform,));
+        *self = Self::new();
+        // self.world.clear();
+        // self.transforms = TransformSystem::new();
+        // self.camera = Camera::from_transform(self.transforms.next().unwrap());
+        // self.world.push((self.camera.transform,));
     }
 }

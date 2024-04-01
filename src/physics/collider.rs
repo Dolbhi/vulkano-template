@@ -1,14 +1,15 @@
 mod bounds_tree;
 
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    sync::{Arc, Mutex},
+};
 
-// use cgmath::Matrix4;
+use cgmath::{InnerSpace, Rotation, Zero};
 
-use cgmath::{InnerSpace, Rotation};
+use crate::game_objects::transform::{TransformID, TransformSystem, TransformView};
 
-use crate::game_objects::transform::{TransformID, TransformView};
-
-use self::bounds_tree::BoundsTree;
+use self::bounds_tree::{BoundsTree, Leaf};
 
 use super::Vector;
 
@@ -74,6 +75,14 @@ impl PartialEq for BoundingBox {
         min.magnitude2() < f32::EPSILON && max.magnitude2() < f32::EPSILON
     }
 }
+impl Default for BoundingBox {
+    fn default() -> Self {
+        Self {
+            max: Vector::zero(),
+            min: Vector::zero(),
+        }
+    }
+}
 
 const CUBE_BOUNDING: [Vector; 3] = [
     Vector {
@@ -121,5 +130,23 @@ impl ColliderSystem {
         Self {
             bounds_tree: BoundsTree::new(),
         }
+    }
+
+    pub fn add(&mut self, transform: TransformID) {
+        self.bounds_tree.insert(CuboidCollider {
+            transform,
+            bounding_box: Default::default(),
+        });
+    }
+    pub fn remove(&mut self, target: Arc<Mutex<Leaf>>) {
+        self.bounds_tree.remove(target);
+    }
+
+    pub fn update(&mut self, mut collider: CuboidCollider, transforms: TransformSystem) {
+        let view = transforms
+            .get_transform(&collider.transform)
+            .unwrap()
+            .get_local_transform();
+        collider.update_bounding(view);
     }
 }

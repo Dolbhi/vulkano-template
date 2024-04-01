@@ -2,6 +2,8 @@ mod collider;
 mod geo_alg;
 // mod geo_alg_com;
 
+pub use collider::ColliderSystem;
+
 use cgmath::Vector3;
 
 use crate::game_objects::transform::Transform;
