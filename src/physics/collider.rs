@@ -1,21 +1,18 @@
 mod bounds_tree;
 
-use std::{
-    fmt::Debug,
-    sync::{Arc, Mutex, Weak},
-};
+use std::fmt::Debug;
 
 // use cgmath::Matrix4;
 
-use cgmath::Rotation;
+use cgmath::{InnerSpace, Rotation};
 
-use crate::game_objects::transform::{TransformID, TransformSystem, TransformView};
+use crate::game_objects::transform::{TransformID, TransformView};
 
 use self::bounds_tree::BoundsTree;
 
 use super::Vector;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 struct BoundingBox {
     pub max: Vector,
     pub min: Vector,
@@ -67,6 +64,14 @@ impl BoundingBox {
     fn volume(&self) -> f32 {
         let extends = self.max - self.min;
         extends.x * extends.y * extends.z
+    }
+}
+impl PartialEq for BoundingBox {
+    fn eq(&self, other: &Self) -> bool {
+        let max = self.max - other.max;
+        let min = self.min - other.min;
+
+        min.magnitude2() < f32::EPSILON && max.magnitude2() < f32::EPSILON
     }
 }
 
