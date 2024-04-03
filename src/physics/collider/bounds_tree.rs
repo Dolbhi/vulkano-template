@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     fmt::Debug,
     ops::Not,
     sync::{Arc, Mutex, Weak},
@@ -16,7 +15,7 @@ mod tree_tests {
         physics::collider::{bounds_tree::BoundsTree, CuboidCollider},
     };
 
-    use super::{BoundingBox, ChildSide, Node, NodeChild};
+    use super::{ChildSide, Node, NodeChild};
 
     fn validate_tree(
         child: &NodeChild,
@@ -44,7 +43,9 @@ mod tree_tests {
             return Err("Incorrect parent".to_string());
         }
         if child.depth != lock.depth() {
-            return Err("Incorrect branch depth".to_string());
+            return Err(
+                format!("Incorrect depth: {:?} vs {:?}", child.depth, lock.depth()).to_string(),
+            );
         }
 
         if let Some(branch) = lock.try_into_branch() {
@@ -63,16 +64,20 @@ mod tree_tests {
         Ok(())
     }
 
-    fn assert_depth(root: Arc<Mutex<dyn Node>>) {
-        let node = root.lock().unwrap();
+    fn assert_valid_tree(root: &NodeChild) {
+        let mut root = root.clone();
+        {
+            let lock = root.node.lock().unwrap();
+            root.depth = lock.depth(); // manually validate root depth
+        }
+        let validation = validate_tree(&root, None, ChildSide::Right);
 
-        let validate_start = NodeChild::from_mutex_lock(&*node, &root);
-        drop(node);
-        let validation = validate_tree(&validate_start, None, ChildSide::Right);
-
-        let node = root.lock().unwrap();
-
-        assert_eq!(validation, Ok(()), "Tree: \n{:#?}", node);
+        assert!(
+            validation.is_ok(),
+            "Err: {:?}, \nTree: {:#?}",
+            validation,
+            root.node.lock().unwrap()
+        );
         // assert_eq!("ALL", "GOOD", "Tree: \n{:#?}", node);
     }
 
@@ -103,7 +108,7 @@ mod tree_tests {
             bounding_box: box_2,
         });
 
-        assert_depth(tree.root.unwrap());
+        assert_valid_tree(&tree.root.unwrap());
     }
     #[test]
     fn remove_test() {
@@ -134,7 +139,7 @@ mod tree_tests {
 
         tree.remove(to_remove);
 
-        assert_depth(tree.root.unwrap());
+        assert_valid_tree(&tree.root.unwrap());
     }
     #[test]
     fn big_tree() {
@@ -175,7 +180,7 @@ mod tree_tests {
             });
         }
 
-        assert_depth(tree.root.unwrap())
+        assert_valid_tree(&tree.root.unwrap())
     }
     #[test]
     fn big_remove() {
@@ -229,7 +234,7 @@ mod tree_tests {
         tree.remove(a);
         tree.remove(b);
 
-        assert_depth(tree.root.unwrap())
+        assert_valid_tree(&tree.root.unwrap())
     }
     #[test]
     fn remove_branch_root() {
@@ -255,7 +260,7 @@ mod tree_tests {
         });
 
         tree.remove(remove);
-        assert_depth(tree.root.unwrap());
+        assert_valid_tree(&tree.root.unwrap());
     }
     #[test]
     fn remove_leaf_root() {
@@ -307,13 +312,13 @@ impl NodeChild {
             depth,
         }
     }
-    fn from_mutex_lock(lock: &dyn Node, node: &Arc<Mutex<dyn Node>>) -> Self {
-        Self {
-            node: node.clone(),
-            bounds: lock.bounds(),
-            depth: lock.depth(),
-        }
-    }
+    // fn from_mutex_lock(lock: &dyn Node, node: &Arc<Mutex<dyn Node>>) -> Self {
+    //     Self {
+    //         node: node.clone(),
+    //         bounds: lock.bounds(),
+    //         depth: lock.depth(),
+    //     }
+    // }
 }
 
 fn arcmutex<T>(thing: T) -> Arc<Mutex<T>> {
@@ -321,7 +326,8 @@ fn arcmutex<T>(thing: T) -> Arc<Mutex<T>> {
 }
 
 pub struct BoundsTree {
-    root: Option<Arc<Mutex<dyn Node>>>,
+    /// Depth is invalid LOL
+    root: Option<NodeChild>,
 }
 impl BoundsTree {
     pub fn new() -> Self {
@@ -329,20 +335,22 @@ impl BoundsTree {
     }
 
     pub fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
-        match self.root.take() {
+        match &mut self.root {
             None => {
+                // empty root, make new leaf
+                let bounds = collider.bounding_box;
                 let new_leaf = arcmutex(Leaf {
                     parent: Weak::new(),
                     right_child: Right,
                     collider,
                 });
-                self.root = Some(new_leaf.clone());
+                self.root = Some(NodeChild::new(new_leaf.clone(), bounds, 0));
                 new_leaf
             }
-            Some(mut node) => {
-                let (_, new_leaf) = insert(&mut node, collider);
-                self.root = Some(node);
-                new_leaf
+            Some(node) => {
+                // existing root, use insert func
+                node.bounds = node.bounds.join(collider.bounding_box);
+                insert(node, collider)
             }
         }
     }
@@ -374,11 +382,8 @@ trait Node: Debug + Send + Sync {
 }
 
 /// returns new depth of tree_slot and arc of new leaf
-fn insert(
-    tree_slot: &mut Arc<Mutex<dyn Node>>,
-    collider: CuboidCollider,
-) -> (u32, Arc<Mutex<Leaf>>) {
-    let mut lock = tree_slot.lock().unwrap();
+fn insert(tree_slot: &mut NodeChild, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
+    let mut lock = tree_slot.node.lock().unwrap();
 
     // branch or leaf?
     if let Some(branch) = lock.try_into_branch_mut() {
@@ -400,23 +405,26 @@ fn insert(
             &mut branch.children[1]
         };
 
-        let mut result = insert(&mut next.node, collider);
-        next.depth = result.0;
-        result.0 = branch.depth();
+        let result = insert(next, collider);
+        tree_slot.depth = branch.depth();
+        // next.depth = result.0;
+        // result.0 = branch.depth();
         result
     } else {
+        // convert leaf to branch
         let mut fresh_leaf = None;
 
-        let branch = Arc::new_cyclic(|branch| {
+        let branch = Arc::new_cyclic(|new_branch| {
             let parent = lock.parent().clone();
             let right_child = lock.right_child();
 
-            lock.set_parent(branch.clone(), Right);
-            let new_right = NodeChild::from_mutex_lock(&*lock, &tree_slot);
+            lock.set_parent(new_branch.clone(), Right);
+            let mut new_right = tree_slot.clone();
+            new_right.bounds = lock.bounds();
 
             let new_bounds = collider.bounding_box;
             let new_leaf = Arc::new(Mutex::new(Leaf {
-                parent: branch.clone(),
+                parent: new_branch.clone(),
                 right_child: Left,
                 collider,
             }));
@@ -432,9 +440,10 @@ fn insert(
         });
 
         drop(lock);
-        *tree_slot = branch;
+        tree_slot.node = branch;
+        tree_slot.depth = 1;
 
-        (1, fresh_leaf.unwrap())
+        fresh_leaf.unwrap()
     }
 }
 
@@ -488,7 +497,7 @@ struct Branch {
 }
 impl Branch {
     /// If self has no parent, return the replacement instead
-    fn delete_child(&mut self, right_child: ChildSide) -> Option<Arc<Mutex<dyn Node>>> {
+    fn delete_child(&mut self, right_child: ChildSide) -> Option<NodeChild> {
         let replacement = self.children[1 - right_child as usize].clone();
 
         if let Some(parent) = self.parent.upgrade() {
@@ -510,7 +519,7 @@ impl Branch {
             }
             None
         } else {
-            Some(replacement.node)
+            Some(replacement)
         }
     }
     fn update_removed(&mut self, right_child: ChildSide, bounds: BoundingBox, depth: u32) {
