@@ -282,45 +282,6 @@ mod tree_tests {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ChildSide {
-    Left,
-    Right,
-}
-impl Not for ChildSide {
-    type Output = Self;
-    fn not(self) -> Self::Output {
-        match self {
-            Left => Right,
-            Right => Left,
-        }
-    }
-}
-use ChildSide::*;
-
-#[derive(Clone)]
-struct NodeChild {
-    node: Arc<Mutex<dyn Node>>,
-    bounds: BoundingBox,
-    depth: u32,
-}
-impl NodeChild {
-    fn new(node: Arc<Mutex<dyn Node>>, bounds: BoundingBox, depth: u32) -> Self {
-        Self {
-            node,
-            bounds,
-            depth,
-        }
-    }
-    // fn from_mutex_lock(lock: &dyn Node, node: &Arc<Mutex<dyn Node>>) -> Self {
-    //     Self {
-    //         node: node.clone(),
-    //         bounds: lock.bounds(),
-    //         depth: lock.depth(),
-    //     }
-    // }
-}
-
 fn arcmutex<T>(thing: T) -> Arc<Mutex<T>> {
     Arc::new(Mutex::new(thing))
 }
@@ -350,7 +311,7 @@ impl BoundsTree {
             Some(node) => {
                 // existing root, use insert func
                 node.bounds = node.bounds.join(collider.bounding_box);
-                insert(node, collider)
+                node.insert(collider)
             }
         }
     }
@@ -369,6 +330,96 @@ impl BoundsTree {
     }
 }
 
+#[derive(Clone)]
+struct NodeChild {
+    node: Arc<Mutex<dyn Node>>,
+    bounds: BoundingBox,
+    depth: u32,
+}
+impl NodeChild {
+    fn new(node: Arc<Mutex<dyn Node>>, bounds: BoundingBox, depth: u32) -> Self {
+        Self {
+            node,
+            bounds,
+            depth,
+        }
+    }
+    // fn from_mutex_lock(lock: &dyn Node, node: &Arc<Mutex<dyn Node>>) -> Self {
+    //     Self {
+    //         node: node.clone(),
+    //         bounds: lock.bounds(),
+    //         depth: lock.depth(),
+    //     }
+    // }
+
+    /// returns new depth of tree_slot and arc of new leaf
+    fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
+        let mut lock = self.node.lock().unwrap();
+
+        // branch or leaf?
+        if let Some(branch) = lock.try_into_branch_mut() {
+            let new_bounds: Vec<(BoundingBox, f32)> = branch
+                .children
+                .iter()
+                .map(|NodeChild { bounds, .. }| {
+                    let new = bounds.join(collider.bounding_box);
+                    (new, new.volume() - bounds.volume())
+                })
+                .collect();
+
+            // pick child and update balance and bounds
+            let next = if new_bounds[0].1 < new_bounds[1].1 {
+                branch.children[0].bounds = new_bounds[0].0;
+                &mut branch.children[0]
+            } else {
+                branch.children[1].bounds = new_bounds[1].0;
+                &mut branch.children[1]
+            };
+
+            let result = next.insert(collider);
+            self.depth = branch.depth();
+            // next.depth = result.0;
+            // result.0 = branch.depth();
+            result
+        } else {
+            // convert leaf to branch
+            let mut fresh_leaf = None;
+
+            let branch = Arc::new_cyclic(|new_branch| {
+                let parent = lock.parent().clone();
+                let right_child = lock.right_child();
+
+                lock.set_parent(new_branch.clone(), Right);
+                let mut new_right = self.clone();
+                new_right.bounds = lock.bounds();
+
+                let new_bounds = collider.bounding_box;
+                let new_leaf = Arc::new(Mutex::new(Leaf {
+                    parent: new_branch.clone(),
+                    right_child: Left,
+                    collider,
+                }));
+                let new_left =
+                    NodeChild::new(new_leaf.clone() as Arc<Mutex<dyn Node>>, new_bounds, 0);
+
+                fresh_leaf = Some(new_leaf);
+
+                Mutex::new(Branch {
+                    parent,
+                    right_child,
+                    children: [new_left, new_right],
+                })
+            });
+
+            drop(lock);
+            self.node = branch;
+            self.depth = 1;
+
+            fresh_leaf.unwrap()
+        }
+    }
+}
+
 trait Node: Debug + Send + Sync {
     fn parent(&self) -> &Weak<Mutex<Branch>>;
     fn right_child(&self) -> ChildSide;
@@ -381,71 +432,21 @@ trait Node: Debug + Send + Sync {
     // fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>>;
 }
 
-/// returns new depth of tree_slot and arc of new leaf
-fn insert(tree_slot: &mut NodeChild, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
-    let mut lock = tree_slot.node.lock().unwrap();
-
-    // branch or leaf?
-    if let Some(branch) = lock.try_into_branch_mut() {
-        let new_bounds: Vec<(BoundingBox, f32)> = branch
-            .children
-            .iter()
-            .map(|NodeChild { bounds, .. }| {
-                let new = bounds.join(collider.bounding_box);
-                (new, new.volume() - bounds.volume())
-            })
-            .collect();
-
-        // pick child and update balance and bounds
-        let next = if new_bounds[0].1 < new_bounds[1].1 {
-            branch.children[0].bounds = new_bounds[0].0;
-            &mut branch.children[0]
-        } else {
-            branch.children[1].bounds = new_bounds[1].0;
-            &mut branch.children[1]
-        };
-
-        let result = insert(next, collider);
-        tree_slot.depth = branch.depth();
-        // next.depth = result.0;
-        // result.0 = branch.depth();
-        result
-    } else {
-        // convert leaf to branch
-        let mut fresh_leaf = None;
-
-        let branch = Arc::new_cyclic(|new_branch| {
-            let parent = lock.parent().clone();
-            let right_child = lock.right_child();
-
-            lock.set_parent(new_branch.clone(), Right);
-            let mut new_right = tree_slot.clone();
-            new_right.bounds = lock.bounds();
-
-            let new_bounds = collider.bounding_box;
-            let new_leaf = Arc::new(Mutex::new(Leaf {
-                parent: new_branch.clone(),
-                right_child: Left,
-                collider,
-            }));
-            let new_left = NodeChild::new(new_leaf.clone() as Arc<Mutex<dyn Node>>, new_bounds, 0);
-
-            fresh_leaf = Some(new_leaf);
-
-            Mutex::new(Branch {
-                parent,
-                right_child,
-                children: [new_left, new_right],
-            })
-        });
-
-        drop(lock);
-        tree_slot.node = branch;
-        tree_slot.depth = 1;
-
-        fresh_leaf.unwrap()
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ChildSide {
+    Left,
+    Right,
+}
+impl Not for ChildSide {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        match self {
+            Left => Right,
+            Right => Left,
+        }
     }
 }
+use ChildSide::*;
 
 pub struct Leaf {
     parent: Weak<Mutex<Branch>>,
