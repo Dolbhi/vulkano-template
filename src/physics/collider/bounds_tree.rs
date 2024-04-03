@@ -456,38 +456,7 @@ impl NodeChild {
             branch.children[next_child].insert(new_leaf);
 
             // rebalance if needed
-            if branch.children[next_child]
-                .depth
-                .abs_diff(branch.children[1 - next_child].depth)
-                > 1
-            {
-                let bigger_lock = branch.children[next_child].node.lock().unwrap();
-                let bigger_child = bigger_lock.try_into_branch().unwrap();
-                let bigger_index =
-                    if bigger_child.children[0].depth > bigger_child.children[1].depth {
-                        0
-                    } else {
-                        1
-                    };
-                let weak_self = bigger_child.parent.clone();
-
-                let bigger_grand = bigger_child.children[bigger_index].clone();
-                let smaller_grand = bigger_child.children[1 - bigger_index].clone();
-
-                drop(bigger_lock);
-
-                bigger_grand
-                    .node
-                    .lock()
-                    .unwrap()
-                    .set_parent(weak_self, next_child.into());
-                branch.children[next_child] = bigger_grand;
-
-                branch.children[1 - next_child].bounds = branch.children[1 - next_child]
-                    .bounds
-                    .join(smaller_grand.bounds);
-                branch.children[1 - next_child].insert(smaller_grand);
-            }
+            branch.rebalance();
             self.depth = branch.depth();
         } else {
             // convert leaf to branch
@@ -630,8 +599,10 @@ impl Branch {
             }
 
             let mut parent_lock = parent.lock().unwrap();
+            // replace self in parent
             parent_lock.children[self.right_child as usize] = replacement;
-            // parent_lock.balance += 1 - 2 * self.right_child as i32;
+
+            parent_lock.rebalance();
 
             if let Some(grandparent) = parent_lock.parent.upgrade() {
                 grandparent.lock().unwrap().update_removed(
@@ -642,6 +613,7 @@ impl Branch {
             }
             None
         } else {
+            // self is root, make replacement the new root
             {
                 let mut lock = replacement.node.lock().unwrap();
                 lock.set_parent(Weak::new(), self.right_child)
@@ -653,6 +625,8 @@ impl Branch {
         self.children[right_child as usize].bounds = bounds;
         self.children[right_child as usize].depth = depth;
 
+        self.rebalance();
+
         let right_child = self.right_child;
         let bounds = self.bounds();
         let depth = self.depth();
@@ -662,6 +636,44 @@ impl Branch {
                 .lock()
                 .unwrap()
                 .update_removed(right_child, bounds, depth);
+        }
+    }
+
+    /// Rebalance tree if needed
+    fn rebalance(&mut self) {
+        let unbalanced_child = match self.children[1].depth as i32 - self.children[0].depth as i32 {
+            i if i <= -2 => Some(0),
+            i if i >= 2 => Some(1),
+            _ => None,
+        };
+
+        // rebalance if needed
+        if let Some(next_child) = unbalanced_child {
+            let bigger_lock = self.children[next_child].node.lock().unwrap();
+            let bigger_child = bigger_lock.try_into_branch().unwrap();
+            let bigger_index = if bigger_child.children[0].depth > bigger_child.children[1].depth {
+                0
+            } else {
+                1
+            };
+            let weak_self = bigger_child.parent.clone();
+
+            let bigger_grand = bigger_child.children[bigger_index].clone();
+            let smaller_grand = bigger_child.children[1 - bigger_index].clone();
+
+            drop(bigger_lock);
+
+            bigger_grand
+                .node
+                .lock()
+                .unwrap()
+                .set_parent(weak_self, next_child.into());
+            self.children[next_child] = bigger_grand;
+
+            self.children[1 - next_child].bounds = self.children[1 - next_child]
+                .bounds
+                .join(smaller_grand.bounds);
+            self.children[1 - next_child].insert(smaller_grand);
         }
     }
 }
