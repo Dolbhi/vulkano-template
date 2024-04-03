@@ -72,7 +72,7 @@ impl Shader {
 
         for material in &mut self.materials {
             // bind material sets
-            material.bind_sets(&self.pipeline.layout(), command_builder);
+            material.bind_sets(self.pipeline.layout(), command_builder);
 
             // Draw objects with the same mesh in a single instanced draw call
             let mut last_mesh = None;
@@ -80,7 +80,7 @@ impl Shader {
             let mut instance_count = 0;
             for mesh in material.pending_meshes.iter() {
                 match last_mesh {
-                    Some(old_mesh) if Arc::ptr_eq(old_mesh, &mesh) => {
+                    Some(old_mesh) if Arc::ptr_eq(old_mesh, mesh) => {
                         // println!("Same mesh, skipping...");
                     }
                     Some(_) => {
@@ -109,7 +109,7 @@ impl Shader {
                             .bind_index_buffer(index_buffer)
                             .unwrap();
 
-                        last_mesh = Some(&mesh);
+                        last_mesh = Some(mesh);
                         last_buffer_len = index_buffer_length;
                     }
                     _ => {
@@ -125,7 +125,7 @@ impl Shader {
                             .bind_index_buffer(index_buffer)
                             .unwrap();
 
-                        last_mesh = Some(&mesh);
+                        last_mesh = Some(mesh);
                         last_buffer_len = index_buffer_length;
                     }
                 }
@@ -175,7 +175,7 @@ impl Shader {
     pub fn upload_pending_objects(&mut self) -> impl Iterator<Item = Matrix4<f32>> + '_ {
         self.materials.iter_mut().flat_map(|mat| {
             let mut objs = mat.pending_objects.lock().unwrap();
-            std::mem::replace(&mut *objs, vec![])
+            std::mem::take(&mut *objs)
                 .into_iter()
                 .map(|(mesh, data)| {
                     mat.pending_meshes.push(mesh);

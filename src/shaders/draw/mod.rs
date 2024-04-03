@@ -57,6 +57,7 @@ impl GPUGlobalData {
         }
     }
 }
+// default for buffer init, invalid otherwise
 impl Default for GPUGlobalData {
     fn default() -> Self {
         Self {

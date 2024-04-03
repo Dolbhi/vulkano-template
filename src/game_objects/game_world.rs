@@ -24,7 +24,7 @@ impl Inputs {
     fn move_transform(&self, transform: &mut Transform, seconds_passed: f32) {
         let view = transform.get_local_transform();
 
-        let mut final_move = self.movement.clone();
+        let mut final_move = self.movement;
         final_move.y = 0.;
 
         // if self.w == Pressed {
@@ -101,7 +101,7 @@ impl GameWorld {
         for transform_id in query.iter(&self.world) {
             // *last_model =
             //     InterpolateTransform(self.transforms.get_global_model(transform_id).unwrap());
-            if let Err(_) = self.transforms.store_last_model(transform_id) {
+            if self.transforms.store_last_model(transform_id).is_err() {
                 println!("[Error] Failed to find transform of interpolated object");
             }
         }

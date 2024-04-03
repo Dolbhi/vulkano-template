@@ -148,7 +148,7 @@ impl<'a> ResourceRetriever<'a> {
                                 MeshID::InaBody,
                                 MeshID::InaHead,
                             ],
-                            mesh_from_file(&self.context, "models/ina/ReadyToRigINA.obj").skip(2),
+                            mesh_from_file(self.context, "models/ina/ReadyToRigINA.obj").skip(2),
                         ) {
                             loaded_meshes.insert(i, mesh);
                         }
@@ -159,7 +159,7 @@ impl<'a> ResourceRetriever<'a> {
                             "Lost empire only has 45 sub-meshes"
                         );
                         for (i, mesh) in
-                            mesh_from_file(&self.context, "models/lost_empire.obj").enumerate()
+                            mesh_from_file(self.context, "models/lost_empire.obj").enumerate()
                         {
                             loaded_meshes.insert(MeshID::LostEmpire(i as u8), mesh);
                         }
@@ -173,7 +173,7 @@ impl<'a> ResourceRetriever<'a> {
                             _ => panic!("Unmatched mesh id"),
                         };
                         loaded_meshes
-                            .insert(id, mesh_from_file(&self.context, path).next().unwrap());
+                            .insert(id, mesh_from_file(self.context, path).next().unwrap());
                     }
                 };
                 // try fetch again
@@ -205,7 +205,7 @@ impl<'a> ResourceRetriever<'a> {
                                 }
                                 MaterialID::Color(_) => {
                                     system.add_shader(
-                                        &self.context,
+                                        self.context,
                                         MaterialID::Color([0, 0, 0, 0]),
                                         draw::load_basic_vs(self.context.device.clone())
                                             .expect("failed to create solid shader module"),
@@ -215,7 +215,7 @@ impl<'a> ResourceRetriever<'a> {
                                 }
                                 MaterialID::UV => {
                                     system.add_shader(
-                                        &self.context,
+                                        self.context,
                                         id,
                                         draw::load_basic_vs(self.context.device.clone())
                                             .expect("failed to create uv shader module"),
@@ -225,7 +225,7 @@ impl<'a> ResourceRetriever<'a> {
                                 }
                                 MaterialID::Gradient => {
                                     system.add_shader(
-                                        &self.context,
+                                        self.context,
                                         id,
                                         draw::load_basic_vs(self.context.device.clone())
                                             .expect("failed to create grad shader module"),
@@ -234,7 +234,7 @@ impl<'a> ResourceRetriever<'a> {
                                     );
                                 }
                                 MaterialID::Billboard => system.add_shader(
-                                    &self.context,
+                                    self.context,
                                     id,
                                     draw::load_billboard_vs(self.context.device.clone())
                                         .expect("failed to create billboard shader module"),
@@ -249,10 +249,9 @@ impl<'a> ResourceRetriever<'a> {
                 // make material
                 let material = match id {
                     MaterialID::Texture(tex_id) => {
-                        let tex =
-                            Self::get_texture(&mut self.loaded_resources, &self.context, tex_id);
+                        let tex = Self::get_texture(self.loaded_resources, self.context, tex_id);
                         init_material(
-                            &self.context,
+                            self.context,
                             shader,
                             [WriteDescriptorSet::image_view_sampler(
                                 0,
@@ -263,28 +262,28 @@ impl<'a> ResourceRetriever<'a> {
                     }
                     MaterialID::Color(color) => {
                         let color_buffer = create_material_buffer(
-                            &self.context,
+                            self.context,
                             draw::SolidData {
                                 color: color.map(|v| (v as f32) / (u8::MAX as f32)),
                             },
                             vulkano::buffer::BufferUsage::empty(),
                         );
                         init_material(
-                            &self.context,
+                            self.context,
                             shader,
                             [WriteDescriptorSet::buffer(0, color_buffer)],
                         )
                     }
                     MaterialID::Billboard => {
                         let color_buffer = create_material_buffer(
-                            &self.context,
+                            self.context,
                             draw::SolidData {
                                 color: [1.0, 0.0, 1.0, 1.0],
                             },
                             vulkano::buffer::BufferUsage::empty(),
                         );
                         init_material(
-                            &self.context,
+                            self.context,
                             shader,
                             [WriteDescriptorSet::buffer(0, color_buffer)],
                         )

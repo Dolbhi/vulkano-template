@@ -47,7 +47,7 @@ impl RenderObject<Matrix4<f32>> {
         self.material
             .lock()
             .unwrap()
-            .push((self.mesh.clone(), self.data.clone()));
+            .push((self.mesh.clone(), self.data));
     }
 
     // pub fn update_transform_axis(

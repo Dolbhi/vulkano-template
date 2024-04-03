@@ -46,8 +46,7 @@ impl Camera {
     pub fn view_matrix(&self) -> Matrix4<f32> {
         // Matrix4::from(transform.rotation.conjugate().clone())
         //     * Matrix4::from_translation(-transform.translation.clone())
-        Matrix4::from(self.rotation.conjugate().clone())
-            * Matrix4::from_translation(-self.smooth_pos)
+        Matrix4::from(self.rotation.conjugate()) * Matrix4::from_translation(-self.smooth_pos)
     }
     pub fn projection_matrix(&self, aspect: f32) -> Matrix4<f32> {
         let mut projection = cgmath::perspective(self.fov, aspect, 0.05, 200.);

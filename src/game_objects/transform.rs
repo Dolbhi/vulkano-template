@@ -12,6 +12,20 @@ impl TransformID {
         self.0
     }
 }
+impl From<TransformCreateInfo> for Transform {
+    fn from(val: TransformCreateInfo) -> Self {
+        Transform {
+            parent: val.parent,
+            children: HashSet::new(),
+            local_model: None,
+            global_model: None,
+            translation: val.translation,
+            rotation: val.rotation,
+            scale: val.scale,
+            last_model: None,
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct Transform {
@@ -53,7 +67,7 @@ impl Transform {
     }
 
     pub fn is_dirty(&self) -> bool {
-        self.global_model == None
+        self.global_model.is_none()
     }
 
     pub fn mutate(
@@ -117,20 +131,20 @@ impl TransformCreateInfo {
         self
     }
 }
-impl Into<Transform> for TransformCreateInfo {
-    fn into(self) -> Transform {
-        Transform {
-            parent: self.parent,
-            children: HashSet::new(),
-            local_model: None,
-            global_model: None,
-            translation: self.translation,
-            rotation: self.rotation,
-            scale: self.scale,
-            last_model: None,
-        }
-    }
-}
+// impl Into<Transform> for TransformCreateInfo {
+//     fn into(self) -> Transform {
+//         Transform {
+//             parent: self.parent,
+//             children: HashSet::new(),
+//             local_model: None,
+//             global_model: None,
+//             translation: self.translation,
+//             rotation: self.rotation,
+//             scale: self.scale,
+//             last_model: None,
+//         }
+//     }
+// }
 impl Default for TransformCreateInfo {
     fn default() -> Self {
         Self {
@@ -366,5 +380,10 @@ impl Iterator for TransformSystem {
 
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.add_transform(Default::default()))
+    }
+}
+impl Default for TransformSystem {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -22,7 +22,7 @@ pub struct MaterialSwapper {
 }
 impl MaterialSwapper {
     pub fn new(materials: impl IntoIterator<Item = RenderSubmit>) -> Self {
-        let materials = materials.into_iter().map(|m| m.into()).collect();
+        let materials = materials.into_iter().collect();
         Self {
             materials,
             curent_index: 0,

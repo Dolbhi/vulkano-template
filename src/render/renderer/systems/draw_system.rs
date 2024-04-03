@@ -27,7 +27,7 @@ pub struct DrawSystem {
     subpass: Subpass,
 }
 
-impl<'a> DrawSystem {
+impl DrawSystem {
     /// creates from a collection of shader entry points
     pub fn new(
         context: &Context,
@@ -85,12 +85,15 @@ impl<'a> DrawSystem {
 
     /// search for shader via MaterialID
     pub fn find_shader(&mut self, id: MaterialID) -> Option<&mut Shader> {
-        for shader in &mut self.shaders {
-            if std::mem::discriminant(&shader.get_id()) == std::mem::discriminant(&id) {
-                return Some(shader);
-            }
-        }
-        None
+        self.shaders
+            .iter_mut()
+            .find(|shader| std::mem::discriminant(&shader.get_id()) == std::mem::discriminant(&id))
+        // for shader in &mut self.shaders {
+        //     if std::mem::discriminant(&shader.get_id()) == std::mem::discriminant(&id) {
+        //         return Some(shader);
+        //     }
+        // }
+        // None
     }
 
     /// Recreate all pipelines with any changes in viewport

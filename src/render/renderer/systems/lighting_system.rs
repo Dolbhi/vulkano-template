@@ -62,19 +62,19 @@ impl LightingSystem {
             .expect("failed to create point shader module");
         let fs = lighting::load_point_fs(context.device.clone())
             .expect("failed to create point shader module");
-        let point_pipeline = Self::create_lighting_pipeline(&context, subpass.clone(), vs, fs, []); //[(1, 0)]); // global data is dynamic
+        let point_pipeline = Self::create_lighting_pipeline(context, subpass.clone(), vs, fs, []); //[(1, 0)]); // global data is dynamic
 
         let vs = lighting::load_direction_vs(context.device.clone())
             .expect("failed to create directional shader module");
         let fs = lighting::load_direction_fs(context.device.clone())
             .expect("failed to create directional shader module");
         let direction_pipeline =
-            Self::create_lighting_pipeline(&context, subpass.clone(), vs.clone(), fs, []);
+            Self::create_lighting_pipeline(context, subpass.clone(), vs.clone(), fs, []);
 
         let fs = lighting::load_ambient_fs(context.device.clone())
             .expect("failed to create ambient shader module");
         let ambient_pipeline =
-            Self::create_lighting_pipeline(&context, subpass.clone(), vs.clone(), fs, []);
+            Self::create_lighting_pipeline(context, subpass.clone(), vs.clone(), fs, []);
 
         // let image_count = context.get_image_count();
 
@@ -185,7 +185,7 @@ impl LightingSystem {
     ) -> Arc<PersistentDescriptorSet> {
         PersistentDescriptorSet::new(
             &context.allocators.descriptor_set,
-            pipeline.layout().set_layouts().get(0).unwrap().clone(),
+            pipeline.layout().set_layouts().first().unwrap().clone(),
             [
                 WriteDescriptorSet::image_view(0, attachments.0.clone()),
                 WriteDescriptorSet::image_view(1, attachments.1.clone()),

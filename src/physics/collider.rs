@@ -108,9 +108,7 @@ pub struct CuboidCollider {
 }
 impl CuboidCollider {
     fn update_bounding(&mut self, view: TransformView) {
-        let vertices = CUBE_BOUNDING
-            .clone()
-            .map(|v| view.rotation.rotate_vector(v));
+        let vertices = CUBE_BOUNDING.map(|v| view.rotation.rotate_vector(v));
 
         self.bounding_box = BoundingBox::from_vertices(&vertices);
         self.bounding_box.translate(*view.translation);

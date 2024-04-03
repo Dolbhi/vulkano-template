@@ -389,10 +389,11 @@ impl App {
                 self.inputs.q = state;
             }
             VirtualKeyCode::R => {
-                if state == Pressed && self.inputs.r == Released {
-                    if self.game_state == GameState::Playing {
-                        let _ = self.load_level(self.current_level);
-                    }
+                if self.game_state == GameState::Playing
+                    && state == Pressed
+                    && self.inputs.r == Released
+                {
+                    let _ = self.load_level(self.current_level);
                 }
                 self.inputs.r = state;
             }

@@ -42,7 +42,7 @@ pub fn from_obj(file_name: &Path) -> Vec<(Vec<VertexFull>, Vec<u32>)> {
 
                 vertices.push(VertexFull {
                     position,
-                    normal: normal.clone(),
+                    normal,
                     colour,
                     uv,
                 })
