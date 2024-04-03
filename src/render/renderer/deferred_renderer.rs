@@ -52,7 +52,7 @@ impl DeferredRenderer {
 
         // create render systems
         let (lit_draw_system, [global_draw_layout, objects_layout]) = DrawSystem::new(
-            &context,
+            context,
             &Subpass::from(render_pass.clone(), 0).unwrap(),
             MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
             draw::load_basic_vs(context.device.clone())
@@ -62,12 +62,12 @@ impl DeferredRenderer {
         );
         let (lighting_system, [global_light_layout, point_layout, dir_layout]) =
             LightingSystem::new(
-                &context,
+                context,
                 &Subpass::from(render_pass.clone(), 1).unwrap(),
                 &attachments,
             );
         let (unlit_draw_system, [_, _]) = DrawSystem::new(
-            &context,
+            context,
             &Subpass::from(render_pass.clone(), 2).unwrap(),
             MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
             draw::load_basic_vs(context.device.clone())
@@ -272,11 +272,7 @@ impl FrameData {
     /// write object data to storage buffer
     ///
     /// `RenderObject::upload(&self)` must have been called beforehand
-    pub fn update_objects_data<'a>(
-        &self,
-        lit_system: &mut DrawSystem,
-        unlit_system: &mut DrawSystem,
-    ) {
+    pub fn update_objects_data(&self, lit_system: &mut DrawSystem, unlit_system: &mut DrawSystem) {
         let obj_iter = lit_system
             .shaders
             .iter_mut()
