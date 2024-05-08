@@ -1,11 +1,16 @@
 use std::{collections::HashMap, iter::zip, path::Path, sync::Arc};
 
 use vulkano::{
+    buffer::Subbuffer,
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     image::{sampler::Sampler, view::ImageView},
 };
 
-use crate::{shaders::draw, vulkano_objects::buffers::Buffers, VertexFull};
+use crate::{
+    shaders::draw::{self, SolidData},
+    vulkano_objects::buffers::Buffers,
+    VertexFull,
+};
 
 use super::{
     mesh::from_obj,
@@ -33,13 +38,15 @@ pub enum MeshID {
 
 const LOST_EMPIRE_MESH_COUNT: u8 = 45;
 
+/// Unique ID to identify materials, descriminant corresponds to shader
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum MaterialID {
     Texture(TextureID),
-    Color([u8; 4]),
+    Color(u32),
     UV,
     Gradient,
     Billboard,
+    // Parameter(u32),
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
@@ -59,6 +66,7 @@ pub struct ResourceManager {
     loaded_materials: HashMap<(MaterialID, bool), RenderSubmit>,
     loaded_textures: HashMap<TextureID, Arc<ImageView>>,
     linear_sampler: Arc<Sampler>,
+    next_color_id: u32,
 }
 
 impl ResourceManager {
@@ -71,6 +79,7 @@ impl ResourceManager {
                 context.device.clone(),
                 vulkano::image::sampler::Filter::Linear,
             ),
+            next_color_id: 0,
         }
     }
 
@@ -204,14 +213,7 @@ impl<'a> ResourceRetriever<'a> {
                                     panic!("Texture shader should be loaded by default")
                                 }
                                 MaterialID::Color(_) => {
-                                    system.add_shader(
-                                        self.context,
-                                        MaterialID::Color([0, 0, 0, 0]),
-                                        draw::load_basic_vs(self.context.device.clone())
-                                            .expect("failed to create solid shader module"),
-                                        draw::load_solid_fs(self.context.device.clone())
-                                            .expect("failed to create solid shader module"),
-                                    );
+                                    panic!("Color shader should be loaded when creating solid material")
                                 }
                                 MaterialID::UV => {
                                     system.add_shader(
@@ -260,19 +262,20 @@ impl<'a> ResourceRetriever<'a> {
                             )],
                         )
                     }
-                    MaterialID::Color(color) => {
-                        let color_buffer = create_material_buffer(
-                            self.context,
-                            draw::SolidData {
-                                color: color.map(|v| (v as f32) / (u8::MAX as f32)),
-                            },
-                            vulkano::buffer::BufferUsage::empty(),
-                        );
-                        init_material(
-                            self.context,
-                            shader,
-                            [WriteDescriptorSet::buffer(0, color_buffer)],
-                        )
+                    MaterialID::Color(_) => {
+                        panic!("Solid material not found, it must be loaded with load")
+                        // let color_buffer = create_material_buffer(
+                        //     self.context,
+                        //     draw::SolidData {
+                        //         color: color.map(|v| (v as f32) / (u8::MAX as f32)),
+                        //     },
+                        //     vulkano::buffer::BufferUsage::empty(),
+                        // );
+                        // init_material(
+                        //     self.context,
+                        //     shader,
+                        //     [WriteDescriptorSet::buffer(0, color_buffer)],
+                        // )
                     }
                     MaterialID::Billboard => {
                         let color_buffer = create_material_buffer(
@@ -296,6 +299,51 @@ impl<'a> ResourceRetriever<'a> {
                 material
             }
         }
+    }
+
+    /// Create a material with a solid color, returns the material id, the subbuffer holding the color and the rendersubmit arc mutex
+    pub fn load_solid_material(
+        &mut self,
+        color: [f32; 4],
+        lit: bool,
+    ) -> (MaterialID, Subbuffer<SolidData>, RenderSubmit) {
+        // Narrow down system
+        let system = if lit {
+            &mut self.lit_system
+        } else {
+            &mut self.unlit_system
+        };
+
+        if let None = system.find_shader(MaterialID::Color(0)) {
+            system.add_shader(
+                self.context,
+                MaterialID::Color(0),
+                draw::load_basic_vs(self.context.device.clone())
+                    .expect("failed to create solid shader module"),
+                draw::load_solid_fs(self.context.device.clone())
+                    .expect("failed to create solid shader module"),
+            );
+        }
+        let shader = system.find_shader(MaterialID::Color(0)).unwrap();
+
+        let id = MaterialID::Color(self.loaded_resources.next_color_id);
+        self.loaded_resources.next_color_id += 1;
+        let color_buffer = create_material_buffer(
+            self.context,
+            draw::SolidData { color },
+            vulkano::buffer::BufferUsage::empty(),
+        );
+        let mat = init_material(
+            self.context,
+            shader,
+            [WriteDescriptorSet::buffer(0, color_buffer.clone())],
+        );
+
+        self.loaded_resources
+            .loaded_materials
+            .insert((id, lit), mat.clone());
+
+        (id, color_buffer, mat)
     }
 
     pub fn get_texture(

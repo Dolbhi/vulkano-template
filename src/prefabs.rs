@@ -58,10 +58,10 @@ pub fn init_world(
     let le_mat = resources.get_material(MaterialID::Texture(TextureID::LostEmpire), true);
     let le_mat_unlit = resources.get_material(MaterialID::Texture(TextureID::LostEmpire), false);
 
-    let red_mat = resources.get_material(MaterialID::Color([u8::MAX, 0, 0, u8::MAX]), false);
-    let blue_mat = resources.get_material(MaterialID::Color([0, 0, u8::MAX, u8::MAX]), false);
+    let red_mat = resources.load_solid_material([1., 0., 0., 1.], false).2;
+    let blue_mat = resources.load_solid_material([0., 0., 1., 1.], false).2;
 
-    let green_mat = resources.get_material(MaterialID::Color([0, u8::MAX, 0, u8::MAX]), true);
+    let green_mat = resources.load_solid_material([0., 1., 0., 1.], true).2;
 
     // objects
     //      Suzanne
@@ -212,8 +212,8 @@ pub fn init_phys_test(
     let plane_mesh = resources.get_mesh(MeshID::Square);
     let cube_mesh = resources.get_mesh(MeshID::Cube);
 
-    let yellow_mat = resources.get_material(MaterialID::Color([255, 255, 0, 255]), true);
-    let green_mat = resources.get_material(MaterialID::Color([0, 255, 0, 255]), true);
+    let yellow_mat = resources.load_solid_material([1., 1., 0., 1.], true).2;
+    let green_mat = resources.load_solid_material([0., 1., 0., 1.], true).2;
 
     let plane_trans = transform_sys.add_transform(TransformCreateInfo {
         rotation: Quaternion::from_axis_angle([1., 0., 0.].into(), Rad(-PI / 2.)),
