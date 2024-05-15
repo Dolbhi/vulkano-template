@@ -6,6 +6,382 @@ use std::{
 
 use super::{BoundingBox, CuboidCollider};
 
+fn arcmutex<T>(thing: T) -> Arc<Mutex<T>> {
+    Arc::new(Mutex::new(thing))
+}
+
+pub struct BoundsTree {
+    /// Depth is invalid LOL
+    root: Option<Link>,
+}
+#[derive(Clone)]
+struct Link {
+    node: Arc<Mutex<dyn Node>>,
+    bounds: BoundingBox,
+    depth: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ChildSide {
+    Left,
+    Right,
+}
+use ChildSide::*;
+
+pub struct Leaf {
+    parent: Weak<Mutex<Branch>>,
+    right_child: ChildSide,
+    pub collider: CuboidCollider,
+}
+struct Branch {
+    parent: Weak<Mutex<Branch>>,
+    right_child: ChildSide,
+    children: [Link; 2],
+}
+
+impl BoundsTree {
+    pub fn new() -> Self {
+        Self { root: None }
+    }
+
+    pub fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
+        let bounds = collider.bounding_box;
+        let new_leaf_node = arcmutex(Leaf {
+            parent: Weak::new(),
+            right_child: Right,
+            collider,
+        });
+        let new_leaf = Link::new(new_leaf_node.clone(), bounds, 0);
+        match &mut self.root {
+            None => {
+                // empty root, make new leaf
+                self.root = Some(new_leaf);
+            }
+            Some(node) => {
+                // existing root, use insert func
+                node.bounds = node.bounds.join(new_leaf.bounds);
+                node.insert(new_leaf);
+            }
+        }
+        new_leaf_node
+    }
+
+    pub fn remove(&mut self, target: Arc<Mutex<Leaf>>) {
+        let lock = target.lock().unwrap();
+        if let Some(parent) = lock.parent.upgrade() {
+            if let Some(new_root) = parent.lock().unwrap().delete_child(lock.right_child) {
+                // leaf as a new root
+                self.root = Some(new_root);
+            }
+        } else {
+            // single leaf on root, remove it
+            self.root = None;
+        }
+    }
+
+    pub fn merge(&mut self, other: BoundsTree) {
+        if let Some(other_root) = other.root {
+            match &mut self.root {
+                None => {
+                    // empty root, make new leaf
+                    self.root = Some(other_root);
+                }
+                Some(node) => {
+                    // existing root, use insert func
+                    node.bounds = node.bounds.join(other_root.bounds);
+                    node.insert(other_root);
+                }
+            }
+        }
+    }
+}
+
+impl Link {
+    fn new(node: Arc<Mutex<dyn Node>>, bounds: BoundingBox, depth: u32) -> Self {
+        Self {
+            node,
+            bounds,
+            depth,
+        }
+    }
+    // fn from_mutex_lock(lock: &dyn Node, node: &Arc<Mutex<dyn Node>>) -> Self {
+    //     Self {
+    //         node: node.clone(),
+    //         bounds: lock.bounds(),
+    //         depth: lock.depth(),
+    //     }
+    // }
+
+    /// Inserted child must be right
+    fn insert(&mut self, new_leaf: Link) {
+        let mut lock = self.node.lock().unwrap();
+
+        // branch or leaf?
+        if let Some(branch) = lock.try_into_branch_mut() {
+            // get potential bounds and volume change
+            let new_bounds: Vec<(BoundingBox, f32)> = branch
+                .children
+                .iter()
+                .map(|Link { bounds, .. }| {
+                    let new = bounds.join(new_leaf.bounds);
+                    (new, new.volume() - bounds.volume())
+                })
+                .collect();
+
+            // pick child and update bounds
+            let next_child = (if new_bounds[0].1 < new_bounds[1].1 {
+                Left
+            } else {
+                Right
+            }) as usize;
+            branch.children[next_child].bounds = new_bounds[next_child].0;
+
+            branch.children[next_child].insert(new_leaf);
+
+            // rebalance if needed
+            branch.rebalance();
+            self.depth = branch.depth();
+        } else {
+            // convert leaf to branch
+            let mut new_depth = 0;
+            let branch = Arc::new_cyclic(|new_branch| {
+                let parent = lock.parent().clone();
+                let right_child = lock.right_child();
+
+                lock.set_parent(new_branch.clone(), Left);
+                let mut new_left = self.clone();
+                new_left.bounds = lock.bounds();
+
+                {
+                    new_leaf
+                        .node
+                        .lock()
+                        .unwrap()
+                        .set_parent(new_branch.clone(), Right);
+                }
+                let new_right = new_leaf;
+
+                new_depth = new_left.depth.max(new_right.depth) + 1;
+                Mutex::new(Branch {
+                    parent,
+                    right_child,
+                    children: [new_left, new_right],
+                })
+            });
+
+            drop(lock);
+            self.depth = new_depth;
+            self.node = branch;
+        }
+    }
+}
+impl Debug for Link {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "depth: {}, node: {:#?}",
+            self.depth,
+            self.node.lock().unwrap()
+        ))
+    }
+}
+
+trait Node: Debug + Send + Sync {
+    fn parent(&self) -> &Weak<Mutex<Branch>>;
+    fn right_child(&self) -> ChildSide;
+    fn set_parent(&mut self, parent: Weak<Mutex<Branch>>, right_child: ChildSide);
+    fn bounds(&self) -> BoundingBox;
+    fn depth(&self) -> u32;
+    fn is_leaf(&self) -> bool;
+    fn try_into_branch(&self) -> Option<&Branch>;
+    fn try_into_branch_mut(&mut self) -> Option<&mut Branch>;
+    // fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>>;
+}
+
+impl Not for ChildSide {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        match self {
+            Left => Right,
+            Right => Left,
+        }
+    }
+}
+impl From<usize> for ChildSide {
+    fn from(value: usize) -> Self {
+        if value == 0 {
+            Left
+        } else {
+            Right
+        }
+    }
+}
+
+impl Leaf {}
+impl Node for Leaf {
+    fn parent(&self) -> &Weak<Mutex<Branch>> {
+        &self.parent
+    }
+    fn right_child(&self) -> ChildSide {
+        self.right_child
+    }
+    fn set_parent(&mut self, parent: Weak<Mutex<Branch>>, right_child: ChildSide) {
+        self.parent = parent;
+        self.right_child = right_child;
+    }
+    fn bounds(&self) -> BoundingBox {
+        self.collider.bounding_box
+    }
+    fn depth(&self) -> u32 {
+        0
+    }
+    fn try_into_branch(&self) -> Option<&Branch> {
+        None
+    }
+    fn try_into_branch_mut(&mut self) -> Option<&mut Branch> {
+        None
+    }
+    fn is_leaf(&self) -> bool {
+        true
+    }
+}
+impl Debug for Leaf {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Leaf")
+            .field("right_child", &self.right_child)
+            .field("depth", &self.depth())
+            .field("collider", &self.collider)
+            .finish()
+    }
+}
+
+impl Branch {
+    /// If self has no parent, return the replacement instead
+    fn delete_child(&mut self, right_child: ChildSide) -> Option<Link> {
+        let replacement = self.children[1 - right_child as usize].clone();
+
+        if let Some(parent) = self.parent.upgrade() {
+            {
+                let mut lock = replacement.node.lock().unwrap();
+                lock.set_parent(Arc::downgrade(&parent), self.right_child)
+            }
+
+            let mut parent_lock = parent.lock().unwrap();
+            // replace self in parent
+            parent_lock.children[self.right_child as usize] = replacement;
+
+            parent_lock.rebalance();
+
+            if let Some(grandparent) = parent_lock.parent.upgrade() {
+                grandparent.lock().unwrap().update_removed(
+                    parent_lock.right_child,
+                    parent_lock.bounds(),
+                    parent_lock.depth(),
+                );
+            }
+            None
+        } else {
+            // self is root, make replacement the new root
+            {
+                let mut lock = replacement.node.lock().unwrap();
+                lock.set_parent(Weak::new(), self.right_child)
+            }
+            Some(replacement)
+        }
+    }
+    fn update_removed(&mut self, right_child: ChildSide, bounds: BoundingBox, depth: u32) {
+        self.children[right_child as usize].bounds = bounds;
+        self.children[right_child as usize].depth = depth;
+
+        self.rebalance();
+
+        let right_child = self.right_child;
+        let bounds = self.bounds();
+        let depth = self.depth();
+
+        if let Some(parent) = self.parent.upgrade() {
+            parent
+                .lock()
+                .unwrap()
+                .update_removed(right_child, bounds, depth);
+        }
+    }
+
+    /// Rebalance tree if needed
+    fn rebalance(&mut self) {
+        let unbalanced_child = match self.children[1].depth as i32 - self.children[0].depth as i32 {
+            i if i <= -2 => Some(0),
+            i if i >= 2 => Some(1),
+            _ => None,
+        };
+
+        // rebalance if needed
+        if let Some(next_child) = unbalanced_child {
+            let bigger_lock = self.children[next_child].node.lock().unwrap();
+            let bigger_child = bigger_lock.try_into_branch().unwrap();
+            let bigger_index = if bigger_child.children[0].depth > bigger_child.children[1].depth {
+                0
+            } else {
+                1
+            };
+            let weak_self = bigger_child.parent.clone();
+
+            let bigger_grand = bigger_child.children[bigger_index].clone();
+            let smaller_grand = bigger_child.children[1 - bigger_index].clone();
+
+            drop(bigger_lock);
+
+            bigger_grand
+                .node
+                .lock()
+                .unwrap()
+                .set_parent(weak_self, next_child.into());
+            self.children[next_child] = bigger_grand;
+
+            self.children[1 - next_child].bounds = self.children[1 - next_child]
+                .bounds
+                .join(smaller_grand.bounds);
+            self.children[1 - next_child].insert(smaller_grand);
+        }
+    }
+}
+impl Node for Branch {
+    fn parent(&self) -> &Weak<Mutex<Branch>> {
+        &self.parent
+    }
+    fn right_child(&self) -> ChildSide {
+        self.right_child
+    }
+    fn set_parent(&mut self, parent: Weak<Mutex<Branch>>, right_child: ChildSide) {
+        self.parent = parent;
+        self.right_child = right_child;
+    }
+    fn bounds(&self) -> BoundingBox {
+        self.children[0].bounds.join(self.children[1].bounds)
+    }
+    fn depth(&self) -> u32 {
+        self.children[0].depth.max(self.children[1].depth) + 1
+    }
+    fn try_into_branch(&self) -> Option<&Branch> {
+        Some(self)
+    }
+    fn try_into_branch_mut(&mut self) -> Option<&mut Branch> {
+        Some(self)
+    }
+    fn is_leaf(&self) -> bool {
+        false
+    }
+}
+impl Debug for Branch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Branch")
+            .field("right_child", &self.right_child)
+            .field("depth", &self.depth())
+            .field("left", &self.children[0])
+            .field("right", &self.children[1])
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tree_tests {
     use std::sync::{Arc, Mutex};
@@ -15,10 +391,10 @@ mod tree_tests {
         physics::collider::{bounds_tree::BoundsTree, CuboidCollider},
     };
 
-    use super::{ChildSide, Node, NodeChild};
+    use super::{ChildSide, Link, Node};
 
     fn validate_tree(
-        child: &NodeChild,
+        child: &Link,
         parent: Option<&Arc<Mutex<dyn Node>>>,
         side: ChildSide,
     ) -> Result<(), String> {
@@ -68,7 +444,7 @@ mod tree_tests {
         Ok(())
     }
 
-    fn assert_valid_tree(root: &NodeChild) {
+    fn assert_valid_tree(root: &Link) {
         let mut root = root.clone();
         {
             let lock = root.node.lock().unwrap();
@@ -340,377 +716,4 @@ mod tree_tests {
     }
     #[test]
     fn removal_balance() {}
-}
-
-fn arcmutex<T>(thing: T) -> Arc<Mutex<T>> {
-    Arc::new(Mutex::new(thing))
-}
-
-pub struct BoundsTree {
-    /// Depth is invalid LOL
-    root: Option<NodeChild>,
-}
-impl BoundsTree {
-    pub fn new() -> Self {
-        Self { root: None }
-    }
-
-    pub fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
-        let bounds = collider.bounding_box;
-        let new_leaf_node = arcmutex(Leaf {
-            parent: Weak::new(),
-            right_child: Right,
-            collider,
-        });
-        let new_leaf = NodeChild::new(new_leaf_node.clone(), bounds, 0);
-        match &mut self.root {
-            None => {
-                // empty root, make new leaf
-                self.root = Some(new_leaf);
-            }
-            Some(node) => {
-                // existing root, use insert func
-                node.bounds = node.bounds.join(new_leaf.bounds);
-                node.insert(new_leaf);
-            }
-        }
-        new_leaf_node
-    }
-
-    pub fn remove(&mut self, target: Arc<Mutex<Leaf>>) {
-        let lock = target.lock().unwrap();
-        if let Some(parent) = lock.parent.upgrade() {
-            if let Some(new_root) = parent.lock().unwrap().delete_child(lock.right_child) {
-                // leaf as a new root
-                self.root = Some(new_root);
-            }
-        } else {
-            // single leaf on root, remove it
-            self.root = None;
-        }
-    }
-
-    pub fn merge(&mut self, other: BoundsTree) {
-        if let Some(other_root) = other.root {
-            match &mut self.root {
-                None => {
-                    // empty root, make new leaf
-                    self.root = Some(other_root);
-                }
-                Some(node) => {
-                    // existing root, use insert func
-                    node.bounds = node.bounds.join(other_root.bounds);
-                    node.insert(other_root);
-                }
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-struct NodeChild {
-    node: Arc<Mutex<dyn Node>>,
-    bounds: BoundingBox,
-    depth: u32,
-}
-impl NodeChild {
-    fn new(node: Arc<Mutex<dyn Node>>, bounds: BoundingBox, depth: u32) -> Self {
-        Self {
-            node,
-            bounds,
-            depth,
-        }
-    }
-    // fn from_mutex_lock(lock: &dyn Node, node: &Arc<Mutex<dyn Node>>) -> Self {
-    //     Self {
-    //         node: node.clone(),
-    //         bounds: lock.bounds(),
-    //         depth: lock.depth(),
-    //     }
-    // }
-
-    /// Inserted child must be right
-    fn insert(&mut self, new_leaf: NodeChild) {
-        let mut lock = self.node.lock().unwrap();
-
-        // branch or leaf?
-        if let Some(branch) = lock.try_into_branch_mut() {
-            // get potential bounds and volume change
-            let new_bounds: Vec<(BoundingBox, f32)> = branch
-                .children
-                .iter()
-                .map(|NodeChild { bounds, .. }| {
-                    let new = bounds.join(new_leaf.bounds);
-                    (new, new.volume() - bounds.volume())
-                })
-                .collect();
-
-            // pick child and update bounds
-            let next_child = (if new_bounds[0].1 < new_bounds[1].1 {
-                Left
-            } else {
-                Right
-            }) as usize;
-            branch.children[next_child].bounds = new_bounds[next_child].0;
-
-            branch.children[next_child].insert(new_leaf);
-
-            // rebalance if needed
-            branch.rebalance();
-            self.depth = branch.depth();
-        } else {
-            // convert leaf to branch
-            let mut new_depth = 0;
-            let branch = Arc::new_cyclic(|new_branch| {
-                let parent = lock.parent().clone();
-                let right_child = lock.right_child();
-
-                lock.set_parent(new_branch.clone(), Left);
-                let mut new_left = self.clone();
-                new_left.bounds = lock.bounds();
-
-                {
-                    new_leaf
-                        .node
-                        .lock()
-                        .unwrap()
-                        .set_parent(new_branch.clone(), Right);
-                }
-                let new_right = new_leaf;
-
-                new_depth = new_left.depth.max(new_right.depth) + 1;
-                Mutex::new(Branch {
-                    parent,
-                    right_child,
-                    children: [new_left, new_right],
-                })
-            });
-
-            drop(lock);
-            self.depth = new_depth;
-            self.node = branch;
-        }
-    }
-}
-impl Debug for NodeChild {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!(
-            "depth: {}, node: {:#?}",
-            self.depth,
-            self.node.lock().unwrap()
-        ))
-    }
-}
-
-trait Node: Debug + Send + Sync {
-    fn parent(&self) -> &Weak<Mutex<Branch>>;
-    fn right_child(&self) -> ChildSide;
-    fn set_parent(&mut self, parent: Weak<Mutex<Branch>>, right_child: ChildSide);
-    fn bounds(&self) -> BoundingBox;
-    fn depth(&self) -> u32;
-    fn is_leaf(&self) -> bool;
-    fn try_into_branch(&self) -> Option<&Branch>;
-    fn try_into_branch_mut(&mut self) -> Option<&mut Branch>;
-    // fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>>;
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ChildSide {
-    Left,
-    Right,
-}
-use ChildSide::*;
-impl Not for ChildSide {
-    type Output = Self;
-    fn not(self) -> Self::Output {
-        match self {
-            Left => Right,
-            Right => Left,
-        }
-    }
-}
-impl From<usize> for ChildSide {
-    fn from(value: usize) -> Self {
-        if value == 0 {
-            Left
-        } else {
-            Right
-        }
-    }
-}
-
-pub struct Leaf {
-    parent: Weak<Mutex<Branch>>,
-    right_child: ChildSide,
-    pub collider: CuboidCollider,
-}
-impl Leaf {}
-impl Node for Leaf {
-    fn parent(&self) -> &Weak<Mutex<Branch>> {
-        &self.parent
-    }
-    fn right_child(&self) -> ChildSide {
-        self.right_child
-    }
-    fn set_parent(&mut self, parent: Weak<Mutex<Branch>>, right_child: ChildSide) {
-        self.parent = parent;
-        self.right_child = right_child;
-    }
-    fn bounds(&self) -> BoundingBox {
-        self.collider.bounding_box
-    }
-    fn depth(&self) -> u32 {
-        0
-    }
-    fn try_into_branch(&self) -> Option<&Branch> {
-        None
-    }
-    fn try_into_branch_mut(&mut self) -> Option<&mut Branch> {
-        None
-    }
-    fn is_leaf(&self) -> bool {
-        true
-    }
-}
-impl Debug for Leaf {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Leaf")
-            .field("right_child", &self.right_child)
-            .field("depth", &self.depth())
-            .field("collider", &self.collider)
-            .finish()
-    }
-}
-
-struct Branch {
-    parent: Weak<Mutex<Branch>>,
-    right_child: ChildSide,
-    children: [NodeChild; 2],
-}
-impl Branch {
-    /// If self has no parent, return the replacement instead
-    fn delete_child(&mut self, right_child: ChildSide) -> Option<NodeChild> {
-        let replacement = self.children[1 - right_child as usize].clone();
-
-        if let Some(parent) = self.parent.upgrade() {
-            {
-                let mut lock = replacement.node.lock().unwrap();
-                lock.set_parent(Arc::downgrade(&parent), self.right_child)
-            }
-
-            let mut parent_lock = parent.lock().unwrap();
-            // replace self in parent
-            parent_lock.children[self.right_child as usize] = replacement;
-
-            parent_lock.rebalance();
-
-            if let Some(grandparent) = parent_lock.parent.upgrade() {
-                grandparent.lock().unwrap().update_removed(
-                    parent_lock.right_child,
-                    parent_lock.bounds(),
-                    parent_lock.depth(),
-                );
-            }
-            None
-        } else {
-            // self is root, make replacement the new root
-            {
-                let mut lock = replacement.node.lock().unwrap();
-                lock.set_parent(Weak::new(), self.right_child)
-            }
-            Some(replacement)
-        }
-    }
-    fn update_removed(&mut self, right_child: ChildSide, bounds: BoundingBox, depth: u32) {
-        self.children[right_child as usize].bounds = bounds;
-        self.children[right_child as usize].depth = depth;
-
-        self.rebalance();
-
-        let right_child = self.right_child;
-        let bounds = self.bounds();
-        let depth = self.depth();
-
-        if let Some(parent) = self.parent.upgrade() {
-            parent
-                .lock()
-                .unwrap()
-                .update_removed(right_child, bounds, depth);
-        }
-    }
-
-    /// Rebalance tree if needed
-    fn rebalance(&mut self) {
-        let unbalanced_child = match self.children[1].depth as i32 - self.children[0].depth as i32 {
-            i if i <= -2 => Some(0),
-            i if i >= 2 => Some(1),
-            _ => None,
-        };
-
-        // rebalance if needed
-        if let Some(next_child) = unbalanced_child {
-            let bigger_lock = self.children[next_child].node.lock().unwrap();
-            let bigger_child = bigger_lock.try_into_branch().unwrap();
-            let bigger_index = if bigger_child.children[0].depth > bigger_child.children[1].depth {
-                0
-            } else {
-                1
-            };
-            let weak_self = bigger_child.parent.clone();
-
-            let bigger_grand = bigger_child.children[bigger_index].clone();
-            let smaller_grand = bigger_child.children[1 - bigger_index].clone();
-
-            drop(bigger_lock);
-
-            bigger_grand
-                .node
-                .lock()
-                .unwrap()
-                .set_parent(weak_self, next_child.into());
-            self.children[next_child] = bigger_grand;
-
-            self.children[1 - next_child].bounds = self.children[1 - next_child]
-                .bounds
-                .join(smaller_grand.bounds);
-            self.children[1 - next_child].insert(smaller_grand);
-        }
-    }
-}
-impl Node for Branch {
-    fn parent(&self) -> &Weak<Mutex<Branch>> {
-        &self.parent
-    }
-    fn right_child(&self) -> ChildSide {
-        self.right_child
-    }
-    fn set_parent(&mut self, parent: Weak<Mutex<Branch>>, right_child: ChildSide) {
-        self.parent = parent;
-        self.right_child = right_child;
-    }
-    fn bounds(&self) -> BoundingBox {
-        self.children[0].bounds.join(self.children[1].bounds)
-    }
-    fn depth(&self) -> u32 {
-        self.children[0].depth.max(self.children[1].depth) + 1
-    }
-    fn try_into_branch(&self) -> Option<&Branch> {
-        Some(self)
-    }
-    fn try_into_branch_mut(&mut self) -> Option<&mut Branch> {
-        Some(self)
-    }
-    fn is_leaf(&self) -> bool {
-        false
-    }
-}
-impl Debug for Branch {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Branch")
-            .field("right_child", &self.right_child)
-            .field("depth", &self.depth())
-            .field("left", &self.children[0])
-            .field("right", &self.children[1])
-            .finish()
-    }
 }
