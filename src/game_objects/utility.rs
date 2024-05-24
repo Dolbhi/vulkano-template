@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use cgmath::{Vector3, Zero};
+use cgmath::{InnerSpace, Vector3, Zero};
 
 // const MAX_COUNTER_DV: f32 = -1.;
 
@@ -24,10 +24,13 @@ impl VectorDamp {
         let elapsed_time = self.last_time.elapsed().as_secs_f32();
         self.last_time = Instant::now();
         // lag too large, snap to target
-        if elapsed_time > 0.8 / self.strength {
+        if elapsed_time > 2.0 / self.strength {
+            println!("[Warning] Lerp lag (elapsed time:{elapsed_time}), snapping to targer");
             self.velocity = Vector3::zero();
             return target;
         }
+
+        // dy = h/2( dy/dt(y) + dy/dt(y + h*dy/dt(y)) )
 
         let delta_vel =
             -self.strength * (2. * self.velocity + self.strength * difference) * elapsed_time;
@@ -37,6 +40,11 @@ impl VectorDamp {
         //     delta_vel += (MAX_COUNTER_DV - counter_dv) * self.velocity;
         // }
         self.velocity += delta_vel;
+        let sqr_vel = self.velocity.magnitude2();
+        if sqr_vel > 16.0 {
+            println!("[Warning] Vel maxed out, square vel: {sqr_vel}");
+            self.velocity *= (16.0 / sqr_vel).sqrt();
+        }
 
         let delta_pos = (self.velocity) * elapsed_time;
 

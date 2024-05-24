@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cgmath::{Matrix4, Vector3, Vector4};
+use cgmath::{Matrix4, One, Quaternion, Vector3, Vector4};
 use legion::*;
 
 use winit::{
@@ -20,7 +20,7 @@ use crate::{
     game_objects::{
         light::PointLightComponent,
         transform::{TransformCreateInfo, TransformID},
-        DisabledLERP, GameWorld, MaterialSwapper,
+        Camera, DisabledLERP, GameWorld, MaterialSwapper,
     },
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
@@ -50,9 +50,6 @@ struct InputState {
     shift: KeyState,
     escape: KeyState,
     q_triggered: bool,
-    mouse_dx: f32,
-    mouse_dy: f32,
-    // esc_triggered: bool,
 }
 
 impl InputState {
@@ -91,6 +88,7 @@ pub struct App {
     renderer: DeferredRenderer,
     resources: ResourceManager,
     world: Arc<Mutex<GameWorld>>,
+    camera_rotation: Quaternion<f32>,
     game_thread: GameWorldThread,
     inputs: InputState,
     game_state: GameState,
@@ -125,6 +123,7 @@ impl App {
             resources,
             inputs: InputState::default(),
             world,
+            camera_rotation: Quaternion::one(),
             game_thread,
             game_state: Default::default(),
             last_frame_time: Instant::now(),
@@ -275,8 +274,11 @@ impl App {
                 ..
             } => {
                 if self.game_state == GameState::Playing {
-                    self.inputs.mouse_dx += delta.0 as f32;
-                    self.inputs.mouse_dy += delta.1 as f32;
+                    Camera::camera_rotation(
+                        &mut self.camera_rotation,
+                        delta.0 as f32,
+                        delta.1 as f32,
+                    );
                 }
             }
             _ => (),
@@ -303,9 +305,7 @@ impl App {
                 // sync inputs
                 if self.game_state == GameState::Playing {
                     inputs.movement = self.inputs.get_move();
-                    camera.rotate(self.inputs.mouse_dx, self.inputs.mouse_dy);
-                    self.inputs.mouse_dx = 0.;
-                    self.inputs.mouse_dy = 0.;
+                    camera.set_rotation(self.camera_rotation);
                 }
                 camera.sync_transform(transforms);
 

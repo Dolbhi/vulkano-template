@@ -19,18 +19,26 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn rotate(&mut self, dx: f32, dy: f32) {
-        let old_pitch = Rad::atan(self.rotation.v.x / self.rotation.s);
+    pub fn camera_rotation(current: &mut Quaternion<f32>, dx: f32, dy: f32) {
+        let old_pitch = Rad::atan(current.v.x / current.s);
         let delta_pitch = clamp(
             Rad(-dy * MOUSE_SENSITIVITY),
             Rad(-PI / 4.01) - old_pitch,
             Rad(PI / 4.01) - old_pitch,
         );
 
-        self.rotation = Quaternion::from_angle_y(Rad(-dx * MOUSE_SENSITIVITY))
-            * self.rotation
+        *current = Quaternion::from_angle_y(Rad(-dx * MOUSE_SENSITIVITY))
+            * (*current)
             * Quaternion::from_angle_x(delta_pitch);
     }
+
+    pub fn set_rotation(&mut self, rotation: Quaternion<f32>) {
+        self.rotation = rotation;
+    }
+    // pub fn rotate(&mut self, dx: f32, dy: f32) {
+    //     Self::camera_rotation(&mut self.rotation, dx, dy);
+    // }
+
     /// Lerp camera slightly towards target position
     ///
     /// Update transform rotation to match camera
