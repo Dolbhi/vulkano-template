@@ -44,6 +44,6 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 
 ### Issues
 - [ ] Crashes when closed after resize?
-- [ ] Occasional camera jumping while moving
+- [x] Occasional camera jumping while moving
 - [x] Interpolation struggles with curve movements (use smooth camera)
 - [x] Crashes when moving to 2nd monitor with loaded level
