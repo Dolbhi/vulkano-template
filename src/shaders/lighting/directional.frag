@@ -2,6 +2,9 @@
 
 #version 450
 
+layout(location = 0) in vec2 v_screen_coords;
+layout(location = 1) in flat uint v_light_index;
+
 layout(set = 0, binding = 0) uniform GPUGlobalData {
     mat4 view;
     mat4 proj;
@@ -26,8 +29,6 @@ layout(set = 2, binding = 0) readonly buffer DirectionLights {
     DirectionLight lights[];
 } direction_buffer;
 
-layout(location = 0) in vec2 v_screen_coords;
-layout(location = 1) in flat uint v_light_index;
 layout(location = 0) out vec4 f_color;
 
 void main() {
