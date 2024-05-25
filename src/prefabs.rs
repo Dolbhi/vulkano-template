@@ -17,7 +17,7 @@ use crate::{
     vertex_data::VertexFull,
 };
 
-type Mesh = std::sync::Arc<crate::vulkano_objects::buffers::Buffers<VertexFull>>;
+type Mesh = std::sync::Arc<crate::vulkano_objects::buffers::MeshBuffers<VertexFull>>;
 
 pub fn init_world(
     world: &mut World,

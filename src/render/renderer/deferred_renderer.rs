@@ -91,22 +91,6 @@ impl DeferredRenderer {
 
         // create buffers and descriptor sets
         let image_count = context.get_image_count();
-        // let mut object_data =
-        //     create_storage_buffers(&context.allocators, objects_layout, image_count, 10000);
-
-        // // create frame data
-        // let mut point_data = create_storage_buffers::<PointLight>(
-        //     &context.allocators,
-        //     point_layout,
-        //     image_count,
-        //     1000,
-        // );
-        // let mut dir_data = create_storage_buffers::<DirectionLight>(
-        //     &context.allocators,
-        //     dir_layout,
-        //     image_count,
-        //     1000,
-        // );
 
         // pack into frames
         let mut frame_data = vec![];
@@ -126,6 +110,15 @@ impl DeferredRenderer {
                 Default::default(),
             )
             .unwrap();
+            let descriptor_allocator = &context.allocators.descriptor_set;
+            let global_draw_set = lit_draw_system.shaders[0]
+                .pipeline
+                .create_descriptor_set(descriptor_allocator, global_buffer.clone(), 0)
+                .into();
+            let global_light_set = lighting_system
+                .point_pipeline
+                .create_descriptor_set(descriptor_allocator, global_buffer.clone(), 0)
+                .into();
 
             // draw data
             let (objects_buffer, objects_set) = lit_draw_system.shaders[0]
@@ -145,17 +138,10 @@ impl DeferredRenderer {
 
             // println!("Creation layout: {:?}", global_set.as_ref().0.layout());
 
-            let descriptor_allocator = &context.allocators.descriptor_set;
             frame_data.push(FrameData {
-                global_buffer: global_buffer.clone(),
-                global_draw_set: lit_draw_system.shaders[0]
-                    .pipeline
-                    .create_descriptor_set(descriptor_allocator, global_buffer.clone(), 0)
-                    .into(),
-                global_light_set: lighting_system
-                    .point_pipeline
-                    .create_descriptor_set(descriptor_allocator, global_buffer, 0)
-                    .into(),
+                global_buffer,
+                global_draw_set,
+                global_light_set,
 
                 objects_buffer,
                 objects_set: objects_set.into(),

@@ -13,7 +13,7 @@ use vulkano::{
 
 use crate::{
     render::resource_manager::MaterialID,
-    vulkano_objects::{buffers::Buffers, pipeline::PipelineHandler},
+    vulkano_objects::{buffers::MeshBuffers, pipeline::PipelineHandler},
     VertexFull,
 };
 
@@ -21,6 +21,14 @@ pub struct Shader {
     id: MaterialID,
     pub pipeline: PipelineHandler<VertexFull>,
     materials: Vec<Material>,
+}
+
+pub type RenderSubmit = Arc<Mutex<Vec<(Arc<MeshBuffers<VertexFull>>, Matrix4<f32>)>>>;
+
+struct Material {
+    pub descriptor_set: Option<Arc<PersistentDescriptorSet>>,
+    pending_objects: RenderSubmit,
+    pending_meshes: Vec<Arc<MeshBuffers<VertexFull>>>,
 }
 
 impl Display for Shader {
@@ -186,19 +194,12 @@ impl Shader {
     }
 }
 
-pub type RenderSubmit = Arc<Mutex<Vec<(Arc<Buffers<VertexFull>>, Matrix4<f32>)>>>;
-
-struct Material {
-    pub descriptor_set: Option<Arc<PersistentDescriptorSet>>,
-    pending_objects: RenderSubmit,
-    pending_meshes: Vec<Arc<Buffers<VertexFull>>>,
-}
 impl Material {
     // bind material sets starting from set 2
-    fn bind_sets<T, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
+    fn bind_sets<L, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &self,
         layout: &Arc<PipelineLayout>,
-        command_builder: &mut AutoCommandBufferBuilder<T, A>,
+        command_builder: &mut AutoCommandBufferBuilder<L, A>,
     ) {
         if let Some(set) = &self.descriptor_set {
             command_builder

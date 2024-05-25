@@ -8,7 +8,7 @@ use vulkano::{
 
 use crate::{
     shaders::{self, SolidData},
-    vulkano_objects::buffers::Buffers,
+    vulkano_objects::buffers::MeshBuffers,
     VertexFull,
 };
 
@@ -62,7 +62,7 @@ pub enum TextureID {
 ///
 /// Call `begin_retrieving` to retrieve resources
 pub struct ResourceManager {
-    loaded_meshes: HashMap<MeshID, Arc<Buffers<VertexFull>>>,
+    loaded_meshes: HashMap<MeshID, Arc<MeshBuffers<VertexFull>>>,
     loaded_materials: HashMap<(MaterialID, bool), RenderSubmit>,
     loaded_textures: HashMap<TextureID, Arc<ImageView>>,
     linear_sampler: Arc<Sampler>,
@@ -106,7 +106,7 @@ pub struct ResourceRetriever<'a> {
 }
 
 impl<'a> ResourceRetriever<'a> {
-    pub fn get_mesh(&mut self, id: MeshID) -> Arc<Buffers<VertexFull>> {
+    pub fn get_mesh(&mut self, id: MeshID) -> Arc<MeshBuffers<VertexFull>> {
         let loaded_meshes = &mut self.loaded_resources.loaded_meshes;
         match loaded_meshes.get(&id) {
             Some(mesh) => mesh.clone(),
@@ -141,7 +141,7 @@ impl<'a> ResourceRetriever<'a> {
                             },
                         ];
                         let indices = vec![0, 1, 2, 2, 1, 3];
-                        let mesh = Arc::new(Buffers::initialize_device_local(
+                        let mesh = Arc::new(MeshBuffers::initialize_device_local(
                             &self.context.allocators,
                             self.context.queue.clone(),
                             vertices,
@@ -372,11 +372,11 @@ impl<'a> ResourceRetriever<'a> {
 fn mesh_from_file<'a>(
     context: &'a Context,
     path: &str,
-) -> impl Iterator<Item = Arc<Buffers<VertexFull>>> + 'a {
+) -> impl Iterator<Item = Arc<MeshBuffers<VertexFull>>> + 'a {
     from_obj(Path::new(path))
         .into_iter()
         .map(|(vertices, indices)| {
-            Arc::new(Buffers::initialize_device_local(
+            Arc::new(MeshBuffers::initialize_device_local(
                 &context.allocators,
                 context.queue.clone(),
                 vertices,

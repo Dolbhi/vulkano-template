@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cgmath::{Matrix4, Rad, SquareMatrix};
 
-use crate::{vulkano_objects::buffers::Buffers, VertexFull};
+use crate::{vulkano_objects::buffers::MeshBuffers, VertexFull};
 
 use super::material::RenderSubmit;
 
@@ -10,7 +10,7 @@ use super::material::RenderSubmit;
 /// Data for standard rendering of a mesh
 /// Type T is the additional data type of the object (usually a transform matrix)
 pub struct RenderObject<T: Clone> {
-    pub mesh: Arc<Buffers<VertexFull>>,
+    pub mesh: Arc<MeshBuffers<VertexFull>>,
     pub material: RenderSubmit,
     pub data: T,
 }
@@ -22,7 +22,7 @@ pub struct RenderObject<T: Clone> {
 // }
 
 impl RenderObject<Matrix4<f32>> {
-    pub fn new(mesh: Arc<Buffers<VertexFull>>, material: RenderSubmit) -> Self {
+    pub fn new(mesh: Arc<MeshBuffers<VertexFull>>, material: RenderSubmit) -> Self {
         Self {
             mesh,
             material,

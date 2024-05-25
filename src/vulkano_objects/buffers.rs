@@ -26,13 +26,13 @@ type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
 
 /// Buffers for vertcies and indecies, essentially a struct containing mesh data
 #[derive(Debug)]
-pub struct Buffers<V: Vertex + BufferContents> {
+pub struct MeshBuffers<V: Vertex + BufferContents> {
     pub vertex: Subbuffer<[V]>,
     pub index: Subbuffer<[u32]>,
     // pub uniforms: Vec<Uniform<U>>,
 }
 
-impl<V: Vertex + BufferContents> Buffers<V> {
+impl<V: Vertex + BufferContents> MeshBuffers<V> {
     /// Creates device local vertex and index buffers of specified model
     pub fn initialize_device_local(
         allocators: &Allocators,
@@ -369,20 +369,6 @@ pub fn create_storage_buffer<T: BufferContents>(
 
     (storage_buffer, descriptor_set)
 }
-
-// pub fn create_descriptor_set(
-//     allocators: &Allocators,
-//     descriptor_set_layout: Arc<DescriptorSetLayout>,
-//     writes: impl IntoIterator<Item = WriteDescriptorSet>,
-// ) -> Arc<PersistentDescriptorSet> {
-//     PersistentDescriptorSet::new(
-//         &allocators.descriptor_set,
-//         descriptor_set_layout,
-//         writes,
-//         [],
-//     )
-//     .unwrap()
-// }
 
 /// Write to a storage buffer from an iterator
 /// returns the index of the last item added or None if no items were added
