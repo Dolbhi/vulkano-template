@@ -6,10 +6,7 @@ use super::{
 };
 use crate::{
     render::{resource_manager::MaterialID, Context},
-    shaders::{
-        draw::{self, GPUGlobalData, GPUObjectData},
-        lighting::{DirectionLight, PointLight},
-    },
+    shaders::{self, DirectionLight, GPUGlobalData, GPUObjectData, PointLight},
     vulkano_objects::{
         self,
         buffers::{create_storage_buffers, write_to_buffer, write_to_storage_buffer},
@@ -55,9 +52,9 @@ impl DeferredRenderer {
             context,
             &Subpass::from(render_pass.clone(), 0).unwrap(),
             MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
-            draw::load_basic_vs(context.device.clone())
+            shaders::load_basic_vs(context.device.clone())
                 .expect("failed to create lit shader module"),
-            draw::load_basic_fs(context.device.clone())
+            shaders::load_basic_fs(context.device.clone())
                 .expect("failed to create lit shader module"),
         );
         let (lighting_system, [global_light_layout, point_layout, dir_layout]) =
@@ -70,9 +67,9 @@ impl DeferredRenderer {
             context,
             &Subpass::from(render_pass.clone(), 2).unwrap(),
             MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
-            draw::load_basic_vs(context.device.clone())
+            shaders::load_basic_vs(context.device.clone())
                 .expect("failed to create unlit shader module"),
-            draw::load_basic_fs(context.device.clone())
+            shaders::load_basic_fs(context.device.clone())
                 .expect("failed to create unlit shader module"),
         );
 

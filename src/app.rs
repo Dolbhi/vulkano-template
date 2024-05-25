@@ -24,7 +24,7 @@ use crate::{
     },
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
-    shaders::{draw::GPUGlobalData, lighting::DirectionLight},
+    shaders::{DirectionLight, GPUGlobalData},
     ui::{self, MenuOption},
     RENDER_PROFILER,
 };

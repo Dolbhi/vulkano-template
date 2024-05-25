@@ -1,24 +1,59 @@
 pub mod draw;
-pub mod lighting;
 
-impl Into<draw::GPUGlobalData> for lighting::GPUGlobalData {
-    fn into(self) -> draw::GPUGlobalData {
-        draw::GPUGlobalData {
-            view: self.view,
-            proj: self.proj,
-            view_proj: self.view_proj,
-            inv_view_proj: self.inv_view_proj,
-        }
-    }
-}
+vulkano_shaders::shader! {
+    shaders: {
+        // draw
+        basic_vs: {
+            ty: "vertex",
+            path: "src/shaders/draw/basic/vertex.vert",
+        },
+        basic_fs: {
+            ty: "fragment",
+            path: "src/shaders/draw/basic/fragment.frag",
+        },
+        uv_fs: {
+            ty: "fragment",
+            path: "src/shaders/draw/uv/fragment.frag",
+        },
+        grad_fs: {
+            ty: "fragment",
+            path: "src/shaders/draw/gradient/fragment.frag",
+        },
 
-impl Into<lighting::GPUGlobalData> for draw::GPUGlobalData {
-    fn into(self) -> lighting::GPUGlobalData {
-        lighting::GPUGlobalData {
-            view: self.view,
-            proj: self.proj,
-            view_proj: self.view_proj,
-            inv_view_proj: self.inv_view_proj,
-        }
+        // colored draw
+        colored_vs: {
+            ty: "vertex",
+            path: "src/shaders/colored/vertex.vert",
+        },
+        solid_fs: {
+            ty: "fragment",
+            path: "src/shaders/colored/solid.frag",
+        },
+        billboard_vs: {
+            ty: "vertex",
+            path: "src/shaders/colored/billboard.vert",
+        },
+
+        // lighting
+        point_vs: {
+            ty: "vertex",
+            path: "src/shaders/lighting/point.vert",
+        },
+        point_fs: {
+            ty: "fragment",
+            path: "src/shaders/lighting/point.frag",
+        },
+        direction_vs: {
+            ty: "vertex",
+            path: "src/shaders/lighting/directional.vert",
+        },
+        direction_fs: {
+            ty: "fragment",
+            path: "src/shaders/lighting/directional.frag",
+        },
+        ambient_fs: {
+            ty: "fragment",
+            path: "src/shaders/lighting/ambient.frag",
+        },
     }
 }

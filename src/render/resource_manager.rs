@@ -7,7 +7,7 @@ use vulkano::{
 };
 
 use crate::{
-    shaders::draw::{self, SolidData},
+    shaders::{self, SolidData},
     vulkano_objects::buffers::Buffers,
     VertexFull,
 };
@@ -219,9 +219,9 @@ impl<'a> ResourceRetriever<'a> {
                                     system.add_shader(
                                         self.context,
                                         id,
-                                        draw::load_basic_vs(self.context.device.clone())
+                                        shaders::load_basic_vs(self.context.device.clone())
                                             .expect("failed to create uv shader module"),
-                                        draw::load_uv_fs(self.context.device.clone())
+                                        shaders::load_uv_fs(self.context.device.clone())
                                             .expect("failed to create uv shader module"),
                                     );
                                 }
@@ -229,18 +229,18 @@ impl<'a> ResourceRetriever<'a> {
                                     system.add_shader(
                                         self.context,
                                         id,
-                                        draw::load_basic_vs(self.context.device.clone())
+                                        shaders::load_basic_vs(self.context.device.clone())
                                             .expect("failed to create grad shader module"),
-                                        draw::load_grad_fs(self.context.device.clone())
+                                        shaders::load_grad_fs(self.context.device.clone())
                                             .expect("failed to create grad shader module"),
                                     );
                                 }
                                 MaterialID::Billboard => system.add_shader(
                                     self.context,
                                     id,
-                                    draw::load_billboard_vs(self.context.device.clone())
+                                    shaders::load_billboard_vs(self.context.device.clone())
                                         .expect("failed to create billboard shader module"),
-                                    draw::load_solid_fs(self.context.device.clone())
+                                    shaders::load_solid_fs(self.context.device.clone())
                                         .expect("failed to create billboard shader module"),
                                 ),
                             };
@@ -280,7 +280,7 @@ impl<'a> ResourceRetriever<'a> {
                     MaterialID::Billboard => {
                         let color_buffer = create_material_buffer(
                             self.context,
-                            draw::SolidData {
+                            shaders::SolidData {
                                 color: [1.0, 0.0, 1.0, 1.0],
                             },
                             vulkano::buffer::BufferUsage::empty(),
@@ -318,9 +318,9 @@ impl<'a> ResourceRetriever<'a> {
             system.add_shader(
                 self.context,
                 MaterialID::Color(0),
-                draw::load_basic_vs(self.context.device.clone())
+                shaders::load_basic_vs(self.context.device.clone())
                     .expect("failed to create solid shader module"),
-                draw::load_solid_fs(self.context.device.clone())
+                shaders::load_solid_fs(self.context.device.clone())
                     .expect("failed to create solid shader module"),
             );
         }
@@ -330,7 +330,7 @@ impl<'a> ResourceRetriever<'a> {
         self.loaded_resources.next_color_id += 1;
         let color_buffer = create_material_buffer(
             self.context,
-            draw::SolidData { color },
+            shaders::SolidData { color },
             vulkano::buffer::BufferUsage::empty(),
         );
         let mat = init_material(

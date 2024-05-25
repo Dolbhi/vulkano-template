@@ -17,13 +17,15 @@ layout(set = 0, binding = 0) uniform GPUGlobalData {
 struct GPUObjectData {
 	mat4 render_matrix;
     mat4 normal_matrix;
+    // vec4 color;
 };
-layout(set = 1, binding = 0) readonly buffer ObjectBuffer {
+layout(set = 1, binding = 0) readonly buffer ColoredBuffer {
     GPUObjectData objects[];
 } objectBuffer;
 
 layout(location = 0) out vec2 v_tex_coord;
 layout(location = 1) out vec3 v_normal;
+// layout(location = 2) out uint v_object_index;
 
 void main() {
     // billboard shenanigans
@@ -46,5 +48,6 @@ void main() {
     gl_Position = screen_pos;
     v_tex_coord = uv;
     v_normal = vec3(0.0, 0.0, 1.0);
+    // v_object_index = gl_InstanceIndex;
     // v_screen_coords = gl_Position.xy;
 }

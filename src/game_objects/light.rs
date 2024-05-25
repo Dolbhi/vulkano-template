@@ -1,6 +1,6 @@
 use cgmath::{Vector3, Vector4};
 
-use crate::shaders::lighting::{DirectionLight, PointLight};
+use crate::shaders::{DirectionLight, PointLight};
 
 #[derive(Clone)]
 pub struct PointLightComponent {

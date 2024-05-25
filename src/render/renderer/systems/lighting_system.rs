@@ -15,7 +15,7 @@ use vulkano::{
 
 use crate::{
     render::Context,
-    shaders::lighting,
+    shaders,
     vulkano_objects::{
         buffers::create_device_local_buffer, pipeline::PipelineHandler,
         render_pass::FramebufferAttachments,
@@ -58,20 +58,20 @@ impl LightingSystem {
         attachments: &FramebufferAttachments,
     ) -> (Self, [Arc<DescriptorSetLayout>; 3]) {
         // create pipelines
-        let vs = lighting::load_point_vs(context.device.clone())
+        let vs = shaders::load_point_vs(context.device.clone())
             .expect("failed to create point shader module");
-        let fs = lighting::load_point_fs(context.device.clone())
+        let fs = shaders::load_point_fs(context.device.clone())
             .expect("failed to create point shader module");
         let point_pipeline = Self::create_lighting_pipeline(context, subpass.clone(), vs, fs, []); //[(1, 0)]); // global data is dynamic
 
-        let vs = lighting::load_direction_vs(context.device.clone())
+        let vs = shaders::load_direction_vs(context.device.clone())
             .expect("failed to create directional shader module");
-        let fs = lighting::load_direction_fs(context.device.clone())
+        let fs = shaders::load_direction_fs(context.device.clone())
             .expect("failed to create directional shader module");
         let direction_pipeline =
             Self::create_lighting_pipeline(context, subpass.clone(), vs.clone(), fs, []);
 
-        let fs = lighting::load_ambient_fs(context.device.clone())
+        let fs = shaders::load_ambient_fs(context.device.clone())
             .expect("failed to create ambient shader module");
         let ambient_pipeline =
             Self::create_lighting_pipeline(context, subpass.clone(), vs.clone(), fs, []);
@@ -289,7 +289,7 @@ impl LightingSystem {
             .push_constants(
                 layout.clone(),
                 0,
-                lighting::GPUAmbientData {
+                shaders::GPUAmbientData {
                     ambient_color: self.ambient_color,
                 },
             )
