@@ -187,13 +187,11 @@ impl Shader {
     pub fn upload_pending_objects(&mut self) -> impl Iterator<Item = Matrix4<f32>> + '_ {
         self.materials.iter_mut().flat_map(|mat| {
             let mut objs = mat.pending_objects.lock().unwrap();
-            std::mem::take(&mut *objs)
-                .into_iter()
-                .map(|(mesh, data)| {
-                    mat.pending_meshes.push(mesh);
-                    data
-                })
-                .collect::<Vec<Matrix4<f32>>>()
+            std::mem::take(&mut *objs).into_iter().map(|(mesh, data)| {
+                mat.pending_meshes.push(mesh);
+                data
+            })
+            // .collect::<Vec<Matrix4<f32>>>()
         })
     }
 }
