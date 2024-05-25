@@ -23,11 +23,12 @@ pub struct Shader {
     materials: Vec<Material>,
 }
 
-pub type RenderSubmit = Arc<Mutex<Vec<(Arc<MeshBuffers<VertexFull>>, Matrix4<f32>)>>>;
+/// Arc Mutex storing renderobject data to be uploaded
+pub type RenderSubmit<T> = Arc<Mutex<Vec<(Arc<MeshBuffers<VertexFull>>, T)>>>;
 
 struct Material {
     pub descriptor_set: Option<Arc<PersistentDescriptorSet>>,
-    pending_objects: RenderSubmit,
+    pending_objects: RenderSubmit<Matrix4<f32>>,
     pending_meshes: Vec<Arc<MeshBuffers<VertexFull>>>,
 }
 
@@ -154,7 +155,10 @@ impl Shader {
     }
 
     /// creates a material and returns a mutex vec for submitting render objects
-    pub fn add_material(&mut self, set: Option<Arc<PersistentDescriptorSet>>) -> RenderSubmit {
+    pub fn add_material(
+        &mut self,
+        set: Option<Arc<PersistentDescriptorSet>>,
+    ) -> RenderSubmit<Matrix4<f32>> {
         let pending_objects = Arc::new(Mutex::new(vec![]));
         let material = Material {
             descriptor_set: set,

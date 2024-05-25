@@ -3,18 +3,14 @@
 
 use std::sync::Arc;
 
-use cgmath::Matrix4;
 use vulkano::{
-    buffer::{BufferContents, Subbuffer},
-    command_buffer::AutoCommandBufferBuilder,
-    descriptor_set::DescriptorSetsCollection,
-    render_pass::Subpass,
-    shader::ShaderModule,
+    command_buffer::AutoCommandBufferBuilder, descriptor_set::DescriptorSetsCollection,
+    render_pass::Subpass, shader::ShaderModule,
 };
 
 use crate::{
     render::{context::Context, render_data::material::Shader, resource_manager::MaterialID},
-    vulkano_objects::{buffers::write_to_storage_buffer, pipeline::PipelineHandler},
+    vulkano_objects::pipeline::PipelineHandler,
 };
 
 /// Collection of shaders, meant to be run on a single subpass
@@ -104,18 +100,19 @@ impl DrawSystem {
         }
     }
 
-    /// sort and write object data to given storage buffer (must be called before rendering)
-    pub fn update_object_buffer<O: BufferContents + From<Matrix4<f32>>>(
-        &mut self,
-        buffer: &Subbuffer<[O]>,
-        offset: usize,
-    ) -> Option<usize> {
-        let obj_iter = self
-            .shaders
-            .iter_mut()
-            .flat_map(|shader| shader.upload_pending_objects());
-        write_to_storage_buffer(buffer, obj_iter, offset)
-    }
+    // /// sort and write object data to given storage buffer (must be called before rendering)
+    // pub fn update_object_buffer<O: BufferContents + From<Matrix4<f32>>>(
+    //     &mut self,
+    //     buffer: &Subbuffer<[O]>,
+    //     offset: usize,
+    // ) -> Option<usize> {
+    //     let obj_iter = self
+    //         .shaders
+    //         .iter_mut()
+    //         .flat_map(|shader| shader.upload_pending_objects());
+    //     write_to_storage_buffer(buffer, obj_iter, offset)
+    // }
+
     /// bind draw calls to the given command buffer builder, be sure to call `update_object_buffer()` before hand
     pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &mut self,

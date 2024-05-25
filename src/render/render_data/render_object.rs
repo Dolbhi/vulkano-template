@@ -11,7 +11,7 @@ use super::material::RenderSubmit;
 /// Type T is the additional data type of the object (usually a transform matrix)
 pub struct RenderObject<T: Clone> {
     pub mesh: Arc<MeshBuffers<VertexFull>>,
-    pub material: RenderSubmit,
+    pub material: RenderSubmit<T>,
     pub data: T,
 }
 
@@ -22,7 +22,7 @@ pub struct RenderObject<T: Clone> {
 // }
 
 impl RenderObject<Matrix4<f32>> {
-    pub fn new(mesh: Arc<MeshBuffers<VertexFull>>, material: RenderSubmit) -> Self {
+    pub fn new(mesh: Arc<MeshBuffers<VertexFull>>, material: RenderSubmit<Matrix4<f32>>) -> Self {
         Self {
             mesh,
             material,

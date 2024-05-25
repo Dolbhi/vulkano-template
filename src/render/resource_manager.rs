@@ -1,5 +1,6 @@
 use std::{collections::HashMap, iter::zip, path::Path, sync::Arc};
 
+use cgmath::Matrix4;
 use vulkano::{
     buffer::Subbuffer,
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
@@ -63,7 +64,7 @@ pub enum TextureID {
 /// Call `begin_retrieving` to retrieve resources
 pub struct ResourceManager {
     loaded_meshes: HashMap<MeshID, Arc<MeshBuffers<VertexFull>>>,
-    loaded_materials: HashMap<(MaterialID, bool), RenderSubmit>,
+    loaded_materials: HashMap<(MaterialID, bool), RenderSubmit<Matrix4<f32>>>,
     loaded_textures: HashMap<TextureID, Arc<ImageView>>,
     linear_sampler: Arc<Sampler>,
     next_color_id: u32,
@@ -191,7 +192,7 @@ impl<'a> ResourceRetriever<'a> {
         }
     }
 
-    pub fn get_material(&mut self, id: MaterialID, lit: bool) -> RenderSubmit {
+    pub fn get_material(&mut self, id: MaterialID, lit: bool) -> RenderSubmit<Matrix4<f32>> {
         match self.loaded_resources.loaded_materials.get(&(id, lit)) {
             Some(mat) => mat.clone(),
             None => {
@@ -306,7 +307,7 @@ impl<'a> ResourceRetriever<'a> {
         &mut self,
         color: [f32; 4],
         lit: bool,
-    ) -> (MaterialID, Subbuffer<SolidData>, RenderSubmit) {
+    ) -> (MaterialID, Subbuffer<SolidData>, RenderSubmit<Matrix4<f32>>) {
         // Narrow down system
         let system = if lit {
             &mut self.lit_system
@@ -390,7 +391,7 @@ fn init_material(
     context: &Context,
     shader: &mut Shader,
     descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
-) -> RenderSubmit {
+) -> RenderSubmit<Matrix4<f32>> {
     shader.add_material(Some(
         PersistentDescriptorSet::new(
             &context.allocators.descriptor_set,
