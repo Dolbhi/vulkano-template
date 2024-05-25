@@ -7,7 +7,7 @@ use crate::{
     game_objects::{
         light::PointLightComponent,
         transform::{TransformCreateInfo, TransformSystem},
-        MaterialSwapper, Rotate,
+        MaterialSwapper, Rotate, WorldLoader,
     },
     physics::RigidBody,
     render::{
@@ -27,9 +27,8 @@ pub fn init_world(
     // let le_mesh_count = from_obj(Path::new("models/lost_empire.obj")).len(); // 45
 
     // meshes
-    let suzanne_mesh = resources.get_mesh(MeshID::Suzanne);
-    let square_mesh = resources.get_mesh(MeshID::Square);
-    let cube_mesh = resources.get_mesh(MeshID::Cube);
+    let [suzanne_mesh, square_mesh, cube_mesh] =
+        [MeshID::Suzanne, MeshID::Square, MeshID::Cube].map(|id| resources.get_mesh(id));
 
     let ina_meshes = [
         MeshID::InaBody,
@@ -64,11 +63,12 @@ pub fn init_world(
     let green_mat = resources.load_solid_material([0., 1., 0., 1.], true).2;
 
     // objects
+    let mut obj_loader = WorldLoader(world, transform_sys);
+
     //      Suzanne
-    let suzanne = transform_sys.next().unwrap();
     let suzanne_obj = RenderObject::new_default_data(suzanne_mesh.clone(), uv_mat.clone());
     let rotate = Rotate(Vector3::new(1.0, 1.0, 0.0).normalize(), Rad(5.0));
-    world.push((suzanne, suzanne_obj, rotate));
+    obj_loader.add_2_comp([0., 0., 0.], suzanne_obj, rotate);
 
     //      Spam Suzanne
     for x in 0..20 {
@@ -78,53 +78,31 @@ pub fn init_world(
             } else {
                 &green_mat
             };
-            let square_obj = RenderObject::new_default_data(suzanne_mesh.clone(), mat.clone());
-            let transform_id = transform_sys.add_transform(TransformCreateInfo {
-                translation: [x as f32, 7f32, z as f32].into(),
-                ..Default::default()
-            });
-
-            world.push((transform_id, square_obj));
+            obj_loader.quick_ro(
+                [x as f32, 7f32, z as f32],
+                suzanne_mesh.clone(),
+                mat.clone(),
+            );
         }
     }
 
     //      Squares
+    let square_obj = RenderObject::new_default_data(square_mesh.clone(), grad_mat.clone()); //uv_mat.clone());
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
-        let square_obj = RenderObject::new_default_data(square_mesh.clone(), grad_mat.clone()); //uv_mat.clone());
-        let transform_id = transform_sys.add_transform(TransformCreateInfo {
-            translation: [x, y, z].into(),
-            ..Default::default()
-        });
-
-        world.push((transform_id, square_obj));
+        obj_loader.add_1_comp([x, y, z], square_obj.clone());
     }
 
     //      Ina
-    let ina_transform = transform_sys.add_transform(TransformCreateInfo {
-        translation: [0.0, 5.0, -1.0].into(),
-        ..Default::default()
-    });
     let rotate = Rotate([0., 1., 0.].into(), Rad(0.5));
-    world.push((ina_transform, rotate));
+    let (ina_transform, _) = obj_loader.add_1_comp([0.0, 5.0, -1.0], rotate);
     for (mesh, mat) in zip(ina_meshes, ina_mats.clone()) {
-        let obj = RenderObject::new_default_data(mesh, mat);
-        let transform_id = transform_sys.add_transform(TransformCreateInfo {
-            parent: Some(ina_transform),
-            ..Default::default()
-        });
-
-        world.push((transform_id, obj));
+        obj_loader.quick_ro(ina_transform, mesh, mat);
     }
 
     //      lost empires
-    let le_transform = transform_sys.add_transform(TransformCreateInfo::default());
+    let le_transform = obj_loader.1.add_transform(TransformCreateInfo::default());
     for mesh in le_meshes {
         let le_obj = RenderObject::new_default_data(mesh, le_mat.clone());
-        let transform_id = transform_sys.add_transform(TransformCreateInfo {
-            parent: Some(le_transform),
-            ..Default::default()
-        });
-
         let mat_swapper = MaterialSwapper::new([
             le_mat.clone(),
             le_mat_unlit.clone(),
@@ -132,50 +110,50 @@ pub fn init_world(
             ina_mats[1].clone(),
         ]);
 
-        world.push((transform_id, le_obj, mat_swapper));
+        obj_loader.add_2_comp(le_transform, le_obj, mat_swapper);
     }
 
     // lights
-    world.push((
-        transform_sys.add_transform(TransformCreateInfo {
+    obj_loader.add_2_comp(
+        TransformCreateInfo {
             scale: Vector3::new(0.1, 0.1, 0.1),
             translation: Vector3::new(0., 5., -1.),
             ..Default::default()
-        }),
+        },
         PointLightComponent {
             color: Vector4::new(1., 0., 0., 3.),
             half_radius: 3.,
         },
         RenderObject::new_default_data(cube_mesh.clone(), red_mat.clone()),
-    ));
-    world.push((
-        transform_sys.add_transform(TransformCreateInfo {
+    );
+    obj_loader.add_2_comp(
+        TransformCreateInfo {
             scale: Vector3::new(0.1, 0.1, 0.1),
             translation: Vector3::new(0.0, 6.0, -0.5),
             ..Default::default()
-        }),
+        },
         PointLightComponent {
             color: Vector4::new(0., 0., 1., 2.),
             half_radius: 3.,
         },
         RenderObject::new_default_data(cube_mesh.clone(), blue_mat),
-    ));
+    );
 
     // spam lights
     for x in 0..20 {
         for z in -10..10 {
-            world.push((
-                transform_sys.add_transform(TransformCreateInfo {
+            obj_loader.add_2_comp(
+                TransformCreateInfo {
                     scale: Vector3::new(0.1, 0.1, 0.1),
                     translation: Vector3::new(x as f32, 6.1, z as f32),
                     ..Default::default()
-                }),
+                },
                 PointLightComponent {
                     color: Vector4::new(1., 0., 0., 1.),
                     half_radius: 1.,
                 },
                 RenderObject::new_default_data(cube_mesh.clone(), red_mat.clone()),
-            ));
+            );
         }
     }
 }

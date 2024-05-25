@@ -5,28 +5,6 @@ use std::{
 
 use cgmath::{Matrix4, One, Quaternion, SquareMatrix, Vector3, VectorSpace, Zero};
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
-pub struct TransformID(u32);
-impl TransformID {
-    pub fn id(&self) -> u32 {
-        self.0
-    }
-}
-impl From<TransformCreateInfo> for Transform {
-    fn from(val: TransformCreateInfo) -> Self {
-        Transform {
-            parent: val.parent,
-            children: HashSet::new(),
-            local_model: None,
-            global_model: None,
-            translation: val.translation,
-            rotation: val.rotation,
-            scale: val.scale,
-            last_model: None,
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct Transform {
     parent: Option<TransformID>,
@@ -38,7 +16,57 @@ pub struct Transform {
     scale: Vector3<f32>,
     last_model: Option<Matrix4<f32>>,
 }
+
+pub struct TransformCreateInfo {
+    pub parent: Option<TransformID>,
+    pub translation: Vector3<f32>,
+    pub rotation: Quaternion<f32>,
+    pub scale: Vector3<f32>,
+}
+
+pub struct TransformSystem {
+    root: HashSet<TransformID>,
+    transforms: HashMap<TransformID, Transform>,
+    next_id: u32,
+    last_fixed_time: Instant,
+    interpolation: f32,
+}
+
+#[derive(Debug)]
+pub struct TransformView<'a> {
+    pub translation: &'a Vector3<f32>,
+    pub rotation: &'a Quaternion<f32>,
+    pub scale: &'a Vector3<f32>,
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
+pub struct TransformID(u32);
+
+#[derive(Debug)]
+pub enum TransformError {
+    IDNotFound,
+}
+
+impl TransformID {
+    pub fn id(&self) -> u32 {
+        self.0
+    }
+}
+
 impl Transform {
+    fn new(val: TransformCreateInfo) -> Self {
+        Self {
+            parent: val.parent,
+            children: HashSet::new(),
+            local_model: None,
+            global_model: None,
+            translation: val.translation,
+            rotation: val.rotation,
+            scale: val.scale,
+            last_model: None,
+        }
+    }
+
     fn get_local_model(&mut self) -> Matrix4<f32> {
         match self.local_model {
             Some(matrix) => matrix,
@@ -107,12 +135,6 @@ impl Transform {
     }
 }
 
-pub struct TransformCreateInfo {
-    pub parent: Option<TransformID>,
-    pub translation: Vector3<f32>,
-    pub rotation: Quaternion<f32>,
-    pub scale: Vector3<f32>,
-}
 impl TransformCreateInfo {
     pub fn set_parent(mut self, parent: Option<TransformID>) -> Self {
         self.parent = parent;
@@ -131,20 +153,16 @@ impl TransformCreateInfo {
         self
     }
 }
-// impl Into<Transform> for TransformCreateInfo {
-//     fn into(self) -> Transform {
-//         Transform {
-//             parent: self.parent,
-//             children: HashSet::new(),
-//             local_model: None,
-//             global_model: None,
-//             translation: self.translation,
-//             rotation: self.rotation,
-//             scale: self.scale,
-//             last_model: None,
-//         }
-//     }
-// }
+impl From<[f32; 3]> for TransformCreateInfo {
+    fn from(value: [f32; 3]) -> Self {
+        Self::default().set_translation(value)
+    }
+}
+impl From<TransformID> for TransformCreateInfo {
+    fn from(value: TransformID) -> Self {
+        Self::default().set_parent(Some(value))
+    }
+}
 impl Default for TransformCreateInfo {
     fn default() -> Self {
         Self {
@@ -156,24 +174,6 @@ impl Default for TransformCreateInfo {
     }
 }
 
-#[derive(Debug)]
-pub struct TransformView<'a> {
-    pub translation: &'a Vector3<f32>,
-    pub rotation: &'a Quaternion<f32>,
-    pub scale: &'a Vector3<f32>,
-}
-
-#[derive(Debug)]
-pub enum TransformError {
-    IDNotFound,
-}
-pub struct TransformSystem {
-    root: HashSet<TransformID>,
-    transforms: HashMap<TransformID, Transform>,
-    next_id: u32,
-    last_fixed_time: Instant,
-    interpolation: f32,
-}
 impl TransformSystem {
     pub fn new() -> Self {
         Self {
@@ -304,7 +304,9 @@ impl TransformSystem {
     }
 
     /// adds given transform to the system and returns its unique ID
-    pub fn add_transform(&mut self, info: TransformCreateInfo) -> TransformID {
+    pub fn add_transform(&mut self, info: impl Into<TransformCreateInfo>) -> TransformID {
+        let info = info.into();
+
         // create id
         let id = TransformID(self.next_id);
 
@@ -320,7 +322,7 @@ impl TransformSystem {
         };
 
         // create transform
-        self.transforms.insert(id, info.into());
+        self.transforms.insert(id, Transform::new(info));
         self.next_id += 1;
 
         id
@@ -379,7 +381,7 @@ impl Iterator for TransformSystem {
     type Item = TransformID;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.add_transform(Default::default()))
+        Some(self.add_transform(TransformCreateInfo::default()))
     }
 }
 impl Default for TransformSystem {

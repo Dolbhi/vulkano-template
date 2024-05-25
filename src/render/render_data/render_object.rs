@@ -6,7 +6,7 @@ use crate::{vulkano_objects::buffers::MeshBuffers, VertexFull};
 
 use super::material::RenderSubmit;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Data for standard rendering of a mesh
 /// Type T is the additional data type of the object (usually a transform matrix)
 pub struct RenderObject<T: Clone> {
@@ -32,6 +32,12 @@ impl<T: Clone> RenderObject<T> {
             .lock()
             .unwrap()
             .push((self.mesh.clone(), self.model, self.data.clone()));
+    }
+}
+
+impl<T: Clone> From<(Arc<MeshBuffers<VertexFull>>, RenderSubmit<T>, T)> for RenderObject<T> {
+    fn from(value: (Arc<MeshBuffers<VertexFull>>, RenderSubmit<T>, T)) -> Self {
+        Self::new(value.0, value.1, value.2)
     }
 }
 
