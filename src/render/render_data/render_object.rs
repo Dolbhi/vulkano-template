@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Rad, SquareMatrix};
+use cgmath::{Matrix4, SquareMatrix};
 
 use crate::{vulkano_objects::buffers::MeshBuffers, VertexFull};
 
@@ -11,35 +11,19 @@ use super::material::RenderSubmit;
 /// Type T is the additional data type of the object (usually a transform matrix)
 pub struct RenderObject<T: Clone> {
     pub mesh: Arc<MeshBuffers<VertexFull>>,
+    pub model: Matrix4<f32>,
     pub material: RenderSubmit<T>,
     pub data: T,
 }
 
-// impl<T: Clone> RenderObject<T> {
-//     pub fn get_data(&self) -> T {
-//         self.data.clone()
-//     }
-// }
-
-impl RenderObject<Matrix4<f32>> {
-    pub fn new(mesh: Arc<MeshBuffers<VertexFull>>, material: RenderSubmit<Matrix4<f32>>) -> Self {
+impl<T: Clone> RenderObject<T> {
+    pub fn new(mesh: Arc<MeshBuffers<VertexFull>>, material: RenderSubmit<T>, data: T) -> Self {
         Self {
             mesh,
+            model: Matrix4::identity(),
             material,
-            // uniforms,
-            data: Matrix4::identity(),
+            data,
         }
-    }
-
-    pub fn set_matrix(&mut self, matrix: Matrix4<f32>) {
-        self.data = matrix;
-    }
-
-    pub fn update_transform(&mut self, position: [f32; 3], rotation: Rad<f32>) {
-        let rotation = Matrix4::from_axis_angle([0., 1., 0.].into(), rotation);
-        let translation = Matrix4::from_translation(position.into());
-
-        self.data = translation * rotation;
     }
 
     /// Adds the render object's mesh and data to its material's render queue
@@ -47,18 +31,13 @@ impl RenderObject<Matrix4<f32>> {
         self.material
             .lock()
             .unwrap()
-            .push((self.mesh.clone(), self.data));
+            .push((self.mesh.clone(), self.model, self.data.clone()));
     }
+}
 
-    // pub fn update_transform_axis(
-    //     &mut self,
-    //     position: [f32; 3],
-    //     rotation: Rad<f32>,
-    //     axis: [f32; 3],
-    // ) {
-    //     let rotation = Matrix4::from_axis_angle(axis.into(), rotation);
-    //     let translation = Matrix4::from_translation(position.into());
-
-    //     self.transform = translation * rotation;
-    // }
+impl<T: Default + Clone> RenderObject<T> {
+    /// Create render object with data set to its default value
+    pub fn new_default_data(mesh: Arc<MeshBuffers<VertexFull>>, material: RenderSubmit<T>) -> Self {
+        Self::new(mesh, material, T::default())
+    }
 }

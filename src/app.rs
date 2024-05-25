@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cgmath::{Matrix4, One, Quaternion, Vector3, Vector4};
+use cgmath::{One, Quaternion, Vector3, Vector4};
 use legion::*;
 
 use winit::{
@@ -309,10 +309,9 @@ impl App {
                 }
                 camera.sync_transform(transforms);
 
-                // update mat swap
+                // update basic mat swap
                 if self.inputs.q_triggered {
-                    let mut query =
-                        <(&mut MaterialSwapper, &mut RenderObject<Matrix4<f32>>)>::query();
+                    let mut query = <(&mut MaterialSwapper<()>, &mut RenderObject<()>)>::query();
 
                     query.for_each_mut(world, |(swapper, render_object)| {
                         let next_mat = swapper.swap_material();
@@ -327,14 +326,14 @@ impl App {
                 // let cam_model = transforms.get_slerp_model(&camera.transform).unwrap();
                 let global_data = GPUGlobalData::from_camera(camera, extends);
 
-                // update render objects
-                let mut query = <(&TransformID, &mut RenderObject<Matrix4<f32>>)>::query()
+                // update basic render objects
+                let mut query = <(&TransformID, &mut RenderObject<()>)>::query()
                     .filter(!component::<DisabledLERP>());
                 // println!("==== RENDER OBJECT DATA ====");
                 for (transform_id, render_object) in query.iter_mut(world) {
                     let transfrom_matrix = transforms.get_lerp_model(transform_id).unwrap();
                     // println!("Obj {:?}: {:?}", transform_id, obj);
-                    render_object.set_matrix(transfrom_matrix);
+                    render_object.model = transfrom_matrix;
                     render_object.upload();
                 }
 

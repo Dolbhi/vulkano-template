@@ -64,10 +64,17 @@ pub enum TextureID {
 /// Call `begin_retrieving` to retrieve resources
 pub struct ResourceManager {
     loaded_meshes: HashMap<MeshID, Arc<MeshBuffers<VertexFull>>>,
-    loaded_materials: HashMap<(MaterialID, bool), RenderSubmit<Matrix4<f32>>>,
+    loaded_materials: HashMap<(MaterialID, bool), RenderSubmit<()>>,
     loaded_textures: HashMap<TextureID, Arc<ImageView>>,
     linear_sampler: Arc<Sampler>,
     next_color_id: u32,
+}
+
+pub struct ResourceRetriever<'a> {
+    loaded_resources: &'a mut ResourceManager,
+    context: &'a Context,
+    lit_system: &'a mut DrawSystem<()>,
+    unlit_system: &'a mut DrawSystem<()>,
 }
 
 impl ResourceManager {
@@ -87,8 +94,8 @@ impl ResourceManager {
     pub fn begin_retrieving<'a>(
         &'a mut self,
         context: &'a Context,
-        lit_system: &'a mut DrawSystem,
-        unlit_system: &'a mut DrawSystem,
+        lit_system: &'a mut DrawSystem<()>,
+        unlit_system: &'a mut DrawSystem<()>,
     ) -> ResourceRetriever {
         ResourceRetriever {
             loaded_resources: self,
@@ -97,13 +104,6 @@ impl ResourceManager {
             unlit_system,
         }
     }
-}
-
-pub struct ResourceRetriever<'a> {
-    loaded_resources: &'a mut ResourceManager,
-    context: &'a Context,
-    lit_system: &'a mut DrawSystem,
-    unlit_system: &'a mut DrawSystem,
 }
 
 impl<'a> ResourceRetriever<'a> {
@@ -192,7 +192,7 @@ impl<'a> ResourceRetriever<'a> {
         }
     }
 
-    pub fn get_material(&mut self, id: MaterialID, lit: bool) -> RenderSubmit<Matrix4<f32>> {
+    pub fn get_material(&mut self, id: MaterialID, lit: bool) -> RenderSubmit<()> {
         match self.loaded_resources.loaded_materials.get(&(id, lit)) {
             Some(mat) => mat.clone(),
             None => {
@@ -307,7 +307,7 @@ impl<'a> ResourceRetriever<'a> {
         &mut self,
         color: [f32; 4],
         lit: bool,
-    ) -> (MaterialID, Subbuffer<SolidData>, RenderSubmit<Matrix4<f32>>) {
+    ) -> (MaterialID, Subbuffer<SolidData>, RenderSubmit<()>) {
         // Narrow down system
         let system = if lit {
             &mut self.lit_system
@@ -387,11 +387,11 @@ fn mesh_from_file<'a>(
 }
 
 /// creates a material of the given pipeline with a corresponding descriptor set as set 2
-fn init_material(
+fn init_material<T: Clone>(
     context: &Context,
-    shader: &mut Shader,
+    shader: &mut Shader<T>,
     descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
-) -> RenderSubmit<Matrix4<f32>> {
+) -> RenderSubmit<T> {
     shader.add_material(Some(
         PersistentDescriptorSet::new(
             &context.allocators.descriptor_set,

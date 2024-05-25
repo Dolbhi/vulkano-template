@@ -3,11 +3,11 @@ use crate::game_objects::Camera;
 use cgmath::{Matrix, Matrix4, Transform};
 use winit::dpi::PhysicalSize;
 
-impl From<Matrix4<f32>> for GPUObjectData {
-    fn from(value: Matrix4<f32>) -> Self {
+impl From<(Matrix4<f32>, ())> for GPUObjectData {
+    fn from(value: (Matrix4<f32>, ())) -> Self {
         GPUObjectData {
-            render_matrix: value.into(),
-            normal_matrix: value.inverse_transform().unwrap().transpose().into(),
+            render_matrix: value.0.into(),
+            normal_matrix: value.0.inverse_transform().unwrap().transpose().into(),
             // color: [1.0, 1.0, 1.0, 1.0],
         }
     }

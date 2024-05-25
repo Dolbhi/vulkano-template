@@ -66,7 +66,7 @@ pub fn init_world(
     // objects
     //      Suzanne
     let suzanne = transform_sys.next().unwrap();
-    let suzanne_obj = RenderObject::new(suzanne_mesh.clone(), uv_mat.clone());
+    let suzanne_obj = RenderObject::new_default_data(suzanne_mesh.clone(), uv_mat.clone());
     let rotate = Rotate(Vector3::new(1.0, 1.0, 0.0).normalize(), Rad(5.0));
     world.push((suzanne, suzanne_obj, rotate));
 
@@ -78,7 +78,7 @@ pub fn init_world(
             } else {
                 &green_mat
             };
-            let square_obj = RenderObject::new(suzanne_mesh.clone(), mat.clone());
+            let square_obj = RenderObject::new_default_data(suzanne_mesh.clone(), mat.clone());
             let transform_id = transform_sys.add_transform(TransformCreateInfo {
                 translation: [x as f32, 7f32, z as f32].into(),
                 ..Default::default()
@@ -90,7 +90,7 @@ pub fn init_world(
 
     //      Squares
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
-        let square_obj = RenderObject::new(square_mesh.clone(), grad_mat.clone()); //uv_mat.clone());
+        let square_obj = RenderObject::new_default_data(square_mesh.clone(), grad_mat.clone()); //uv_mat.clone());
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
             translation: [x, y, z].into(),
             ..Default::default()
@@ -107,7 +107,7 @@ pub fn init_world(
     let rotate = Rotate([0., 1., 0.].into(), Rad(0.5));
     world.push((ina_transform, rotate));
     for (mesh, mat) in zip(ina_meshes, ina_mats.clone()) {
-        let obj = RenderObject::new(mesh, mat);
+        let obj = RenderObject::new_default_data(mesh, mat);
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
             parent: Some(ina_transform),
             ..Default::default()
@@ -119,7 +119,7 @@ pub fn init_world(
     //      lost empires
     let le_transform = transform_sys.add_transform(TransformCreateInfo::default());
     for mesh in le_meshes {
-        let le_obj = RenderObject::new(mesh, le_mat.clone());
+        let le_obj = RenderObject::new_default_data(mesh, le_mat.clone());
         let transform_id = transform_sys.add_transform(TransformCreateInfo {
             parent: Some(le_transform),
             ..Default::default()
@@ -146,7 +146,7 @@ pub fn init_world(
             color: Vector4::new(1., 0., 0., 3.),
             half_radius: 3.,
         },
-        RenderObject::new(cube_mesh.clone(), red_mat.clone()),
+        RenderObject::new_default_data(cube_mesh.clone(), red_mat.clone()),
     ));
     world.push((
         transform_sys.add_transform(TransformCreateInfo {
@@ -158,7 +158,7 @@ pub fn init_world(
             color: Vector4::new(0., 0., 1., 2.),
             half_radius: 3.,
         },
-        RenderObject::new(cube_mesh.clone(), blue_mat),
+        RenderObject::new_default_data(cube_mesh.clone(), blue_mat),
     ));
 
     // spam lights
@@ -174,7 +174,7 @@ pub fn init_world(
                     color: Vector4::new(1., 0., 0., 1.),
                     half_radius: 1.,
                 },
-                RenderObject::new(cube_mesh.clone(), red_mat.clone()),
+                RenderObject::new_default_data(cube_mesh.clone(), red_mat.clone()),
             ));
         }
     }
@@ -198,7 +198,7 @@ pub fn init_ui_test(
             parent: Some(le_root),
             ..Default::default()
         });
-        let le_obj = RenderObject::new(mesh, le_mat.clone());
+        let le_obj = RenderObject::new_default_data(mesh, le_mat.clone());
         world.push((transform_id, le_obj));
     }
 }
@@ -220,7 +220,10 @@ pub fn init_phys_test(
         scale: [10., 10., 1.].into(),
         ..Default::default()
     });
-    world.push((plane_trans, RenderObject::new(plane_mesh, yellow_mat)));
+    world.push((
+        plane_trans,
+        RenderObject::new_default_data(plane_mesh, yellow_mat),
+    ));
 
     let cube_trans =
         transform_sys.add_transform(TransformCreateInfo::default().set_translation([0., 1., 0.]));
@@ -230,7 +233,7 @@ pub fn init_phys_test(
     };
     world.push((
         cube_trans,
-        RenderObject::new(cube_mesh, green_mat),
+        RenderObject::new_default_data(cube_mesh, green_mat),
         rigid_body,
     ));
 }

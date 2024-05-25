@@ -18,12 +18,12 @@ use crate::{
 /// All shader pipelines share sets 0 and 1, describing global scene data and an array of object data (storage buffer) respectively
 ///
 /// Materials can optionally add more sets, starting from set 2
-pub struct DrawSystem {
-    pub shaders: Vec<Shader>,
+pub struct DrawSystem<T: Clone> {
+    pub shaders: Vec<Shader<T>>,
     subpass: Subpass,
 }
 
-impl DrawSystem {
+impl<T: Clone> DrawSystem<T> {
     /// creates from a collection of shader entry points
     pub fn new(
         context: &Context,
@@ -77,7 +77,7 @@ impl DrawSystem {
     }
 
     /// search for shader via MaterialID
-    pub fn find_shader(&mut self, id: MaterialID) -> Option<&mut Shader> {
+    pub fn find_shader(&mut self, id: MaterialID) -> Option<&mut Shader<T>> {
         self.shaders
             .iter_mut()
             .find(|shader| std::mem::discriminant(&shader.get_id()) == std::mem::discriminant(&id))

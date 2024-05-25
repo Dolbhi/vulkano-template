@@ -30,9 +30,9 @@ pub struct DeferredRenderer {
     framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
     attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
     pub frame_data: Vec<FrameData>,
-    pub lit_draw_system: DrawSystem,
+    pub lit_draw_system: DrawSystem<()>,
     pub lighting_system: LightingSystem,
-    pub unlit_draw_system: DrawSystem,
+    pub unlit_draw_system: DrawSystem<()>,
 }
 
 pub struct FrameData {
@@ -258,7 +258,11 @@ impl FrameData {
     /// write object data to storage buffer
     ///
     /// `RenderObject::upload(&self)` must have been called beforehand
-    pub fn update_objects_data(&self, lit_system: &mut DrawSystem, unlit_system: &mut DrawSystem) {
+    pub fn update_objects_data(
+        &self,
+        lit_system: &mut DrawSystem<()>,
+        unlit_system: &mut DrawSystem<()>,
+    ) {
         let obj_iter = lit_system
             .shaders
             .iter_mut()

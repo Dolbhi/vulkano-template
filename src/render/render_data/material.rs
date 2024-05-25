@@ -17,22 +17,22 @@ use crate::{
     VertexFull,
 };
 
-pub struct Shader {
+pub struct Shader<T: Clone> {
     id: MaterialID,
     pub pipeline: PipelineHandler<VertexFull>,
-    materials: Vec<Material>,
+    materials: Vec<Material<T>>,
 }
 
 /// Arc Mutex storing renderobject data to be uploaded
-pub type RenderSubmit<T> = Arc<Mutex<Vec<(Arc<MeshBuffers<VertexFull>>, T)>>>;
+pub type RenderSubmit<T> = Arc<Mutex<Vec<(Arc<MeshBuffers<VertexFull>>, Matrix4<f32>, T)>>>;
 
-struct Material {
+struct Material<T: Clone> {
     pub descriptor_set: Option<Arc<PersistentDescriptorSet>>,
-    pending_objects: RenderSubmit<Matrix4<f32>>,
+    pending_objects: RenderSubmit<T>,
     pending_meshes: Vec<Arc<MeshBuffers<VertexFull>>>,
 }
 
-impl Display for Shader {
+impl<T: Clone> Display for Shader<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "Shader {:?} with {} material(s)",
@@ -42,7 +42,7 @@ impl Display for Shader {
     }
 }
 
-impl Shader {
+impl<T: Clone> Shader<T> {
     pub fn new(id: MaterialID, pipeline: PipelineHandler<VertexFull>) -> Self {
         Shader {
             id,
@@ -155,10 +155,7 @@ impl Shader {
     }
 
     /// creates a material and returns a mutex vec for submitting render objects
-    pub fn add_material(
-        &mut self,
-        set: Option<Arc<PersistentDescriptorSet>>,
-    ) -> RenderSubmit<Matrix4<f32>> {
+    pub fn add_material(&mut self, set: Option<Arc<PersistentDescriptorSet>>) -> RenderSubmit<T> {
         let pending_objects = Arc::new(Mutex::new(vec![]));
         let material = Material {
             descriptor_set: set,
@@ -184,19 +181,21 @@ impl Shader {
     // }
 
     /// returns all pending object data in an iterator and queue meshes for rendering
-    pub fn upload_pending_objects(&mut self) -> impl Iterator<Item = Matrix4<f32>> + '_ {
+    pub fn upload_pending_objects(&mut self) -> impl Iterator<Item = (Matrix4<f32>, T)> + '_ {
         self.materials.iter_mut().flat_map(|mat| {
             let mut objs = mat.pending_objects.lock().unwrap();
-            std::mem::take(&mut *objs).into_iter().map(|(mesh, data)| {
-                mat.pending_meshes.push(mesh);
-                data
-            })
+            std::mem::take(&mut *objs)
+                .into_iter()
+                .map(|(mesh, model, data)| {
+                    mat.pending_meshes.push(mesh);
+                    (model, data)
+                })
             // .collect::<Vec<Matrix4<f32>>>()
         })
     }
 }
 
-impl Material {
+impl<T: Clone> Material<T> {
     // bind material sets starting from set 2
     fn bind_sets<L, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &self,
