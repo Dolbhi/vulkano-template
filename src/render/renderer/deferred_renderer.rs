@@ -35,6 +35,23 @@ pub struct DeferredRenderer {
     pub unlit_draw_system: DrawSystem,
 }
 
+pub struct FrameData {
+    global_buffer: Subbuffer<GPUGlobalData>,
+    global_draw_set: DescriptorSetWithOffsets,
+    global_light_set: DescriptorSetWithOffsets,
+
+    objects_buffer: Subbuffer<[GPUObjectData]>,
+    objects_set: DescriptorSetWithOffsets,
+
+    point_buffer: Subbuffer<[PointLight]>,
+    point_set: DescriptorSetWithOffsets,
+    last_point_index: Option<usize>,
+
+    dir_buffer: Subbuffer<[DirectionLight]>,
+    dir_set: DescriptorSetWithOffsets,
+    last_dir_index: Option<usize>,
+}
+
 impl DeferredRenderer {
     pub fn new(context: &Context) -> Self {
         // let render_pass = deferred_render_pass(context.device.clone(), context.swapchain.clone());
@@ -138,16 +155,18 @@ impl DeferredRenderer {
 
             frame_data.push(FrameData {
                 global_buffer,
-                objects_buffer,
-                point_buffer,
-                dir_buffer,
-
                 global_draw_set,
-                objects_set: objects_set.into(),
-                point_set: point_set.into(),
                 global_light_set,
-                dir_set: dir_set.into(),
+
+                objects_buffer,
+                objects_set: objects_set.into(),
+
+                point_buffer,
+                point_set: point_set.into(),
                 last_point_index: None,
+
+                dir_buffer,
+                dir_set: dir_set.into(),
                 last_dir_index: None,
             });
         }
@@ -210,7 +229,7 @@ impl Renderer for DeferredRenderer {
             frame.point_set.clone(),
             frame.dir_set.clone(),
             frame.last_point_index,
-            frame.last_point_index,
+            frame.last_dir_index,
             command_builder,
         );
         // end subpass
@@ -243,21 +262,6 @@ impl Renderer for DeferredRenderer {
         self.lighting_system
             .recreate_descriptor(context, &self.attachments);
     }
-}
-
-pub struct FrameData {
-    global_buffer: Subbuffer<GPUGlobalData>,
-    objects_buffer: Subbuffer<[GPUObjectData]>,
-    point_buffer: Subbuffer<[PointLight]>,
-    dir_buffer: Subbuffer<[DirectionLight]>,
-
-    global_draw_set: DescriptorSetWithOffsets,
-    objects_set: DescriptorSetWithOffsets,
-    global_light_set: DescriptorSetWithOffsets,
-    point_set: DescriptorSetWithOffsets,
-    dir_set: DescriptorSetWithOffsets,
-    last_point_index: Option<usize>,
-    last_dir_index: Option<usize>,
 }
 
 impl FrameData {
