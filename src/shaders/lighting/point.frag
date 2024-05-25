@@ -2,19 +2,19 @@
 
 #version 450
 
-// The `color_input` parameter of the `draw` method.
-layout(input_attachment_index = 0, set = 0, binding = 0) uniform subpassInput u_diffuse;
-// The `normals_input` parameter of the `draw` method.
-layout(input_attachment_index = 1, set = 0, binding = 1) uniform subpassInput u_normals;
-// The `depth_input` parameter of the `draw` method.
-layout(input_attachment_index = 2, set = 0, binding = 2) uniform subpassInput u_depth;
-
-layout(set = 1, binding = 0) uniform GPUGlobalData {
+layout(set = 0, binding = 0) uniform GPUGlobalData {
     mat4 view;
     mat4 proj;
     mat4 view_proj;
     mat4 inv_view_proj;
 } scene_data;
+
+// The `color_input` parameter of the `draw` method.
+layout(input_attachment_index = 0, set = 1, binding = 0) uniform subpassInput u_diffuse;
+// The `normals_input` parameter of the `draw` method.
+layout(input_attachment_index = 1, set = 1, binding = 1) uniform subpassInput u_normals;
+// The `depth_input` parameter of the `draw` method.
+layout(input_attachment_index = 2, set = 1, binding = 2) uniform subpassInput u_depth;
 
 struct PointLight {
     // The `color` parameter of the `draw` method, w value is the intensity

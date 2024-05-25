@@ -52,6 +52,7 @@ impl LightingSystem {
             crate::vulkano_objects::pipeline::PipelineType::Lighting,
         )
     }
+    /// Returned layouts are in order: [global, point, directional]
     pub fn new(
         context: &Context,
         subpass: &Subpass,
@@ -129,11 +130,12 @@ impl LightingSystem {
             .unwrap();
         fence.wait(None).unwrap();
 
+        // global, point, dir
         let layouts = [
             point_pipeline
                 .layout()
                 .set_layouts()
-                .get(1)
+                .get(0)
                 .unwrap()
                 .clone(),
             point_pipeline
@@ -145,7 +147,7 @@ impl LightingSystem {
             direction_pipeline
                 .layout()
                 .set_layouts()
-                .get(1)
+                .get(2)
                 .unwrap()
                 .clone(),
         ];
@@ -185,7 +187,7 @@ impl LightingSystem {
     ) -> Arc<PersistentDescriptorSet> {
         PersistentDescriptorSet::new(
             &context.allocators.descriptor_set,
-            pipeline.layout().set_layouts().first().unwrap().clone(),
+            pipeline.layout().set_layouts().get(1).unwrap().clone(),
             [
                 WriteDescriptorSet::image_view(0, attachments.0.clone()),
                 WriteDescriptorSet::image_view(1, attachments.1.clone()),
@@ -215,6 +217,8 @@ impl LightingSystem {
         last_dir_index: Option<usize>,
         command_builder: &mut AutoCommandBufferBuilder<P, A>,
     ) {
+        // NOTE: descriptor set order: global, attachments, point/direction
+
         // println!(
         //     "Pipeline layout: {:?}",
         //     self.pipeline.layout().set_layouts()[1]
@@ -223,6 +227,8 @@ impl LightingSystem {
         //     "Set layout:      {:?}",
         //     frame.descriptor_sets[0].as_ref().0.layout()
         // );
+
+        // let global_attachments = vec![global_set.clone(), self.attachments_set.clone().into()];
 
         // bind commands
         // point lights
@@ -236,7 +242,11 @@ impl LightingSystem {
                     PipelineBindPoint::Graphics,
                     layout.clone(),
                     0,
-                    vec![self.attachments_set.clone().into(), global_set, point_set],
+                    vec![
+                        global_set.clone(),
+                        self.attachments_set.clone().into(),
+                        point_set,
+                    ],
                 )
                 .unwrap()
                 .bind_vertex_buffers(0, self.point_vertices.clone())
@@ -260,7 +270,11 @@ impl LightingSystem {
                     PipelineBindPoint::Graphics,
                     layout.clone(),
                     0,
-                    vec![self.attachments_set.clone().into(), dir_set],
+                    vec![
+                        global_set.clone(),
+                        self.attachments_set.clone().into(),
+                        dir_set,
+                    ],
                 )
                 .unwrap()
                 .bind_vertex_buffers(0, self.screen_vertices.clone())
@@ -283,7 +297,7 @@ impl LightingSystem {
                 PipelineBindPoint::Graphics,
                 layout.clone(),
                 0,
-                self.attachments_set.clone(),
+                vec![global_set.clone(), self.attachments_set.clone().into()],
             )
             .unwrap()
             .push_constants(

@@ -7,7 +7,6 @@ layout(location = 1) in vec3 normal;
 layout(location = 2) in vec3 colour;
 layout(location = 3) in vec2 uv;
 
-
 layout(set = 0, binding = 0) uniform GPUGlobalData {
     mat4 view;
     mat4 proj;
