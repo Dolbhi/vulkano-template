@@ -9,7 +9,7 @@ use crate::{
     shaders::{self, DirectionLight, GPUGlobalData, GPUObjectData, PointLight},
     vulkano_objects::{
         self,
-        buffers::{create_storage_buffers, write_to_buffer, write_to_storage_buffer},
+        buffers::{write_to_buffer, write_to_storage_buffer},
         render_pass::FramebufferAttachments,
     },
 };
@@ -17,7 +17,7 @@ use crate::{
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
-    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
+    descriptor_set::DescriptorSetWithOffsets,
     device::Device,
     format::Format,
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
@@ -65,7 +65,7 @@ impl DeferredRenderer {
             );
 
         // create render systems
-        let (lit_draw_system, [global_draw_layout, objects_layout]) = DrawSystem::new(
+        let lit_draw_system = DrawSystem::new(
             context,
             &Subpass::from(render_pass.clone(), 0).unwrap(),
             MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
@@ -74,13 +74,12 @@ impl DeferredRenderer {
             shaders::load_basic_fs(context.device.clone())
                 .expect("failed to create lit shader module"),
         );
-        let (lighting_system, [global_light_layout, point_layout, dir_layout]) =
-            LightingSystem::new(
-                context,
-                &Subpass::from(render_pass.clone(), 1).unwrap(),
-                &attachments,
-            );
-        let (unlit_draw_system, [_, _]) = DrawSystem::new(
+        let lighting_system = LightingSystem::new(
+            context,
+            &Subpass::from(render_pass.clone(), 1).unwrap(),
+            &attachments,
+        );
+        let unlit_draw_system = DrawSystem::new(
             context,
             &Subpass::from(render_pass.clone(), 2).unwrap(),
             MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
@@ -92,22 +91,22 @@ impl DeferredRenderer {
 
         // create buffers and descriptor sets
         let image_count = context.get_image_count();
-        let mut object_data =
-            create_storage_buffers(&context.allocators, objects_layout, image_count, 10000);
+        // let mut object_data =
+        //     create_storage_buffers(&context.allocators, objects_layout, image_count, 10000);
 
-        // create frame data
-        let mut point_data = create_storage_buffers::<PointLight>(
-            &context.allocators,
-            point_layout,
-            image_count,
-            1000,
-        );
-        let mut dir_data = create_storage_buffers::<DirectionLight>(
-            &context.allocators,
-            dir_layout,
-            image_count,
-            1000,
-        );
+        // // create frame data
+        // let mut point_data = create_storage_buffers::<PointLight>(
+        //     &context.allocators,
+        //     point_layout,
+        //     image_count,
+        //     1000,
+        // );
+        // let mut dir_data = create_storage_buffers::<DirectionLight>(
+        //     &context.allocators,
+        //     dir_layout,
+        //     image_count,
+        //     1000,
+        // );
 
         // pack into frames
         let mut frame_data = vec![];
@@ -129,34 +128,34 @@ impl DeferredRenderer {
             .unwrap();
 
             // draw data
-            let global_draw_set = PersistentDescriptorSet::new(
-                &context.allocators.descriptor_set,
-                global_draw_layout.clone(),
-                [WriteDescriptorSet::buffer(0, global_buffer.clone())],
-                [],
-            )
-            .unwrap()
-            .into();
-            let (objects_buffer, objects_set) = object_data.pop().unwrap();
+            let (objects_buffer, objects_set) = lit_draw_system.shaders[0]
+                .pipeline
+                .create_storage_buffer(&context.allocators, 1000, 1); //object_data.pop().unwrap();
 
             // lighting data
-            let global_light_set = PersistentDescriptorSet::new(
-                &context.allocators.descriptor_set,
-                global_light_layout.clone(),
-                [WriteDescriptorSet::buffer(0, global_buffer.clone())],
-                [],
-            )
-            .unwrap()
-            .into();
-            let (point_buffer, point_set) = point_data.pop().unwrap();
-            let (dir_buffer, dir_set) = dir_data.pop().unwrap();
+            let (point_buffer, point_set) =
+                lighting_system
+                    .point_pipeline
+                    .create_storage_buffer(&context.allocators, 1000, 2);
+            let (dir_buffer, dir_set) = lighting_system.direction_pipeline.create_storage_buffer(
+                &context.allocators,
+                1000,
+                2,
+            );
 
             // println!("Creation layout: {:?}", global_set.as_ref().0.layout());
 
+            let descriptor_allocator = &context.allocators.descriptor_set;
             frame_data.push(FrameData {
-                global_buffer,
-                global_draw_set,
-                global_light_set,
+                global_buffer: global_buffer.clone(),
+                global_draw_set: lit_draw_system.shaders[0]
+                    .pipeline
+                    .create_descriptor_set(descriptor_allocator, global_buffer.clone(), 0)
+                    .into(),
+                global_light_set: lighting_system
+                    .point_pipeline
+                    .create_descriptor_set(descriptor_allocator, global_buffer, 0)
+                    .into(),
 
                 objects_buffer,
                 objects_set: objects_set.into(),

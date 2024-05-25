@@ -3,10 +3,7 @@ use std::sync::Arc;
 use vulkano::{
     buffer::{BufferUsage, Subbuffer},
     command_buffer::AutoCommandBufferBuilder,
-    descriptor_set::{
-        layout::DescriptorSetLayout, DescriptorSetWithOffsets, PersistentDescriptorSet,
-        WriteDescriptorSet,
-    },
+    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
     pipeline::PipelineBindPoint,
     render_pass::Subpass,
     shader::ShaderModule,
@@ -24,8 +21,8 @@ use crate::{
 };
 
 pub struct LightingSystem {
-    point_pipeline: PipelineHandler<Vertex2d>,
-    direction_pipeline: PipelineHandler<Vertex2d>,
+    pub point_pipeline: PipelineHandler<Vertex2d>,
+    pub direction_pipeline: PipelineHandler<Vertex2d>,
     ambient_pipeline: PipelineHandler<Vertex2d>,
     // frame_data: Vec<FrameData>,
     screen_vertices: Subbuffer<[Vertex2d]>,
@@ -53,11 +50,7 @@ impl LightingSystem {
         )
     }
     /// Returned layouts are in order: [global, point, directional]
-    pub fn new(
-        context: &Context,
-        subpass: &Subpass,
-        attachments: &FramebufferAttachments,
-    ) -> (Self, [Arc<DescriptorSetLayout>; 3]) {
+    pub fn new(context: &Context, subpass: &Subpass, attachments: &FramebufferAttachments) -> Self {
         // create pipelines
         let vs = shaders::load_point_vs(context.device.clone())
             .expect("failed to create point shader module");
@@ -130,41 +123,38 @@ impl LightingSystem {
             .unwrap();
         fence.wait(None).unwrap();
 
-        // global, point, dir
-        let layouts = [
-            point_pipeline
-                .layout()
-                .set_layouts()
-                .get(0)
-                .unwrap()
-                .clone(),
-            point_pipeline
-                .layout()
-                .set_layouts()
-                .get(2)
-                .unwrap()
-                .clone(),
-            direction_pipeline
-                .layout()
-                .set_layouts()
-                .get(2)
-                .unwrap()
-                .clone(),
-        ];
+        // // global, point, dir
+        // let layouts = [
+        //     point_pipeline
+        //         .layout()
+        //         .set_layouts()
+        //         .get(0)
+        //         .unwrap()
+        //         .clone(),
+        //     point_pipeline
+        //         .layout()
+        //         .set_layouts()
+        //         .get(2)
+        //         .unwrap()
+        //         .clone(),
+        //     direction_pipeline
+        //         .layout()
+        //         .set_layouts()
+        //         .get(2)
+        //         .unwrap()
+        //         .clone(),
+        // ];
 
-        (
-            LightingSystem {
-                point_pipeline,
-                direction_pipeline,
-                ambient_pipeline,
-                // frame_data,
-                screen_vertices,
-                point_vertices,
-                attachments_set,
-                ambient_color: [0., 0., 0., 0.],
-            },
-            layouts,
-        )
+        LightingSystem {
+            point_pipeline,
+            direction_pipeline,
+            ambient_pipeline,
+            // frame_data,
+            screen_vertices,
+            point_vertices,
+            attachments_set,
+            ambient_color: [0., 0., 0., 0.],
+        }
     }
 
     pub fn recreate_pipeline(&mut self, context: &Context) {

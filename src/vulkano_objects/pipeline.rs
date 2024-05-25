@@ -4,19 +4,22 @@
 use std::{marker::PhantomData, sync::Arc};
 
 use vulkano::{
-    descriptor_set::layout::DescriptorType,
-    device::Device,
-    pipeline::graphics::{
-        color_blend::ColorBlendState,
-        depth_stencil::{DepthState, DepthStencilState},
-        vertex_input::{Vertex, VertexDefinition},
-        viewport::{Viewport, ViewportState},
-        GraphicsPipelineCreateInfo,
+    buffer::{BufferContents, Subbuffer},
+    descriptor_set::{
+        allocator::DescriptorSetAllocator, layout::DescriptorType, PersistentDescriptorSet,
+        WriteDescriptorSet,
     },
+    device::Device,
     pipeline::{
         graphics::{
-            color_blend::{AttachmentBlend, BlendFactor, BlendOp, ColorBlendAttachmentState},
+            color_blend::{
+                AttachmentBlend, BlendFactor, BlendOp, ColorBlendAttachmentState, ColorBlendState,
+            },
+            depth_stencil::{DepthState, DepthStencilState},
             rasterization::{CullMode, RasterizationState},
+            vertex_input::{Vertex, VertexDefinition},
+            viewport::{Viewport, ViewportState},
+            GraphicsPipelineCreateInfo,
         },
         layout::PipelineDescriptorSetLayoutCreateInfo,
         GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
@@ -24,6 +27,8 @@ use vulkano::{
     render_pass::Subpass,
     shader::EntryPoint,
 };
+
+use super::{allocators::Allocators, buffers::create_storage_buffer};
 
 /// Pipeline wrapper to handle its own recreation
 pub struct PipelineHandler<V: Vertex> {
@@ -64,6 +69,36 @@ impl<V: Vertex> PipelineHandler<V> {
             dynamic_bindings: dynamic_bindings.into_iter().collect(),
             pipeline_type,
         }
+    }
+
+    pub fn create_storage_buffer<T: BufferContents>(
+        &self,
+        allocators: &Allocators,
+        object_count: usize,
+        set: usize,
+    ) -> (Subbuffer<[T]>, Arc<PersistentDescriptorSet>) {
+        let layout = self.layout().set_layouts()[set].clone();
+
+        create_storage_buffer(allocators, layout, object_count)
+    }
+
+    /// Creates descriptor set with single buffer on binding 0
+    pub fn create_descriptor_set<A, T: BufferContents>(
+        &self,
+        allocator: &A,
+        buffer: Subbuffer<T>,
+        set: usize,
+    ) -> Arc<PersistentDescriptorSet<A::Alloc>>
+    where
+        A: DescriptorSetAllocator + ?Sized,
+    {
+        PersistentDescriptorSet::new(
+            allocator,
+            self.layout().set_layouts()[set].clone(),
+            [WriteDescriptorSet::buffer(0, buffer)],
+            [],
+        )
+        .unwrap()
     }
 
     pub fn layout(&self) -> &Arc<PipelineLayout> {

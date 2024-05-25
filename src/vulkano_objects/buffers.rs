@@ -339,40 +339,35 @@ pub fn create_dynamic_buffers<C: BufferContents>(
 // }
 
 /// Create descriptor sets of a storage buffer containing an array of the given data type
-pub fn create_storage_buffers<T: BufferContents>(
+pub fn create_storage_buffer<T: BufferContents>(
     allocators: &Allocators,
     descriptor_set_layout: Arc<DescriptorSetLayout>,
-    buffer_count: usize,
     object_count: usize,
-) -> Vec<Uniform<[T]>> {
-    (0..buffer_count)
-        .map(|_| {
-            let storage_buffer = Buffer::new_slice(
-                allocators.memory.clone(),
-                BufferCreateInfo {
-                    usage: BufferUsage::STORAGE_BUFFER,
-                    ..Default::default()
-                },
-                AllocationCreateInfo {
-                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                    ..Default::default()
-                },
-                object_count as DeviceSize,
-            )
-            .unwrap();
+) -> Uniform<[T]> {
+    let storage_buffer = Buffer::new_slice(
+        allocators.memory.clone(),
+        BufferCreateInfo {
+            usage: BufferUsage::STORAGE_BUFFER,
+            ..Default::default()
+        },
+        AllocationCreateInfo {
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+            ..Default::default()
+        },
+        object_count as DeviceSize,
+    )
+    .unwrap();
 
-            let descriptor_set = PersistentDescriptorSet::new(
-                &allocators.descriptor_set,
-                descriptor_set_layout.clone(),
-                [WriteDescriptorSet::buffer(0, storage_buffer.clone())],
-                [],
-            )
-            .unwrap();
+    let descriptor_set = PersistentDescriptorSet::new(
+        &allocators.descriptor_set,
+        descriptor_set_layout.clone(),
+        [WriteDescriptorSet::buffer(0, storage_buffer.clone())],
+        [],
+    )
+    .unwrap();
 
-            (storage_buffer, descriptor_set)
-        })
-        .collect()
+    (storage_buffer, descriptor_set)
 }
 
 // pub fn create_descriptor_set(

@@ -7,7 +7,7 @@ use cgmath::Matrix4;
 use vulkano::{
     buffer::{BufferContents, Subbuffer},
     command_buffer::AutoCommandBufferBuilder,
-    descriptor_set::{layout::DescriptorSetLayout, DescriptorSetsCollection},
+    descriptor_set::DescriptorSetsCollection,
     render_pass::Subpass,
     shader::ShaderModule,
 };
@@ -35,7 +35,7 @@ impl DrawSystem {
         id: MaterialID,
         vs: Arc<ShaderModule>,
         fs: Arc<ShaderModule>,
-    ) -> (Self, [Arc<DescriptorSetLayout>; 2]) {
+    ) -> Self {
         let shader = Shader::new(
             id,
             PipelineHandler::new(
@@ -49,16 +49,13 @@ impl DrawSystem {
             ),
         );
 
-        let layouts = shader.pipeline.layout().set_layouts();
-        let layouts = [layouts[0].clone(), layouts[1].clone()];
+        // let layouts = shader.pipeline.layout().set_layouts();
+        // let layouts = [layouts[0].clone(), layouts[1].clone()];
 
-        (
-            DrawSystem {
-                shaders: vec![shader],
-                subpass: subpass.clone(),
-            },
-            layouts,
-        )
+        DrawSystem {
+            shaders: vec![shader],
+            subpass: subpass.clone(),
+        }
     }
 
     /// creates shader with the same subpass and dynamic bindings as this system
