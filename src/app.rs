@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cgmath::{One, Quaternion, Vector3, Vector4};
+use cgmath::{One, Quaternion, Vector3};
 use legion::*;
 
 use winit::{
@@ -171,13 +171,7 @@ impl App {
                 .set_translation((0., 0., 0.2)), // light pos cannot = cam pos else the light will glitch
         );
 
-        world.push((
-            camera_light,
-            PointLightComponent {
-                color: Vector4::new(1., 1., 1., 2.),
-                half_radius: 4.,
-            },
-        ));
+        world.push((camera_light, PointLightComponent::new([1., 1., 1., 2.], 4.)));
 
         self.current_level = id;
 

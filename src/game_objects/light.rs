@@ -9,6 +9,13 @@ pub struct PointLightComponent {
 }
 
 impl PointLightComponent {
+    pub fn new(color: impl Into<Vector4<f32>>, half_radius: f32) -> Self {
+        PointLightComponent {
+            color: color.into(),
+            half_radius,
+        }
+    }
+
     pub fn into_light(self, position: Vector3<f32>) -> PointLight {
         PointLight {
             color: self.color.into(),

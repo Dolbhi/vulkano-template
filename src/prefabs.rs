@@ -1,6 +1,6 @@
 use std::{f32::consts::PI, iter::zip};
 
-use cgmath::{InnerSpace, Quaternion, Rad, Rotation3, Vector3, Vector4};
+use cgmath::{InnerSpace, Quaternion, Rad, Rotation3, Vector3};
 
 use crate::{
     game_objects::{
@@ -79,19 +79,13 @@ pub fn init_world(mut loader: WorldLoader) {
     let ro = loader.2.load_ro(Cube, red_mat, false);
     loader.add_2_comp(
         TransformCreateInfo::from([0., 5., -1.]).set_scale([0.1, 0.1, 0.1]),
-        PointLightComponent {
-            color: Vector4::new(1., 0., 0., 3.),
-            half_radius: 3.,
-        },
+        PointLightComponent::new([1., 0., 0., 3.], 3.),
         ro,
     );
     let ro = loader.2.load_ro(Cube, blue_mat, false);
     loader.add_2_comp(
         TransformCreateInfo::from([0.0, 6.0, -0.5]).set_scale([0.1, 0.1, 0.1]),
-        PointLightComponent {
-            color: Vector4::new(0., 0., 1., 2.),
-            half_radius: 3.,
-        },
+        PointLightComponent::new([0., 0., 1., 2.], 3.),
         ro,
     );
 
@@ -101,10 +95,7 @@ pub fn init_world(mut loader: WorldLoader) {
         for z in -10..10 {
             loader.add_2_comp(
                 TransformCreateInfo::from([x as f32, 6.1, z as f32]).set_scale([0.1, 0.1, 0.1]),
-                PointLightComponent {
-                    color: Vector4::new(1., 0., 0., 1.),
-                    half_radius: 1.,
-                },
+                PointLightComponent::new([1., 0., 0., 1.], 1.),
                 ro.clone(),
             );
         }
