@@ -25,7 +25,7 @@ impl VectorDamp {
         self.last_time = Instant::now();
         // lag too large, snap to target
         if elapsed_time > 2.0 / self.strength {
-            println!("[Warning] Lerp lag (elapsed time:{elapsed_time}), snapping to targer");
+            println!("[Warning] Lerp lag (elapsed time:{elapsed_time}), snapping to target");
             self.velocity = Vector3::zero();
             return target;
         }
