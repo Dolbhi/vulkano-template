@@ -20,7 +20,7 @@ use crate::{
     game_objects::{
         light::PointLightComponent,
         transform::{TransformCreateInfo, TransformID},
-        Camera, DisabledLERP, GameWorld, MaterialSwapper,
+        Camera, DisabledLERP, GameWorld, MaterialSwapper, WorldLoader,
     },
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
@@ -162,7 +162,7 @@ impl App {
             camera,
             ..
         } = world;
-        loader(world, transforms, resources);
+        loader(WorldLoader(world, transforms, resources));
 
         // camera light, child of the camera
         let camera_light = transforms.add_transform(

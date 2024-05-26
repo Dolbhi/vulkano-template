@@ -1,29 +1,19 @@
 use std::{f32::consts::PI, iter::zip};
 
 use cgmath::{InnerSpace, Quaternion, Rad, Rotation3, Vector3, Vector4};
-use legion::World;
 
 use crate::{
     game_objects::{
-        light::PointLightComponent,
-        transform::{TransformCreateInfo, TransformSystem},
-        MaterialSwapper, Rotate, WorldLoader,
+        light::PointLightComponent, transform::TransformCreateInfo, MaterialSwapper, Rotate,
+        WorldLoader,
     },
     physics::RigidBody,
-    render::{
-        resource_manager::{MaterialID::*, MeshID::*, ResourceRetriever, TextureID},
-        RenderObject,
-    },
-    vertex_data::VertexFull,
+    render::resource_manager::{MaterialID::*, MeshID::*, TextureID},
 };
 
-type Mesh = std::sync::Arc<crate::vulkano_objects::buffers::MeshBuffers<VertexFull>>;
+// type Mesh = std::sync::Arc<crate::vulkano_objects::buffers::MeshBuffers<VertexFull>>;
 
-pub fn init_world(
-    world: &mut World,
-    transform_sys: &mut TransformSystem,
-    resources: &mut ResourceRetriever,
-) {
+pub fn init_world(mut loader: WorldLoader) {
     // meshes
     let ina_meshes = [InaBody, InaCloth, InaHair, InaHead];
     let le_meshes = (0..45u8).map(|n| LostEmpire(n));
@@ -37,13 +27,11 @@ pub fn init_world(
     ]
     .map(|id| Texture(id));
     // colored materials
-    let red_mat = resources.load_solid_material([1., 0., 0., 1.], false).0;
-    let blue_mat = resources.load_solid_material([0., 0., 1., 1.], false).0;
-    let green_mat = resources.load_solid_material([0., 1., 0., 1.], true).0;
+    let red_mat = loader.2.load_solid_material([1., 0., 0., 1.], false).0;
+    let blue_mat = loader.2.load_solid_material([0., 0., 1., 1.], false).0;
+    let green_mat = loader.2.load_solid_material([0., 1., 0., 1.], true).0;
 
     // objects
-    let mut loader = WorldLoader(world, transform_sys, resources);
-
     //      Suzanne
     let suzanne_obj = loader.2.load_ro(Suzanne, UV, true);
     let rotate = Rotate(Vector3::new(1.0, 1.0, 0.0).normalize(), Rad(5.0));
@@ -124,59 +112,36 @@ pub fn init_world(
 }
 
 /// Empty scene with just the lost empire map
-pub fn init_ui_test(
-    world: &mut World,
-    transform_sys: &mut TransformSystem,
-    resources: &mut ResourceRetriever,
-) {
-    let le_meshes: Vec<Mesh> = (0..45u8)
-        .map(|n| resources.get_mesh(LostEmpire(n)))
-        .collect();
-
-    let le_mat = resources.get_material(Texture(TextureID::LostEmpire), true);
-
-    let le_root = transform_sys.add_transform(TransformCreateInfo::default());
-    for mesh in le_meshes {
-        let transform_id = transform_sys.add_transform(TransformCreateInfo {
-            parent: Some(le_root),
-            ..Default::default()
-        });
-        let le_obj = RenderObject::new_default_data(mesh, le_mat.clone());
-        world.push((transform_id, le_obj));
+pub fn init_ui_test(mut loader: WorldLoader) {
+    for i in 0..45u8 {
+        loader.quick_ro(
+            [0., 0., 0.],
+            LostEmpire(i),
+            Texture(TextureID::LostEmpire),
+            true,
+        );
     }
 }
 
 /// Large plane + cube
-pub fn init_phys_test(
-    world: &mut World,
-    transform_sys: &mut TransformSystem,
-    resources: &mut ResourceRetriever,
-) {
-    let plane_mesh = resources.get_mesh(Square);
-    let cube_mesh = resources.get_mesh(Cube);
+pub fn init_phys_test(mut loader: WorldLoader) {
+    // let plane_mesh = resources.get_mesh(Square);
+    // let cube_mesh = resources.get_mesh(Cube);
 
-    let yellow_mat = resources.load_solid_material([1., 1., 0., 1.], true).2;
-    let green_mat = resources.load_solid_material([0., 1., 0., 1.], true).2;
+    let yellow_mat = loader.2.load_solid_material([1., 1., 0., 1.], true).0;
+    let green_mat = loader.2.load_solid_material([0., 1., 0., 1.], true).0;
 
-    let plane_trans = transform_sys.add_transform(TransformCreateInfo {
+    let plane_trans = TransformCreateInfo {
         rotation: Quaternion::from_axis_angle([1., 0., 0.].into(), Rad(-PI / 2.)),
         scale: [10., 10., 1.].into(),
         ..Default::default()
-    });
-    world.push((
-        plane_trans,
-        RenderObject::new_default_data(plane_mesh, yellow_mat),
-    ));
+    };
+    loader.quick_ro(plane_trans, Square, yellow_mat, true);
 
-    let cube_trans =
-        transform_sys.add_transform(TransformCreateInfo::default().set_translation([0., 1., 0.]));
-    let rigid_body = RigidBody {
+    let ro = loader.2.load_ro(Cube, green_mat, true);
+    let rb = RigidBody {
         velocity: (1.0, 10.0, 0.0).into(),
         bivelocity: (0.0, 0.0, -5.0).into(),
     };
-    world.push((
-        cube_trans,
-        RenderObject::new_default_data(cube_mesh, green_mat),
-        rigid_body,
-    ));
+    loader.add_2_comp([0., 1., 0.], ro, rb);
 }
