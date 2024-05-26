@@ -4,17 +4,14 @@ pub mod light;
 pub mod transform;
 pub mod utility;
 
-use std::sync::Arc;
-
 pub use camera::Camera;
 pub use game_world::{GameWorld, Inputs};
 
 use cgmath::{Rad, Vector3};
 
-use crate::{
-    render::{RenderObject, RenderSubmit},
-    vulkano_objects::buffers::MeshBuffers,
-    VertexFull,
+use crate::render::{
+    resource_manager::{MaterialID, MeshID, ResourceRetriever},
+    RenderSubmit,
 };
 
 use self::transform::{TransformCreateInfo, TransformID};
@@ -30,9 +27,10 @@ pub struct MaterialSwapper<T: Clone> {
     curent_index: usize,
 }
 
-pub struct WorldLoader<'a>(
+pub struct WorldLoader<'a, 'b: 'a>(
     pub &'a mut legion::World,
     pub &'a mut transform::TransformSystem,
+    pub &'a mut ResourceRetriever<'b>,
 );
 
 impl<T: Clone> MaterialSwapper<T> {
@@ -50,14 +48,16 @@ impl<T: Clone> MaterialSwapper<T> {
     }
 }
 
-impl<'a> WorldLoader<'a> {
+impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
     pub fn quick_ro(
         &mut self,
         transform: impl Into<TransformCreateInfo>,
-        mesh: Arc<MeshBuffers<VertexFull>>,
-        material: RenderSubmit<()>,
+        mesh: MeshID,
+        material: MaterialID,
+        lit: bool,
     ) -> (TransformID, legion::Entity) {
-        self.add_1_comp(transform, RenderObject::new(mesh, material, ()))
+        let ro = self.2.load_ro(mesh, material, lit);
+        self.add_1_comp(transform, ro)
     }
 
     pub fn add_1_comp<T>(

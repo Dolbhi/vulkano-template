@@ -11,7 +11,7 @@ use crate::{
     },
     physics::RigidBody,
     render::{
-        resource_manager::{MaterialID, MeshID, ResourceRetriever, TextureID},
+        resource_manager::{MaterialID::*, MeshID::*, ResourceRetriever, TextureID},
         RenderObject,
     },
     vertex_data::VertexFull,
@@ -24,135 +24,100 @@ pub fn init_world(
     transform_sys: &mut TransformSystem,
     resources: &mut ResourceRetriever,
 ) {
-    // let le_mesh_count = from_obj(Path::new("models/lost_empire.obj")).len(); // 45
-
     // meshes
-    let [suzanne_mesh, square_mesh, cube_mesh] =
-        [MeshID::Suzanne, MeshID::Square, MeshID::Cube].map(|id| resources.get_mesh(id));
-
-    let ina_meshes = [
-        MeshID::InaBody,
-        MeshID::InaCloth,
-        MeshID::InaHair,
-        MeshID::InaHead,
-    ]
-    .map(|id| resources.get_mesh(id));
-
-    let le_meshes: Vec<Mesh> = (0..45u8)
-        .map(|n| resources.get_mesh(MeshID::LostEmpire(n)))
-        .collect();
+    let ina_meshes = [InaBody, InaCloth, InaHair, InaHead];
+    let le_meshes = (0..45u8).map(|n| LostEmpire(n));
 
     // materials
-    let uv_mat = resources.get_material(MaterialID::UV, false);
-    let grad_mat = resources.get_material(MaterialID::Gradient, false);
-
     let ina_mats = [
         TextureID::InaBody,
         TextureID::InaCloth,
         TextureID::InaHair,
         TextureID::InaHead,
     ]
-    .map(|id| resources.get_material(MaterialID::Texture(id), true));
-
-    let le_mat = resources.get_material(MaterialID::Texture(TextureID::LostEmpire), true);
-    let le_mat_unlit = resources.get_material(MaterialID::Texture(TextureID::LostEmpire), false);
-
-    let red_mat = resources.load_solid_material([1., 0., 0., 1.], false).2;
-    let blue_mat = resources.load_solid_material([0., 0., 1., 1.], false).2;
-
-    let green_mat = resources.load_solid_material([0., 1., 0., 1.], true).2;
+    .map(|id| Texture(id));
+    // colored materials
+    let red_mat = resources.load_solid_material([1., 0., 0., 1.], false).0;
+    let blue_mat = resources.load_solid_material([0., 0., 1., 1.], false).0;
+    let green_mat = resources.load_solid_material([0., 1., 0., 1.], true).0;
 
     // objects
-    let mut obj_loader = WorldLoader(world, transform_sys);
+    let mut loader = WorldLoader(world, transform_sys, resources);
 
     //      Suzanne
-    let suzanne_obj = RenderObject::new_default_data(suzanne_mesh.clone(), uv_mat.clone());
+    let suzanne_obj = loader.2.load_ro(Suzanne, UV, true);
     let rotate = Rotate(Vector3::new(1.0, 1.0, 0.0).normalize(), Rad(5.0));
-    obj_loader.add_2_comp([0., 0., 0.], suzanne_obj, rotate);
+    loader.add_2_comp([0., 0., 0.], suzanne_obj, rotate);
 
     //      Spam Suzanne
     for x in 0..20 {
         for z in 0..20 {
-            let mat = if (x + z) % 2 == 0 {
-                &ina_mats[1]
-            } else {
-                &green_mat
-            };
-            obj_loader.quick_ro(
-                [x as f32, 7f32, z as f32],
-                suzanne_mesh.clone(),
-                mat.clone(),
-            );
+            let mat = [ina_mats[1], green_mat][(x + z) % 2];
+            loader.quick_ro([x as f32, 7f32, z as f32], Suzanne, mat, true);
         }
     }
 
     //      Squares
-    let square_obj = RenderObject::new_default_data(square_mesh.clone(), grad_mat.clone()); //uv_mat.clone());
+    let obj = loader.2.load_ro(Square, Gradient, false);
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
-        obj_loader.add_1_comp([x, y, z], square_obj.clone());
+        loader.add_1_comp([x, y, z], obj.clone());
     }
 
     //      Ina
     let rotate = Rotate([0., 1., 0.].into(), Rad(0.5));
-    let (ina_transform, _) = obj_loader.add_1_comp([0.0, 5.0, -1.0], rotate);
+    let (ina_transform, _) = loader.add_1_comp([0.0, 5.0, -1.0], rotate);
     for (mesh, mat) in zip(ina_meshes, ina_mats.clone()) {
-        obj_loader.quick_ro(ina_transform, mesh, mat);
+        loader.quick_ro(ina_transform, mesh, mat, true);
     }
 
     //      lost empires
-    let le_transform = obj_loader.1.add_transform(TransformCreateInfo::default());
+    let le_transform = loader.1.add_transform(TransformCreateInfo::default());
     for mesh in le_meshes {
-        let le_obj = RenderObject::new_default_data(mesh, le_mat.clone());
-        let mat_swapper = MaterialSwapper::new([
-            le_mat.clone(),
-            le_mat_unlit.clone(),
-            uv_mat.clone(),
-            ina_mats[1].clone(),
-        ]);
+        let le_obj = loader.2.load_ro(mesh, Texture(TextureID::LostEmpire), true);
+        let mat_swapper = MaterialSwapper::new(
+            [
+                (Texture(TextureID::LostEmpire), true),
+                (Texture(TextureID::LostEmpire), false),
+                (UV, false),
+                (ina_mats[1], true),
+            ]
+            .map(|(id, lit)| loader.2.get_material(id, lit)),
+        );
 
-        obj_loader.add_2_comp(le_transform, le_obj, mat_swapper);
+        loader.add_2_comp(le_transform, le_obj, mat_swapper);
     }
 
     // lights
-    obj_loader.add_2_comp(
-        TransformCreateInfo {
-            scale: Vector3::new(0.1, 0.1, 0.1),
-            translation: Vector3::new(0., 5., -1.),
-            ..Default::default()
-        },
+    let ro = loader.2.load_ro(Cube, red_mat, false);
+    loader.add_2_comp(
+        TransformCreateInfo::from([0., 5., -1.]).set_scale([0.1, 0.1, 0.1]),
         PointLightComponent {
             color: Vector4::new(1., 0., 0., 3.),
             half_radius: 3.,
         },
-        RenderObject::new_default_data(cube_mesh.clone(), red_mat.clone()),
+        ro,
     );
-    obj_loader.add_2_comp(
-        TransformCreateInfo {
-            scale: Vector3::new(0.1, 0.1, 0.1),
-            translation: Vector3::new(0.0, 6.0, -0.5),
-            ..Default::default()
-        },
+    let ro = loader.2.load_ro(Cube, blue_mat, false);
+    loader.add_2_comp(
+        TransformCreateInfo::from([0.0, 6.0, -0.5]).set_scale([0.1, 0.1, 0.1]),
         PointLightComponent {
             color: Vector4::new(0., 0., 1., 2.),
             half_radius: 3.,
         },
-        RenderObject::new_default_data(cube_mesh.clone(), blue_mat),
+        ro,
     );
 
     // spam lights
+    let ro = loader.2.load_ro(Cube, red_mat, false);
     for x in 0..20 {
         for z in -10..10 {
-            obj_loader.add_2_comp(
-                TransformCreateInfo {
-                    scale: Vector3::new(0.1, 0.1, 0.1),
-                    translation: Vector3::new(x as f32, 6.1, z as f32),
-                    ..Default::default()
-                },
+            loader.add_2_comp(
+                TransformCreateInfo::from([x as f32, 6.1, z as f32]).set_scale([0.1, 0.1, 0.1]),
                 PointLightComponent {
                     color: Vector4::new(1., 0., 0., 1.),
                     half_radius: 1.,
                 },
-                RenderObject::new_default_data(cube_mesh.clone(), red_mat.clone()),
+                ro.clone(),
             );
         }
     }
@@ -165,10 +130,10 @@ pub fn init_ui_test(
     resources: &mut ResourceRetriever,
 ) {
     let le_meshes: Vec<Mesh> = (0..45u8)
-        .map(|n| resources.get_mesh(MeshID::LostEmpire(n)))
+        .map(|n| resources.get_mesh(LostEmpire(n)))
         .collect();
 
-    let le_mat = resources.get_material(MaterialID::Texture(TextureID::LostEmpire), true);
+    let le_mat = resources.get_material(Texture(TextureID::LostEmpire), true);
 
     let le_root = transform_sys.add_transform(TransformCreateInfo::default());
     for mesh in le_meshes {
@@ -187,8 +152,8 @@ pub fn init_phys_test(
     transform_sys: &mut TransformSystem,
     resources: &mut ResourceRetriever,
 ) {
-    let plane_mesh = resources.get_mesh(MeshID::Square);
-    let cube_mesh = resources.get_mesh(MeshID::Cube);
+    let plane_mesh = resources.get_mesh(Square);
+    let cube_mesh = resources.get_mesh(Cube);
 
     let yellow_mat = resources.load_solid_material([1., 1., 0., 1.], true).2;
     let green_mat = resources.load_solid_material([0., 1., 0., 1.], true).2;

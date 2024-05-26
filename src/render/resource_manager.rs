@@ -1,6 +1,5 @@
 use std::{collections::HashMap, iter::zip, path::Path, sync::Arc};
 
-use cgmath::Matrix4;
 use vulkano::{
     buffer::Subbuffer,
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
@@ -20,7 +19,7 @@ use super::{
         texture::{create_sampler, load_texture},
     },
     renderer::systems::DrawSystem,
-    Context, RenderSubmit,
+    Context, RenderObject, RenderSubmit,
 };
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -107,6 +106,17 @@ impl ResourceManager {
 }
 
 impl<'a> ResourceRetriever<'a> {
+    pub fn load_ro(
+        &mut self,
+        mesh: MeshID,
+        material: MaterialID,
+        lit: bool,
+    ) -> RenderObject<()> {
+        let mesh = self.get_mesh(mesh);
+        let material = self.get_material(material, lit);
+        RenderObject::new(mesh, material, ())
+    }
+
     pub fn get_mesh(&mut self, id: MeshID) -> Arc<MeshBuffers<VertexFull>> {
         let loaded_meshes = &mut self.loaded_resources.loaded_meshes;
         match loaded_meshes.get(&id) {
