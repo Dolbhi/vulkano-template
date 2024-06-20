@@ -41,6 +41,12 @@ pub struct PipelineHandler<V: Vertex> {
     pipeline_type: PipelineType,
 }
 
+#[derive(Clone, Copy)]
+pub enum PipelineType {
+    Drawing,
+    Lighting,
+}
+
 impl<V: Vertex> PipelineHandler<V> {
     pub fn new(
         device: Arc<Device>,
@@ -92,6 +98,11 @@ impl<V: Vertex> PipelineHandler<V> {
     where
         A: DescriptorSetAllocator + ?Sized,
     {
+        // println!(
+        //     "[Debug] Set: {}, layout: {:?}",
+        //     set,
+        //     self.layout().set_layouts()[set]
+        // );
         PersistentDescriptorSet::new(
             allocator,
             self.layout().set_layouts()[set].clone(),
@@ -117,12 +128,6 @@ impl<V: Vertex> PipelineHandler<V> {
             self.pipeline_type,
         );
     }
-}
-
-#[derive(Clone, Copy)]
-pub enum PipelineType {
-    Drawing,
-    Lighting,
 }
 
 impl PipelineType {

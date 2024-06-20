@@ -1,16 +1,18 @@
 #version 460
+#include "../includes/draw_vert_in.glsl"
+#include "../includes/global_data.glsl"
 
-layout(location = 0) in vec3 position;
-layout(location = 1) in vec3 normal;
-layout(location = 2) in vec3 colour;
-layout(location = 3) in vec2 uv;
+// layout(location = 0) in vec3 position;
+// layout(location = 1) in vec3 normal;
+// layout(location = 2) in vec3 colour;
+// layout(location = 3) in vec2 uv;
 
-layout(set = 0, binding = 0) uniform GPUGlobalData {
-    mat4 view;
-    mat4 proj;
-    mat4 view_proj;
-    mat4 inv_view_proj;
-} global_data;
+// layout(set = 0, binding = 0) uniform GPUGlobalData {
+//     mat4 view;
+//     mat4 proj;
+//     mat4 view_proj;
+//     mat4 inv_view_proj;
+// } global_data;
 struct GPUObjectData {
 	mat4 render_matrix;
     mat4 normal_matrix;

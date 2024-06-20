@@ -1,23 +1,11 @@
 // modified from vulkano defered lighting example
 
 #version 450
+#include "../includes/global_data.glsl"
+#include "../includes/light_attachments.glsl"
 
 layout(location = 0) in vec2 v_screen_coords;
 layout(location = 1) in flat uint v_light_index;
-
-layout(set = 0, binding = 0) uniform GPUGlobalData {
-    mat4 view;
-    mat4 proj;
-    mat4 view_proj;
-    mat4 inv_view_proj;
-} scene_data;
-
-// The `color_input` parameter of the `draw` method.
-layout(input_attachment_index = 0, set = 1, binding = 0) uniform subpassInput u_diffuse;
-// The `normals_input` parameter of the `draw` method.
-layout(input_attachment_index = 1, set = 1, binding = 1) uniform subpassInput u_normals;
-// The `depth_input` parameter of the `draw` method.
-layout(input_attachment_index = 2, set = 1, binding = 2) uniform subpassInput u_depth;
 
 struct PointLight {
     // The `color` parameter of the `draw` method, w value is the intensity
@@ -42,7 +30,7 @@ void main() {
     PointLight light = point_buffer.lights[v_light_index];
 
     // Find the world coordinates of the current pixel.
-    vec4 world = scene_data.inv_view_proj * vec4(v_screen_coords, in_depth, 1.0);// just use gl_FragCoord? (no gl_FragCoord is in pixels)
+    vec4 world = global_data.inv_view_proj * vec4(v_screen_coords, in_depth, 1.0);// just use gl_FragCoord? (no gl_FragCoord is in pixels)
     world /= world.w;
     vec3 light_displacement = world.xyz - light.position.xyz;
 
