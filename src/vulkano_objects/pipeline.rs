@@ -50,24 +50,7 @@ pub struct LayoutOverrides {
 }
 
 impl PipelineHandler {
-    pub fn new(
-        device: Arc<Device>,
-        stages: [PipelineShaderStageCreateInfo; 2],
-        layout: Arc<PipelineLayout>,
-        vertex_input_state: VertexInputState,
-        viewport: Viewport,
-        subpass: Subpass,
-        // dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
-        pipeline_type: PipelineType,
-    ) -> Self {
-        let create_info = window_size_dependent_pipeline_info(
-            stages,
-            layout,
-            vertex_input_state,
-            viewport,
-            subpass,
-            pipeline_type,
-        );
+    pub fn new(device: Arc<Device>, create_info: GraphicsPipelineCreateInfo) -> Self {
         let pipeline = GraphicsPipeline::new(device, None, create_info.clone()).unwrap();
 
         Self {
@@ -75,23 +58,6 @@ impl PipelineHandler {
             pipeline,
         }
     }
-
-    // /// Creates another pipeline handler with the same pipeline create info but with different stages
-    // pub fn clone_with_stages(
-    //     &self,
-    //     device: Arc<Device>,
-    //     stages: [PipelineShaderStageCreateInfo; 2],
-    // ) -> Self {
-    //     let mut new_info = self.create_info.clone();
-    //     new_info.stages = stages.into_iter().collect();
-
-    //     let pipeline = GraphicsPipeline::new(device, None, new_info.clone()).unwrap();
-
-    //     Self {
-    //         create_info: new_info,
-    //         pipeline,
-    //     }
-    // }
 
     pub fn create_storage_buffer<T: BufferContents>(
         &self,
@@ -114,11 +80,6 @@ impl PipelineHandler {
     where
         A: DescriptorSetAllocator + ?Sized,
     {
-        // println!(
-        //     "[Debug] Set: {}, layout: {:?}",
-        //     set,
-        //     self.layout().set_layouts()[set]
-        // );
         PersistentDescriptorSet::new(
             allocator,
             self.layout().set_layouts()[set].clone(),
@@ -138,20 +99,8 @@ impl PipelineHandler {
             view_state.viewports[0].extent = viewport.extent;
             self.create_info.viewport_state = Some(view_state);
         }
-        // self.create_info.viewport_state = self.create_info.viewport_state.map(|mut view_state| {
-        //     view_state.viewports[0].extent = viewport.extent;
-        //     view_state
-        // });
 
         self.pipeline = GraphicsPipeline::new(device, None, self.create_info.clone()).unwrap();
-        // self.pipeline = window_size_dependent_pipeline::<V>(
-        //     device,
-        //     self.stages.clone(),
-        //     self.layout.clone(),
-        //     viewport,
-        //     self.subpass.clone(),
-        //     self.pipeline_type,
-        // );
     }
 }
 
@@ -274,33 +223,12 @@ pub fn mod_to_stages<T: Debug>(
     })
 }
 
-// /// Create a pipeline layout from the given shader stages but with the global descriptor in set 0 binding 0 targeting both vertex and fragment shaders
-// pub fn layout_from_stages(
-//     device: Arc<Device>,
-//     stages: &[PipelineShaderStageCreateInfo; 2],
-// ) -> Arc<PipelineLayout> {
-//     let mut draw_layout_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(stages);
-//     override_global_set(&mut draw_layout_info);
-//     PipelineLayout::new(
-//         device.clone(),
-//         draw_layout_info
-//             .into_pipeline_layout_create_info(device)
-//             .unwrap(),
-//     )
-//     .unwrap()
-// }
-
-// fn override_global_set(create_info: &mut PipelineDescriptorSetLayoutCreateInfo) {
-//     create_info.set_layouts[0] =
-//         LayoutOverrides::single_uniform_set(ShaderStages::VERTEX | ShaderStages::FRAGMENT);
-// }
-
 /// Create pipeline made for rarely size changing windows
 ///
 /// ### Pipeline States
 /// - vertex input: based on given generic
 /// - viewport: given
-fn window_size_dependent_pipeline_info(
+pub fn window_size_dependent_pipeline_info(
     stages: impl IntoIterator<Item = PipelineShaderStageCreateInfo>,
     layout: Arc<PipelineLayout>,
     vertex_input_state: VertexInputState,

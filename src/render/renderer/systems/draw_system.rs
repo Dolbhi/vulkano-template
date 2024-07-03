@@ -9,14 +9,16 @@ use vulkano::{
             vertex_input::{Vertex, VertexDefinition},
             GraphicsPipelineCreateInfo,
         },
-        GraphicsPipeline, PipelineShaderStageCreateInfo,
+        PipelineShaderStageCreateInfo,
     },
     render_pass::Subpass,
 };
 
 use crate::{
     render::{context::Context, render_data::material::Shader, resource_manager::MaterialID},
-    vulkano_objects::pipeline::{LayoutOverrides, PipelineHandler},
+    vulkano_objects::pipeline::{
+        window_size_dependent_pipeline_info, LayoutOverrides, PipelineHandler,
+    },
     VertexFull,
 };
 
@@ -55,12 +57,14 @@ impl<T: Clone> DrawSystem<T> {
             id,
             PipelineHandler::new(
                 context.device.clone(),
-                stages,
-                layout,
-                vertex_input_state,
-                context.viewport.clone(),
-                subpass.clone(),
-                crate::vulkano_objects::pipeline::PipelineType::Drawing,
+                window_size_dependent_pipeline_info(
+                    stages,
+                    layout,
+                    vertex_input_state,
+                    context.viewport.clone(),
+                    subpass.clone(),
+                    crate::vulkano_objects::pipeline::PipelineType::Drawing,
+                ),
             ),
         );
 
@@ -90,11 +94,7 @@ impl<T: Clone> DrawSystem<T> {
             ..self.shaders[0].pipeline.create_info.clone()
         };
 
-        let pipeline = PipelineHandler {
-            pipeline: GraphicsPipeline::new(context.device.clone(), None, create_info.clone())
-                .unwrap(),
-            create_info,
-        };
+        let pipeline = PipelineHandler::new(context.device.clone(), create_info);
 
         self.shaders.push(Shader::new(id, pipeline));
     }

@@ -22,10 +22,6 @@ use vulkano::{
     device::Device,
     format::Format,
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
-    pipeline::{
-        layout::PipelineDescriptorSetLayoutCreateInfo, PipelineLayout,
-        PipelineShaderStageCreateInfo,
-    },
     render_pass::{Framebuffer, RenderPass, Subpass},
     shader::ShaderStages,
     swapchain::Swapchain,
@@ -95,6 +91,7 @@ impl DeferredRenderer {
             context,
             &Subpass::from(render_pass.clone(), 1).unwrap(),
             &attachments,
+            &layout_override,
         );
         let unlit_draw_system = DrawSystem::new(
             context,
@@ -180,27 +177,6 @@ impl DeferredRenderer {
             unlit_draw_system,
             lighting_system,
         }
-    }
-
-    /// Create a pipeline layout from the given shader stages but with the global descriptor in set 0 binding 0 targeting both vertex and fragment shaders
-    pub fn layout_from_stages(
-        device: Arc<Device>,
-        stages: &[PipelineShaderStageCreateInfo; 2],
-    ) -> Arc<PipelineLayout> {
-        let mut draw_layout_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(stages);
-        Self::override_global_set(&mut draw_layout_info);
-        PipelineLayout::new(
-            device.clone(),
-            draw_layout_info
-                .into_pipeline_layout_create_info(device)
-                .unwrap(),
-        )
-        .unwrap()
-    }
-
-    fn override_global_set(create_info: &mut PipelineDescriptorSetLayoutCreateInfo) {
-        create_info.set_layouts[0] =
-            LayoutOverrides::single_uniform_set(ShaderStages::VERTEX | ShaderStages::FRAGMENT);
     }
 
     // pub fn get_frame_mut(&mut self, index: usize) -> Option<&mut FrameData> {

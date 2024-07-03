@@ -9,15 +9,17 @@ use vulkano::{
         PipelineBindPoint, PipelineShaderStageCreateInfo,
     },
     render_pass::Subpass,
-    shader::ShaderModule,
     sync::GpuFuture,
 };
 
 use crate::{
-    render::{Context, DeferredRenderer},
+    render::Context,
     shaders,
     vulkano_objects::{
-        buffers::create_device_local_buffer, pipeline::PipelineHandler,
+        buffers::create_device_local_buffer,
+        pipeline::{
+            mod_to_stages, window_size_dependent_pipeline_info, LayoutOverrides, PipelineHandler,
+        },
         render_pass::FramebufferAttachments,
     },
     Vertex2d,
@@ -38,48 +40,67 @@ impl LightingSystem {
     fn create_lighting_pipeline(
         context: &Context,
         subpass: Subpass,
-        vs: Arc<ShaderModule>,
-        fs: Arc<ShaderModule>,
+        stages: [PipelineShaderStageCreateInfo; 2],
+        layout_override: &LayoutOverrides,
     ) -> PipelineHandler {
-        let stages = [vs, fs]
-            .map(|module| PipelineShaderStageCreateInfo::new(module.entry_point("main").unwrap()));
-
         let vertex_input_state = Vertex2d::per_vertex()
             .definition(&stages[0].entry_point.info().input_interface)
             .unwrap();
 
-        let layout = DeferredRenderer::layout_from_stages(context.device.clone(), &stages);
+        let layout = layout_override.create_layout(context.device.clone(), &stages);
 
         PipelineHandler::new(
             context.device.clone(),
-            stages,
-            layout,
-            vertex_input_state,
-            context.viewport.clone(),
-            subpass,
-            crate::vulkano_objects::pipeline::PipelineType::Lighting,
+            window_size_dependent_pipeline_info(
+                stages,
+                layout,
+                vertex_input_state,
+                context.viewport.clone(),
+                subpass,
+                crate::vulkano_objects::pipeline::PipelineType::Lighting,
+            ),
         )
     }
     /// Returned layouts are in order: [global, point, directional]
-    pub fn new(context: &Context, subpass: &Subpass, attachments: &FramebufferAttachments) -> Self {
+    pub fn new(
+        context: &Context,
+        subpass: &Subpass,
+        attachments: &FramebufferAttachments,
+        layout_override: &LayoutOverrides,
+    ) -> Self {
         // create pipelines
-        let vs = shaders::load_point_vs(context.device.clone())
-            .expect("failed to create point shader module");
-        let fs = shaders::load_point_fs(context.device.clone())
-            .expect("failed to create point shader module");
-        let point_pipeline = Self::create_lighting_pipeline(context, subpass.clone(), vs, fs); //[(1, 0)]); // global data is dynamic
+        let point_pipeline = Self::create_lighting_pipeline(
+            context,
+            subpass.clone(),
+            mod_to_stages(
+                context.device.clone(),
+                shaders::load_point_vs,
+                shaders::load_point_fs,
+            ),
+            layout_override,
+        );
 
-        let vs = shaders::load_direction_vs(context.device.clone())
-            .expect("failed to create directional shader module");
-        let fs = shaders::load_direction_fs(context.device.clone())
-            .expect("failed to create directional shader module");
-        let direction_pipeline =
-            Self::create_lighting_pipeline(context, subpass.clone(), vs.clone(), fs);
+        let direction_pipeline = Self::create_lighting_pipeline(
+            context,
+            subpass.clone(),
+            mod_to_stages(
+                context.device.clone(),
+                shaders::load_direction_vs,
+                shaders::load_direction_fs,
+            ),
+            layout_override,
+        );
 
-        let fs = shaders::load_ambient_fs(context.device.clone())
-            .expect("failed to create ambient shader module");
-        let ambient_pipeline =
-            Self::create_lighting_pipeline(context, subpass.clone(), vs.clone(), fs);
+        let ambient_pipeline = Self::create_lighting_pipeline(
+            context,
+            subpass.clone(),
+            mod_to_stages(
+                context.device.clone(),
+                shaders::load_direction_vs,
+                shaders::load_ambient_fs,
+            ),
+            layout_override,
+        );
 
         // let image_count = context.get_image_count();
 
