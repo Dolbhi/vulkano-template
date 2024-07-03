@@ -19,7 +19,7 @@ use crate::{
 
 pub struct Shader<T: Clone> {
     id: MaterialID,
-    pub pipeline: PipelineHandler<VertexFull>,
+    pub pipeline: PipelineHandler,
     materials: Vec<Material<T>>,
 }
 
@@ -43,7 +43,7 @@ impl<T: Clone> Display for Shader<T> {
 }
 
 impl<T: Clone> Shader<T> {
-    pub fn new(id: MaterialID, pipeline: PipelineHandler<VertexFull>) -> Self {
+    pub fn new(id: MaterialID, pipeline: PipelineHandler) -> Self {
         Shader {
             id,
             pipeline,

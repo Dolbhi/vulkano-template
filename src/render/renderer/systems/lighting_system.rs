@@ -4,14 +4,17 @@ use vulkano::{
     buffer::{BufferUsage, Subbuffer},
     command_buffer::AutoCommandBufferBuilder,
     descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
-    pipeline::PipelineBindPoint,
+    pipeline::{
+        graphics::vertex_input::{Vertex, VertexDefinition},
+        PipelineBindPoint, PipelineShaderStageCreateInfo,
+    },
     render_pass::Subpass,
     shader::ShaderModule,
     sync::GpuFuture,
 };
 
 use crate::{
-    render::Context,
+    render::{Context, DeferredRenderer},
     shaders,
     vulkano_objects::{
         buffers::create_device_local_buffer, pipeline::PipelineHandler,
@@ -21,9 +24,9 @@ use crate::{
 };
 
 pub struct LightingSystem {
-    pub point_pipeline: PipelineHandler<Vertex2d>,
-    pub direction_pipeline: PipelineHandler<Vertex2d>,
-    ambient_pipeline: PipelineHandler<Vertex2d>,
+    pub point_pipeline: PipelineHandler,
+    pub direction_pipeline: PipelineHandler,
+    ambient_pipeline: PipelineHandler,
     // frame_data: Vec<FrameData>,
     screen_vertices: Subbuffer<[Vertex2d]>,
     point_vertices: Subbuffer<[Vertex2d]>,
@@ -37,15 +40,23 @@ impl LightingSystem {
         subpass: Subpass,
         vs: Arc<ShaderModule>,
         fs: Arc<ShaderModule>,
-        dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
-    ) -> PipelineHandler<Vertex2d> {
+    ) -> PipelineHandler {
+        let stages = [vs, fs]
+            .map(|module| PipelineShaderStageCreateInfo::new(module.entry_point("main").unwrap()));
+
+        let vertex_input_state = Vertex2d::per_vertex()
+            .definition(&stages[0].entry_point.info().input_interface)
+            .unwrap();
+
+        let layout = DeferredRenderer::layout_from_stages(context.device.clone(), &stages);
+
         PipelineHandler::new(
             context.device.clone(),
-            vs.entry_point("main").unwrap(),
-            fs.entry_point("main").unwrap(),
+            stages,
+            layout,
+            vertex_input_state,
             context.viewport.clone(),
             subpass,
-            dynamic_bindings,
             crate::vulkano_objects::pipeline::PipelineType::Lighting,
         )
     }
@@ -56,19 +67,19 @@ impl LightingSystem {
             .expect("failed to create point shader module");
         let fs = shaders::load_point_fs(context.device.clone())
             .expect("failed to create point shader module");
-        let point_pipeline = Self::create_lighting_pipeline(context, subpass.clone(), vs, fs, []); //[(1, 0)]); // global data is dynamic
+        let point_pipeline = Self::create_lighting_pipeline(context, subpass.clone(), vs, fs); //[(1, 0)]); // global data is dynamic
 
         let vs = shaders::load_direction_vs(context.device.clone())
             .expect("failed to create directional shader module");
         let fs = shaders::load_direction_fs(context.device.clone())
             .expect("failed to create directional shader module");
         let direction_pipeline =
-            Self::create_lighting_pipeline(context, subpass.clone(), vs.clone(), fs, []);
+            Self::create_lighting_pipeline(context, subpass.clone(), vs.clone(), fs);
 
         let fs = shaders::load_ambient_fs(context.device.clone())
             .expect("failed to create ambient shader module");
         let ambient_pipeline =
-            Self::create_lighting_pipeline(context, subpass.clone(), vs.clone(), fs, []);
+            Self::create_lighting_pipeline(context, subpass.clone(), vs.clone(), fs);
 
         // let image_count = context.get_image_count();
 
@@ -171,7 +182,7 @@ impl LightingSystem {
             Self::create_attachment_set(&self.point_pipeline, context, attachments);
     }
     fn create_attachment_set(
-        pipeline: &PipelineHandler<Vertex2d>,
+        pipeline: &PipelineHandler,
         context: &Context,
         attachments: &FramebufferAttachments,
     ) -> Arc<PersistentDescriptorSet> {

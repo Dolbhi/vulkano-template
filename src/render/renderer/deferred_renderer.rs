@@ -10,6 +10,7 @@ use crate::{
     vulkano_objects::{
         self,
         buffers::{write_to_buffer, write_to_storage_buffer},
+        pipeline::{mod_to_stages, LayoutOverrides},
         render_pass::FramebufferAttachments,
     },
 };
@@ -21,7 +22,12 @@ use vulkano::{
     device::Device,
     format::Format,
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
+    pipeline::{
+        layout::PipelineDescriptorSetLayoutCreateInfo, PipelineLayout,
+        PipelineShaderStageCreateInfo,
+    },
     render_pass::{Framebuffer, RenderPass, Subpass},
+    shader::ShaderStages,
     swapchain::Swapchain,
 };
 
@@ -65,14 +71,25 @@ impl DeferredRenderer {
             );
 
         // create render systems
+        let stages = mod_to_stages(
+            context.device.clone(),
+            shaders::load_basic_vs,
+            shaders::load_basic_fs,
+        );
+
+        let layout_override = LayoutOverrides {
+            set_layout_overrides: vec![(
+                0,
+                LayoutOverrides::single_uniform_set(ShaderStages::VERTEX | ShaderStages::FRAGMENT),
+            )],
+        };
+
         let lit_draw_system = DrawSystem::new(
             context,
             &Subpass::from(render_pass.clone(), 0).unwrap(),
             MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
-            shaders::load_basic_vs(context.device.clone())
-                .expect("failed to create lit shader module"),
-            shaders::load_basic_fs(context.device.clone())
-                .expect("failed to create lit shader module"),
+            stages.clone(),
+            layout_override.clone(),
         );
         let lighting_system = LightingSystem::new(
             context,
@@ -83,10 +100,8 @@ impl DeferredRenderer {
             context,
             &Subpass::from(render_pass.clone(), 2).unwrap(),
             MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
-            shaders::load_basic_vs(context.device.clone())
-                .expect("failed to create unlit shader module"),
-            shaders::load_basic_fs(context.device.clone())
-                .expect("failed to create unlit shader module"),
+            stages,
+            layout_override,
         );
 
         // create buffers and descriptor sets
@@ -165,6 +180,27 @@ impl DeferredRenderer {
             unlit_draw_system,
             lighting_system,
         }
+    }
+
+    /// Create a pipeline layout from the given shader stages but with the global descriptor in set 0 binding 0 targeting both vertex and fragment shaders
+    pub fn layout_from_stages(
+        device: Arc<Device>,
+        stages: &[PipelineShaderStageCreateInfo; 2],
+    ) -> Arc<PipelineLayout> {
+        let mut draw_layout_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(stages);
+        Self::override_global_set(&mut draw_layout_info);
+        PipelineLayout::new(
+            device.clone(),
+            draw_layout_info
+                .into_pipeline_layout_create_info(device)
+                .unwrap(),
+        )
+        .unwrap()
+    }
+
+    fn override_global_set(create_info: &mut PipelineDescriptorSetLayoutCreateInfo) {
+        create_info.set_layouts[0] =
+            LayoutOverrides::single_uniform_set(ShaderStages::VERTEX | ShaderStages::FRAGMENT);
     }
 
     // pub fn get_frame_mut(&mut self, index: usize) -> Option<&mut FrameData> {

@@ -8,7 +8,7 @@ use vulkano::{
 
 use crate::{
     shaders::{self, SolidData},
-    vulkano_objects::buffers::MeshBuffers,
+    vulkano_objects::{buffers::MeshBuffers, pipeline::mod_to_stages},
     VertexFull,
 };
 
@@ -106,12 +106,7 @@ impl ResourceManager {
 }
 
 impl<'a> ResourceRetriever<'a> {
-    pub fn load_ro(
-        &mut self,
-        mesh: MeshID,
-        material: MaterialID,
-        lit: bool,
-    ) -> RenderObject<()> {
+    pub fn load_ro(&mut self, mesh: MeshID, material: MaterialID, lit: bool) -> RenderObject<()> {
         let mesh = self.get_mesh(mesh);
         let material = self.get_material(material, lit);
         RenderObject::new(mesh, material, ())
@@ -230,29 +225,32 @@ impl<'a> ResourceRetriever<'a> {
                                     system.add_shader(
                                         self.context,
                                         id,
-                                        shaders::load_basic_vs(self.context.device.clone())
-                                            .expect("failed to create uv shader module"),
-                                        shaders::load_uv_fs(self.context.device.clone())
-                                            .expect("failed to create uv shader module"),
+                                        mod_to_stages(
+                                            self.context.device.clone(),
+                                            shaders::load_basic_vs,
+                                            shaders::load_uv_fs,
+                                        ),
                                     );
                                 }
                                 MaterialID::Gradient => {
                                     system.add_shader(
                                         self.context,
                                         id,
-                                        shaders::load_basic_vs(self.context.device.clone())
-                                            .expect("failed to create grad shader module"),
-                                        shaders::load_grad_fs(self.context.device.clone())
-                                            .expect("failed to create grad shader module"),
+                                        mod_to_stages(
+                                            self.context.device.clone(),
+                                            shaders::load_basic_vs,
+                                            shaders::load_grad_fs,
+                                        ),
                                     );
                                 }
                                 MaterialID::Billboard => system.add_shader(
                                     self.context,
                                     id,
-                                    shaders::load_billboard_vs(self.context.device.clone())
-                                        .expect("failed to create billboard shader module"),
-                                    shaders::load_solid_fs(self.context.device.clone())
-                                        .expect("failed to create billboard shader module"),
+                                    mod_to_stages(
+                                        self.context.device.clone(),
+                                        shaders::load_billboard_vs,
+                                        shaders::load_solid_fs,
+                                    ),
                                 ),
                             };
                             system.find_shader(id).unwrap()
@@ -329,10 +327,11 @@ impl<'a> ResourceRetriever<'a> {
             system.add_shader(
                 self.context,
                 MaterialID::Color(0),
-                shaders::load_basic_vs(self.context.device.clone())
-                    .expect("failed to create solid shader module"),
-                shaders::load_solid_fs(self.context.device.clone())
-                    .expect("failed to create solid shader module"),
+                mod_to_stages(
+                    self.context.device.clone(),
+                    shaders::load_basic_vs,
+                    shaders::load_solid_fs,
+                ),
             );
         }
         let shader = system.find_shader(MaterialID::Color(0)).unwrap();

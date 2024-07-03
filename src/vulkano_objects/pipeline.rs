@@ -1,13 +1,14 @@
 //! Pipeline handling and creating
 //! NOT reusable for multiple renderers (mostly)
 
-use std::{marker::PhantomData, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
 use vulkano::{
     buffer::{BufferContents, Subbuffer},
     descriptor_set::{
-        allocator::DescriptorSetAllocator, layout::DescriptorType, PersistentDescriptorSet,
-        WriteDescriptorSet,
+        allocator::DescriptorSetAllocator,
+        layout::{DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo},
+        PersistentDescriptorSet, WriteDescriptorSet,
     },
     device::Device,
     pipeline::{
@@ -17,7 +18,7 @@ use vulkano::{
             },
             depth_stencil::{DepthState, DepthStencilState},
             rasterization::{CullMode, RasterizationState},
-            vertex_input::{Vertex, VertexDefinition},
+            vertex_input::VertexInputState,
             viewport::{Viewport, ViewportState},
             GraphicsPipelineCreateInfo,
         },
@@ -25,20 +26,15 @@ use vulkano::{
         GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
     },
     render_pass::Subpass,
-    shader::EntryPoint,
+    shader::{ShaderModule, ShaderStages},
 };
 
 use super::{allocators::Allocators, buffers::create_storage_buffer};
 
 /// Pipeline wrapper to handle its own recreation
-pub struct PipelineHandler<V: Vertex> {
-    vs: EntryPoint,
-    fs: EntryPoint,
+pub struct PipelineHandler {
+    pub create_info: GraphicsPipelineCreateInfo,
     pub pipeline: Arc<GraphicsPipeline>,
-    subpass: Subpass,
-    vertex_type: PhantomData<V>,
-    dynamic_bindings: Vec<(usize, u32)>,
-    pipeline_type: PipelineType,
 }
 
 #[derive(Clone, Copy)]
@@ -47,35 +43,55 @@ pub enum PipelineType {
     Lighting,
 }
 
-impl<V: Vertex> PipelineHandler<V> {
+#[derive(Clone, Default)]
+/// Set layouts to be replaced in a `PipelineDescriptorSetLayoutCreateInfo`
+pub struct LayoutOverrides {
+    pub set_layout_overrides: Vec<(usize, DescriptorSetLayoutCreateInfo)>,
+}
+
+impl PipelineHandler {
     pub fn new(
         device: Arc<Device>,
-        vs: EntryPoint,
-        fs: EntryPoint,
+        stages: [PipelineShaderStageCreateInfo; 2],
+        layout: Arc<PipelineLayout>,
+        vertex_input_state: VertexInputState,
         viewport: Viewport,
         subpass: Subpass,
-        dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
+        // dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
         pipeline_type: PipelineType,
     ) -> Self {
-        let pipeline = window_size_dependent_pipeline::<V>(
-            device,
-            vs.clone(),
-            fs.clone(),
+        let create_info = window_size_dependent_pipeline_info(
+            stages,
+            layout,
+            vertex_input_state,
             viewport,
-            subpass.clone(),
-            dynamic_bindings.clone(),
+            subpass,
             pipeline_type,
         );
+        let pipeline = GraphicsPipeline::new(device, None, create_info.clone()).unwrap();
+
         Self {
-            vs,
-            fs,
+            create_info,
             pipeline,
-            subpass,
-            vertex_type: PhantomData,
-            dynamic_bindings: dynamic_bindings.into_iter().collect(),
-            pipeline_type,
         }
     }
+
+    // /// Creates another pipeline handler with the same pipeline create info but with different stages
+    // pub fn clone_with_stages(
+    //     &self,
+    //     device: Arc<Device>,
+    //     stages: [PipelineShaderStageCreateInfo; 2],
+    // ) -> Self {
+    //     let mut new_info = self.create_info.clone();
+    //     new_info.stages = stages.into_iter().collect();
+
+    //     let pipeline = GraphicsPipeline::new(device, None, new_info.clone()).unwrap();
+
+    //     Self {
+    //         create_info: new_info,
+    //         pipeline,
+    //     }
+    // }
 
     pub fn create_storage_buffer<T: BufferContents>(
         &self,
@@ -116,17 +132,26 @@ impl<V: Vertex> PipelineHandler<V> {
         self.pipeline.layout()
     }
 
-    /// recreate pipeline with cached shader entry points, subpass, dynamic bindings and pipeline type
+    /// recreate pipeline with cached shader entry points, subpass, dynamic bindings and pipeline type with new viewport
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, viewport: Viewport) {
-        self.pipeline = window_size_dependent_pipeline::<V>(
-            device,
-            self.vs.clone(),
-            self.fs.clone(),
-            viewport,
-            self.subpass.clone(),
-            self.dynamic_bindings.clone(),
-            self.pipeline_type,
-        );
+        if let Some(mut view_state) = self.create_info.viewport_state.take() {
+            view_state.viewports[0].extent = viewport.extent;
+            self.create_info.viewport_state = Some(view_state);
+        }
+        // self.create_info.viewport_state = self.create_info.viewport_state.map(|mut view_state| {
+        //     view_state.viewports[0].extent = viewport.extent;
+        //     view_state
+        // });
+
+        self.pipeline = GraphicsPipeline::new(device, None, self.create_info.clone()).unwrap();
+        // self.pipeline = window_size_dependent_pipeline::<V>(
+        //     device,
+        //     self.stages.clone(),
+        //     self.layout.clone(),
+        //     viewport,
+        //     self.subpass.clone(),
+        //     self.pipeline_type,
+        // );
     }
 }
 
@@ -137,7 +162,7 @@ impl PipelineType {
     /// - multisample_state
     /// - color_blend_state
     /// - subpass (Not anymore)
-    fn apply_to_create_info(
+    fn apply(
         self,
         create_info: GraphicsPipelineCreateInfo,
         subpass: Subpass,
@@ -192,70 +217,185 @@ impl PipelineType {
     }
 }
 
-/// Create pipeline made for rarely size changing windows
-///
-/// ### Pipeline Sates
-/// - vertex input: based on given generic
-/// - viewport: given
-fn window_size_dependent_pipeline<V: Vertex>(
-    device: Arc<Device>,
-    vs: EntryPoint,
-    fs: EntryPoint,
-    viewport: Viewport,
-    // images: &[Arc<Image>],
-    subpass: Subpass,
-    dynamic_bindings: impl IntoIterator<Item = (usize, u32)>,
-    pipeline_type: PipelineType,
-) -> Arc<GraphicsPipeline> {
-    let vertex_input_state = V::per_vertex()
-        .definition(&vs.info().input_interface) //[Position::per_vertex(), Normal::per_vertex()]
-        .unwrap();
-    let stages = [
-        PipelineShaderStageCreateInfo::new(vs),
-        PipelineShaderStageCreateInfo::new(fs),
-    ];
-    let layout = {
-        let mut layout_create_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
-        for (set, binding) in dynamic_bindings {
-            layout_create_info.set_layouts[set]
-                .bindings
-                .get_mut(&binding)
-                .unwrap()
-                .descriptor_type = DescriptorType::UniformBufferDynamic;
-            // println!("Making set {}, binding {} dynamic", set, binding);
-        }
+impl LayoutOverrides {
+    pub fn add_set(&mut self, index: usize, set_layout_info: DescriptorSetLayoutCreateInfo) {
+        self.set_layout_overrides.push((index, set_layout_info));
+    }
+
+    /// create pipeline layout using given stages with overrides
+    pub fn create_layout(
+        &self,
+        device: Arc<Device>,
+        stages: &[PipelineShaderStageCreateInfo; 2],
+    ) -> Arc<PipelineLayout> {
+        let draw_layout_info =
+            self.apply(PipelineDescriptorSetLayoutCreateInfo::from_stages(stages));
 
         PipelineLayout::new(
             device.clone(),
-            layout_create_info
-                .into_pipeline_layout_create_info(device.clone())
+            draw_layout_info
+                .into_pipeline_layout_create_info(device)
                 .unwrap(),
         )
         .unwrap()
-    };
+    }
 
-    GraphicsPipeline::new(
-        device,
-        None,
-        pipeline_type.apply_to_create_info(
-            GraphicsPipelineCreateInfo {
-                stages: stages.into_iter().collect(),
-                vertex_input_state: Some(vertex_input_state),
-                input_assembly_state: Some(Default::default()),
-                viewport_state: Some(ViewportState {
-                    viewports: [Viewport {
-                        offset: [0.0, 0.0],
-                        extent: viewport.extent,
-                        depth_range: 0.0..=1.0,
-                    }]
-                    .into_iter()
-                    .collect(),
-                    ..Default::default()
-                }),
-                ..GraphicsPipelineCreateInfo::layout(layout)
-            },
-            subpass,
-        ),
-    )
-    .unwrap()
+    pub fn apply(
+        &self,
+        mut create_info: PipelineDescriptorSetLayoutCreateInfo,
+    ) -> PipelineDescriptorSetLayoutCreateInfo {
+        for (set, layout) in self.set_layout_overrides.iter() {
+            create_info.set_layouts[*set] = layout.clone();
+        }
+        create_info
+    }
+
+    /// Creates a `DescriptorSetLayoutCreateInfo` with a single uniform buffer at binding 0
+    pub fn single_uniform_set(stages: ShaderStages) -> DescriptorSetLayoutCreateInfo {
+        let mut binding = DescriptorSetLayoutBinding::descriptor_type(
+            vulkano::descriptor_set::layout::DescriptorType::UniformBuffer,
+        );
+        binding.stages = stages;
+
+        DescriptorSetLayoutCreateInfo {
+            bindings: [(0, binding)].into(),
+            ..Default::default()
+        }
+    }
 }
+
+pub fn mod_to_stages<T: Debug>(
+    device: Arc<Device>,
+    vs: impl FnOnce(Arc<Device>) -> Result<Arc<ShaderModule>, T>,
+    fs: impl FnOnce(Arc<Device>) -> Result<Arc<ShaderModule>, T>, // stages: [dyn FnOnce(Arc<Device>) -> Result<Arc<ShaderModule>, T>; 2],
+) -> [PipelineShaderStageCreateInfo; 2] {
+    [vs(device.clone()), fs(device.clone())].map(|module| {
+        PipelineShaderStageCreateInfo::new(module.unwrap().entry_point("main").unwrap())
+    })
+}
+
+// /// Create a pipeline layout from the given shader stages but with the global descriptor in set 0 binding 0 targeting both vertex and fragment shaders
+// pub fn layout_from_stages(
+//     device: Arc<Device>,
+//     stages: &[PipelineShaderStageCreateInfo; 2],
+// ) -> Arc<PipelineLayout> {
+//     let mut draw_layout_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(stages);
+//     override_global_set(&mut draw_layout_info);
+//     PipelineLayout::new(
+//         device.clone(),
+//         draw_layout_info
+//             .into_pipeline_layout_create_info(device)
+//             .unwrap(),
+//     )
+//     .unwrap()
+// }
+
+// fn override_global_set(create_info: &mut PipelineDescriptorSetLayoutCreateInfo) {
+//     create_info.set_layouts[0] =
+//         LayoutOverrides::single_uniform_set(ShaderStages::VERTEX | ShaderStages::FRAGMENT);
+// }
+
+/// Create pipeline made for rarely size changing windows
+///
+/// ### Pipeline States
+/// - vertex input: based on given generic
+/// - viewport: given
+fn window_size_dependent_pipeline_info(
+    stages: impl IntoIterator<Item = PipelineShaderStageCreateInfo>,
+    layout: Arc<PipelineLayout>,
+    vertex_input_state: VertexInputState,
+    viewport: Viewport,
+    subpass: Subpass,
+    pipeline_type: PipelineType,
+) -> GraphicsPipelineCreateInfo {
+    pipeline_type.apply(
+        GraphicsPipelineCreateInfo {
+            stages: stages.into_iter().collect(),
+            vertex_input_state: Some(vertex_input_state),
+            input_assembly_state: Some(Default::default()),
+            viewport_state: Some(ViewportState {
+                viewports: [Viewport {
+                    offset: [0.0, 0.0],
+                    extent: viewport.extent,
+                    depth_range: 0.0..=1.0,
+                }]
+                .into_iter()
+                .collect(),
+                ..Default::default()
+            }),
+            ..GraphicsPipelineCreateInfo::layout(layout)
+        },
+        subpass,
+    )
+}
+
+// /// Create pipeline made for rarely size changing windows
+// ///
+// /// ### Pipeline States
+// /// - vertex input: based on given generic
+// /// - viewport: given
+// fn window_size_dependent_pipeline<V: Vertex>(
+//     device: Arc<Device>,
+//     stages: impl IntoIterator<Item = PipelineShaderStageCreateInfo>,
+//     layout: Arc<PipelineLayout>,
+//     vertex_input_state: VertexInputState,
+//     // vs: EntryPoint,
+//     // fs: EntryPoint,
+//     viewport: Viewport,
+//     // images: &[Arc<Image>],
+//     subpass: Subpass,
+//     // dynamic_bindings: impl IntoIterator<Item = (usize, u32)>,
+//     pipeline_type: PipelineType,
+// ) -> Arc<GraphicsPipeline> {
+//     // let vertex_input_state = V::per_vertex()
+//     //     .definition(&stages.info().input_interface) //[Position::per_vertex(), Normal::per_vertex()]
+//     //     .unwrap();
+//     // let stages = [
+//     //     PipelineShaderStageCreateInfo::new(vs),
+//     //     PipelineShaderStageCreateInfo::new(fs),
+//     // ];
+//     // let layout = {
+//     //     let mut layout_create_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
+//     //     for (set, binding) in dynamic_bindings {
+//     //         layout_create_info.set_layouts[set]
+//     //             .bindings
+//     //             .get_mut(&binding)
+//     //             .unwrap()
+//     //             .descriptor_type = DescriptorType::UniformBufferDynamic;
+//     //         // println!("Making set {}, binding {} dynamic", set, binding);
+//     //     }
+
+//     //     PipelineLayout::new(
+//     //         device.clone(),
+//     //         layout_create_info
+//     //             .into_pipeline_layout_create_info(device.clone())
+//     //             .unwrap(),
+//     //     )
+//     //     .unwrap()
+//     // };
+
+//     GraphicsPipeline::new(
+//         device,
+//         None,
+//         pipeline_type.apply_to_create_info(
+//             GraphicsPipelineCreateInfo {
+//                 stages: stages.into_iter().collect(),
+//                 vertex_input_state: Some(vertex_input_state),
+//                 input_assembly_state: Some(Default::default()),
+//                 viewport_state: Some(ViewportState {
+//                     viewports: [Viewport {
+//                         offset: [0.0, 0.0],
+//                         extent: viewport.extent,
+//                         depth_range: 0.0..=1.0,
+//                     }]
+//                     .into_iter()
+//                     .collect(),
+//                     ..Default::default()
+//                 }),
+//                 ..GraphicsPipelineCreateInfo::layout(layout)
+//             },
+//             subpass,
+//         ),
+//     )
+//     .unwrap()
+// }

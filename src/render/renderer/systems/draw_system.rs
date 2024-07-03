@@ -1,16 +1,23 @@
 // mod frame_data;
 // use frame_data::FrameData;
 
-use std::sync::Arc;
-
 use vulkano::{
-    command_buffer::AutoCommandBufferBuilder, descriptor_set::DescriptorSetsCollection,
-    render_pass::Subpass, shader::ShaderModule,
+    command_buffer::AutoCommandBufferBuilder,
+    descriptor_set::DescriptorSetsCollection,
+    pipeline::{
+        graphics::{
+            vertex_input::{Vertex, VertexDefinition},
+            GraphicsPipelineCreateInfo,
+        },
+        GraphicsPipeline, PipelineShaderStageCreateInfo,
+    },
+    render_pass::Subpass,
 };
 
 use crate::{
     render::{context::Context, render_data::material::Shader, resource_manager::MaterialID},
-    vulkano_objects::pipeline::PipelineHandler,
+    vulkano_objects::pipeline::{LayoutOverrides, PipelineHandler},
+    VertexFull,
 };
 
 /// Collection of shaders, meant to be run on a single subpass
@@ -20,7 +27,9 @@ use crate::{
 /// Materials can optionally add more sets, starting from set 2
 pub struct DrawSystem<T: Clone> {
     pub shaders: Vec<Shader<T>>,
-    subpass: Subpass,
+    layout_overrides: LayoutOverrides,
+    // layout: PipelineLayout,
+    // subpass: Subpass,
 }
 
 impl<T: Clone> DrawSystem<T> {
@@ -29,18 +38,28 @@ impl<T: Clone> DrawSystem<T> {
         context: &Context,
         subpass: &Subpass,
         id: MaterialID,
-        vs: Arc<ShaderModule>,
-        fs: Arc<ShaderModule>,
+        stages: [PipelineShaderStageCreateInfo; 2],
+        // layout: Arc<PipelineLayout>,
+        layout_overrides: LayoutOverrides,
     ) -> Self {
+        // let stages = [vs, fs]
+        //     .map(|shader| PipelineShaderStageCreateInfo::new(shader.entry_point("main").unwrap()));
+
+        let vertex_input_state = VertexFull::per_vertex()
+            .definition(&stages[0].entry_point.info().input_interface) //[Position::per_vertex(), Normal::per_vertex()]
+            .unwrap();
+
+        let layout = layout_overrides.create_layout(context.device.clone(), &stages);
+
         let shader = Shader::new(
             id,
             PipelineHandler::new(
                 context.device.clone(),
-                vs.entry_point("main").unwrap(),
-                fs.entry_point("main").unwrap(),
+                stages,
+                layout,
+                vertex_input_state,
                 context.viewport.clone(),
                 subpass.clone(),
-                [], // [(0, 0)],
                 crate::vulkano_objects::pipeline::PipelineType::Drawing,
             ),
         );
@@ -50,7 +69,7 @@ impl<T: Clone> DrawSystem<T> {
 
         DrawSystem {
             shaders: vec![shader],
-            subpass: subpass.clone(),
+            layout_overrides, // subpass: subpass.clone(),
         }
     }
 
@@ -59,21 +78,25 @@ impl<T: Clone> DrawSystem<T> {
         &mut self,
         context: &Context,
         id: MaterialID,
-        vs: Arc<ShaderModule>,
-        fs: Arc<ShaderModule>,
+        stages: [PipelineShaderStageCreateInfo; 2],
     ) {
-        self.shaders.push(Shader::new(
-            id,
-            PipelineHandler::new(
-                context.device.clone(),
-                vs.entry_point("main").unwrap(),
-                fs.entry_point("main").unwrap(),
-                context.viewport.clone(),
-                self.subpass.clone(),
-                [], // [(0, 0)],
-                crate::vulkano_objects::pipeline::PipelineType::Drawing,
-            ),
-        ));
+        let layout = self
+            .layout_overrides
+            .create_layout(context.device.clone(), &stages);
+
+        let create_info = GraphicsPipelineCreateInfo {
+            layout,
+            stages: stages.into_iter().collect(),
+            ..self.shaders[0].pipeline.create_info.clone()
+        };
+
+        let pipeline = PipelineHandler {
+            pipeline: GraphicsPipeline::new(context.device.clone(), None, create_info.clone())
+                .unwrap(),
+            create_info,
+        };
+
+        self.shaders.push(Shader::new(id, pipeline));
     }
 
     /// search for shader via MaterialID
