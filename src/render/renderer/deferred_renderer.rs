@@ -5,7 +5,7 @@ use super::{
     Renderer,
 };
 use crate::{
-    render::{resource_manager::MaterialID, Context},
+    render::{render_data::material::Shader, resource_manager::MaterialID, Context},
     shaders::{self, DirectionLight, GPUGlobalData, GPUObjectData, PointLight},
     vulkano_objects::{
         self,
@@ -256,16 +256,8 @@ impl FrameData {
     /// write object data to storage buffer
     ///
     /// `RenderObject::upload(&self)` must have been called beforehand
-    pub fn update_objects_data(
-        &self,
-        lit_system: &mut DrawSystem<()>,
-        unlit_system: &mut DrawSystem<()>,
-    ) {
-        let obj_iter = lit_system
-            .shaders
-            .iter_mut()
-            .chain(unlit_system.shaders.iter_mut())
-            .flat_map(|pipeline| pipeline.upload_pending_objects());
+    pub fn update_objects_data<'a>(&self, shaders: impl Iterator<Item = &'a mut Shader<()>>) {
+        let obj_iter = shaders.flat_map(|pipeline| pipeline.upload_pending_objects());
         write_to_storage_buffer(&self.objects_data.0, obj_iter, 0);
     }
 

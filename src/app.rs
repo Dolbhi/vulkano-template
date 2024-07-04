@@ -339,8 +339,11 @@ impl App {
 
                 frame.update_global_data(global_data);
                 frame.update_objects_data(
-                    &mut renderer.lit_draw_system,
-                    &mut renderer.unlit_draw_system,
+                    renderer
+                        .lit_draw_system
+                        .shaders
+                        .iter_mut()
+                        .chain(renderer.unlit_draw_system.shaders.iter_mut()),
                 );
 
                 // point lights

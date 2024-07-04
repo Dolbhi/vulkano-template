@@ -101,12 +101,6 @@ impl<T: Clone> DrawSystem<T> {
         self.shaders
             .iter_mut()
             .find(|shader| std::mem::discriminant(&shader.get_id()) == std::mem::discriminant(&id))
-        // for shader in &mut self.shaders {
-        //     if std::mem::discriminant(&shader.get_id()) == std::mem::discriminant(&id) {
-        //         return Some(shader);
-        //     }
-        // }
-        // None
     }
 
     /// Recreate all pipelines with any changes in viewport
