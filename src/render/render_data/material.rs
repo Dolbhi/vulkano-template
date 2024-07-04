@@ -17,6 +17,9 @@ use crate::{
     VertexFull,
 };
 
+/// Collection of materials using the same pipeline
+///
+/// T: Type of additional data in render object
 pub struct Shader<T: Clone> {
     id: MaterialID,
     pub pipeline: PipelineHandler,

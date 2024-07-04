@@ -8,7 +8,7 @@ use super::material::RenderSubmit;
 
 #[derive(Debug, Clone)]
 /// Data for standard rendering of a mesh
-/// Type T is the additional data type of the object (usually a transform matrix)
+/// Type T is the additional data type of the object
 pub struct RenderObject<T: Clone> {
     pub mesh: Arc<MeshBuffers<VertexFull>>,
     pub model: Matrix4<f32>,
