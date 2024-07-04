@@ -44,9 +44,6 @@ impl<T: Clone> DrawSystem<T> {
         // layout: Arc<PipelineLayout>,
         layout_overrides: LayoutOverrides,
     ) -> Self {
-        // let stages = [vs, fs]
-        //     .map(|shader| PipelineShaderStageCreateInfo::new(shader.entry_point("main").unwrap()));
-
         let vertex_input_state = VertexFull::per_vertex()
             .definition(&stages[0].entry_point.info().input_interface) //[Position::per_vertex(), Normal::per_vertex()]
             .unwrap();

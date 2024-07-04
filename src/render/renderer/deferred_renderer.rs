@@ -9,16 +9,15 @@ use crate::{
     shaders::{self, DirectionLight, GPUGlobalData, GPUObjectData, PointLight},
     vulkano_objects::{
         self,
-        buffers::{write_to_buffer, write_to_storage_buffer},
+        buffers::{write_to_buffer, write_to_storage_buffer, Uniform},
         pipeline::{mod_to_stages, LayoutOverrides},
         render_pass::FramebufferAttachments,
     },
 };
 
 use vulkano::{
-    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
+    buffer::{Buffer, BufferCreateInfo, BufferUsage},
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
-    descriptor_set::DescriptorSetWithOffsets,
     device::Device,
     format::Format,
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
@@ -38,19 +37,13 @@ pub struct DeferredRenderer {
 }
 
 pub struct FrameData {
-    global_buffer: Subbuffer<GPUGlobalData>,
-    global_draw_set: DescriptorSetWithOffsets,
-    global_light_set: DescriptorSetWithOffsets,
+    global_data: Uniform<GPUGlobalData>,
+    objects_data: Uniform<[GPUObjectData]>,
 
-    objects_buffer: Subbuffer<[GPUObjectData]>,
-    objects_set: DescriptorSetWithOffsets,
-
-    point_buffer: Subbuffer<[PointLight]>,
-    point_set: DescriptorSetWithOffsets,
+    point_data: Uniform<[PointLight]>,
     last_point_index: Option<usize>,
 
-    dir_buffer: Subbuffer<[DirectionLight]>,
-    dir_set: DescriptorSetWithOffsets,
+    dir_data: Uniform<[DirectionLight]>,
     last_dir_index: Option<usize>,
 }
 
@@ -73,12 +66,13 @@ impl DeferredRenderer {
             shaders::load_basic_fs,
         );
 
+        // global descriptor set layout
+        let global_des_layout =
+            LayoutOverrides::single_uniform_set(ShaderStages::VERTEX | ShaderStages::FRAGMENT);
         let layout_override = LayoutOverrides {
-            set_layout_overrides: vec![(
-                0,
-                LayoutOverrides::single_uniform_set(ShaderStages::VERTEX | ShaderStages::FRAGMENT),
-            )],
+            set_layout_overrides: vec![(0, global_des_layout.clone())],
         };
+        // let global_des_layout = DescriptorSetLayout::new(context.device.clone(), global_des_layout);
 
         let lit_draw_system = DrawSystem::new(
             context,
@@ -122,27 +116,25 @@ impl DeferredRenderer {
                 Default::default(),
             )
             .unwrap();
-            let descriptor_allocator = &context.allocators.descriptor_set;
-            let global_draw_set = lit_draw_system.shaders[0]
-                .pipeline
-                .create_descriptor_set(descriptor_allocator, global_buffer.clone(), 0)
-                .into();
-            let global_light_set = lighting_system
-                .point_pipeline
-                .create_descriptor_set(descriptor_allocator, global_buffer.clone(), 0)
-                .into();
+            let global_set = lit_draw_system.shaders[0].pipeline.create_descriptor_set(
+                &context.allocators.descriptor_set,
+                global_buffer.clone(),
+                0,
+            );
 
             // draw data
-            let (objects_buffer, objects_set) = lit_draw_system.shaders[0]
-                .pipeline
-                .create_storage_buffer(&context.allocators, 1000, 1); //object_data.pop().unwrap();
+            let objects_data = lit_draw_system.shaders[0].pipeline.create_storage_buffer(
+                &context.allocators,
+                1000,
+                1,
+            ); //object_data.pop().unwrap();
 
             // lighting data
-            let (point_buffer, point_set) =
+            let point_data =
                 lighting_system
                     .point_pipeline
                     .create_storage_buffer(&context.allocators, 1000, 2);
-            let (dir_buffer, dir_set) = lighting_system.direction_pipeline.create_storage_buffer(
+            let dir_data = lighting_system.direction_pipeline.create_storage_buffer(
                 &context.allocators,
                 1000,
                 2,
@@ -151,19 +143,13 @@ impl DeferredRenderer {
             // println!("Creation layout: {:?}", global_set.as_ref().0.layout());
 
             frame_data.push(FrameData {
-                global_buffer,
-                global_draw_set,
-                global_light_set,
+                global_data: (global_buffer, global_set),
+                objects_data,
 
-                objects_buffer,
-                objects_set: objects_set.into(),
-
-                point_buffer,
-                point_set: point_set.into(),
+                point_data,
                 last_point_index: None,
 
-                dir_buffer,
-                dir_set: dir_set.into(),
+                dir_data,
                 last_dir_index: None,
             });
         }
@@ -212,7 +198,7 @@ impl Renderer for DeferredRenderer {
         // draw subpass
         self.lit_draw_system.render(
             &mut object_index,
-            vec![frame.global_draw_set.clone(), frame.objects_set.clone()],
+            vec![frame.global_data.1.clone(), frame.objects_data.1.clone()],
             command_builder,
         );
         // end subpass
@@ -222,9 +208,9 @@ impl Renderer for DeferredRenderer {
 
         // lighting subpass
         self.lighting_system.render(
-            frame.global_light_set.clone(),
-            frame.point_set.clone(),
-            frame.dir_set.clone(),
+            frame.global_data.1.clone().into(),
+            frame.point_data.1.clone().into(),
+            frame.dir_data.1.clone().into(),
             frame.last_point_index,
             frame.last_dir_index,
             command_builder,
@@ -237,7 +223,7 @@ impl Renderer for DeferredRenderer {
         // unlit subpass
         self.unlit_draw_system.render(
             &mut object_index,
-            vec![frame.global_draw_set.clone(), frame.objects_set.clone()],
+            vec![frame.global_data.1.clone(), frame.objects_data.1.clone()],
             command_builder,
         );
         // end render pass
@@ -264,7 +250,7 @@ impl Renderer for DeferredRenderer {
 impl FrameData {
     /// write global data to buffer
     pub fn update_global_data(&mut self, data: impl Into<GPUGlobalData>) {
-        write_to_buffer(&self.global_buffer, data);
+        write_to_buffer(&self.global_data.0, data);
     }
 
     /// write object data to storage buffer
@@ -280,14 +266,14 @@ impl FrameData {
             .iter_mut()
             .chain(unlit_system.shaders.iter_mut())
             .flat_map(|pipeline| pipeline.upload_pending_objects());
-        write_to_storage_buffer(&self.objects_buffer, obj_iter, 0);
+        write_to_storage_buffer(&self.objects_data.0, obj_iter, 0);
     }
 
     pub fn update_point_lights(&mut self, point_lights: impl Iterator<Item = PointLight>) {
-        self.last_point_index = write_to_storage_buffer(&self.point_buffer, point_lights, 0);
+        self.last_point_index = write_to_storage_buffer(&self.point_data.0, point_lights, 0);
     }
     pub fn update_directional_lights(&mut self, dir_lights: impl Iterator<Item = DirectionLight>) {
-        self.last_dir_index = write_to_storage_buffer(&self.dir_buffer, dir_lights, 0);
+        self.last_dir_index = write_to_storage_buffer(&self.dir_data.0, dir_lights, 0);
     }
 }
 

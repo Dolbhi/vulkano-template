@@ -22,7 +22,7 @@ use vulkano::{
 
 use super::allocators::Allocators;
 
-type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
+pub type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
 
 /// Buffers for vertcies and indecies, essentially a struct containing mesh data
 #[derive(Debug)]
