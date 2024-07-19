@@ -12,6 +12,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [x] Refactor renderobjects
 
 ### Features
+- [ ] Wireframe renderer
 - [ ] Asset loader
 	- [ ] Mesh, material and scene loading from files (with universal IDs)
 	- [ ] Conversion into fast loading format
