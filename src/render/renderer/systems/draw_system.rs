@@ -24,9 +24,13 @@ use crate::{
 
 /// Collection of shaders, meant to be run on a single subpass
 ///
+/// T: See [Shader<T>]
+///
 /// All shader pipelines share sets 0 and 1, describing global scene data and an array of object data (storage buffer) respectively
 ///
 /// Materials can optionally add more sets, starting from set 2
+///
+/// Should always have at least one shader present
 pub struct DrawSystem<T: Clone> {
     pub shaders: Vec<Shader<T>>,
     layout_overrides: LayoutOverrides,
@@ -35,7 +39,7 @@ pub struct DrawSystem<T: Clone> {
 }
 
 impl<T: Clone> DrawSystem<T> {
-    /// creates from a collection of shader entry points
+    /// Creates `DrawSystem` from the stage create infos of a starting shader
     pub fn new(
         context: &Context,
         subpass: &Subpass,
@@ -74,7 +78,9 @@ impl<T: Clone> DrawSystem<T> {
         }
     }
 
-    /// creates shader with the same subpass and dynamic bindings as this system
+    /// Creates shader with the same subpass and dynamic bindings as this system
+    ///
+    /// New shaders will make use of the `GraphicsPipelineCreateInfo` of the first shader with layout and stages substituted
     pub fn add_shader(
         &mut self,
         context: &Context,

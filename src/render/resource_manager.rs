@@ -272,7 +272,9 @@ impl<'a> ResourceRetriever<'a> {
                         )
                     }
                     MaterialID::Color(_) => {
-                        panic!("Solid material not found, it must be loaded with load")
+                        panic!(
+                            "Solid material not found, it must be loaded with load_solid_material"
+                        )
                         // let color_buffer = create_material_buffer(
                         //     self.context,
                         //     draw::SolidData {
