@@ -1,7 +1,27 @@
-use super::{GPUGlobalData, GPUObjectData};
+use super::{GPUColoredData, GPUGlobalData, GPUObjectData};
 use crate::game_objects::Camera;
-use cgmath::{Matrix, Matrix4, Transform};
+use cgmath::{Matrix, Matrix4, Transform, Vector4};
 use winit::dpi::PhysicalSize;
+
+pub struct ColoredData {
+    transform: Matrix4<f32>,
+    color: Vector4<f32>,
+}
+
+impl From<ColoredData> for GPUColoredData {
+    fn from(value: ColoredData) -> Self {
+        GPUColoredData {
+            render_matrix: value.transform.into(),
+            normal_matrix: value
+                .transform
+                .inverse_transform()
+                .unwrap()
+                .transpose()
+                .into(),
+            color: value.color.into(),
+        }
+    }
+}
 
 impl From<(Matrix4<f32>, ())> for GPUObjectData {
     fn from(value: (Matrix4<f32>, ())) -> Self {

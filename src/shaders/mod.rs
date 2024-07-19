@@ -20,16 +20,30 @@ vulkano_shaders::shader! {
             path: "src/shaders/draw/gradient/fragment.frag",
         },
 
-        // colored draw
+        // old colored draw
         colored_vs: {
             ty: "vertex",
-            path: "src/shaders/colored/vertex.vert",
+            path: "src/shaders/draw/colored/vertex.vert",
         },
         solid_fs: {
             ty: "fragment",
-            path: "src/shaders/colored/solid.frag",
+            path: "src/shaders/draw/colored/solid.frag",
         },
         billboard_vs: {
+            ty: "vertex",
+            path: "src/shaders/draw/colored/billboard.vert",
+        },
+
+        // new colored draw
+        new_colored_vs: {
+            ty: "vertex",
+            path: "src/shaders/colored/vertex.vert",
+        },
+        new_solid_fs: {
+            ty: "fragment",
+            path: "src/shaders/colored/solid.frag",
+        },
+        new_billboard_vs: {
             ty: "vertex",
             path: "src/shaders/colored/billboard.vert",
         },

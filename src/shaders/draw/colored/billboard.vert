@@ -1,17 +1,26 @@
 // stolen from vulkano defered lighting example
 
 #version 460
-#include "../includes/draw_vert_in.glsl"
-#include "../includes/global_data.glsl"
-#include "../includes/colored_data.glsl"
+#include "../../includes/draw_vert_in.glsl"
+#include "../../includes/global_data.glsl"
 
-layout(set = 1, binding = 0) readonly buffer ColoredBuffer {
-    GPUColoredData objects[];
+// layout(location = 0) in vec3 position;
+// layout(location = 1) in vec3 normal;
+// layout(location = 2) in vec3 colour;
+// layout(location = 3) in vec2 uv;
+
+struct GPUObjectData {
+	mat4 render_matrix;
+    mat4 normal_matrix;
+    // vec4 color;
+};
+layout(set = 1, binding = 0) readonly buffer ObjectBuffer {
+    GPUObjectData objects[];
 } objectBuffer;
 
 layout(location = 0) out vec2 v_tex_coord;
 layout(location = 1) out vec3 v_normal;
-layout(location = 2) out uint v_object_index;
+// layout(location = 2) out uint v_object_index;
 
 void main() {
     // billboard shenanigans
@@ -19,7 +28,7 @@ void main() {
     vec3 offset_up = position.y * vec3(global_data.view[0][1], global_data.view[1][1], global_data.view[2][1]);
     // vec3 offset_forward = position.z * vec3(global_data.view[0][2], global_data.view[1][2], global_data.view[2][2]);
 
-    GPUColoredData object = objectBuffer.objects[gl_InstanceIndex];
+    GPUObjectData object = objectBuffer.objects[gl_InstanceIndex];
     vec4 object_position = object.render_matrix[3];
 
     // float light_radius = 4.0;
@@ -34,6 +43,6 @@ void main() {
     gl_Position = screen_pos;
     v_tex_coord = uv;
     v_normal = vec3(0.0, 0.0, 1.0);
-    v_object_index = gl_InstanceIndex;
+    // v_object_index = gl_InstanceIndex;
     // v_screen_coords = gl_Position.xy;
 }
