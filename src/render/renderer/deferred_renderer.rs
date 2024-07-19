@@ -72,7 +72,6 @@ impl DeferredRenderer {
         let layout_override = LayoutOverrides {
             set_layout_overrides: vec![(0, global_des_layout.clone())],
         };
-        // let global_des_layout = DescriptorSetLayout::new(context.device.clone(), global_des_layout);
 
         let lit_draw_system = DrawSystem::new(
             context,
