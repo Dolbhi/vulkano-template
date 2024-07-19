@@ -7,6 +7,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 
 ## To Do
 ### Misc.
+- [ ] Add camera light toggle (bound to 'f')
 - [ ] Place billboards in test world
 - [x] Smarter transform matrix calculation
 - [x] Refactor renderobjects
