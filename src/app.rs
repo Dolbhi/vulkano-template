@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cgmath::{One, Quaternion, Vector3};
+use cgmath::{One, Quaternion, Vector3, Vector4};
 use legion::*;
 
 use winit::{
@@ -151,11 +151,9 @@ impl App {
 
         let world = &mut *self.world.lock().unwrap();
         world.clear();
-        let resources = &mut self.resources.begin_retrieving(
-            &self.render_loop.context,
-            &mut self.renderer.lit_draw_system,
-            &mut self.renderer.unlit_draw_system,
-        );
+        let resources = &mut self
+            .resources
+            .begin_retrieving(&self.render_loop.context, &mut self.renderer);
         let GameWorld {
             world,
             transforms,
@@ -331,6 +329,16 @@ impl App {
                     render_object.upload();
                 }
 
+                let mut query = <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query()
+                    .filter(!component::<DisabledLERP>());
+                // println!("==== RENDER COLORED DATA ====");
+                for (transform_id, render_object) in query.iter_mut(world) {
+                    let transfrom_matrix = transforms.get_lerp_model(transform_id).unwrap();
+                    // println!("Obj {:?}: {:?}", transform_id, obj);
+                    render_object.model = transfrom_matrix;
+                    render_object.upload();
+                }
+
                 // upload draw data
                 let frame = renderer
                     .frame_data
@@ -342,8 +350,15 @@ impl App {
                     renderer
                         .lit_draw_system
                         .shaders
-                        .iter_mut()
-                        .chain(renderer.unlit_draw_system.shaders.iter_mut()),
+                        .values_mut()
+                        .chain(renderer.unlit_draw_system.shaders.values_mut()),
+                );
+                frame.update_colored_data(
+                    renderer
+                        .lit_colored_system
+                        .shaders
+                        .values_mut()
+                        .chain(renderer.unlit_colored_system.shaders.values_mut()),
                 );
 
                 // point lights

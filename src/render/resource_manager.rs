@@ -1,5 +1,6 @@
 use std::{collections::HashMap, iter::zip, path::Path, sync::Arc};
 
+use cgmath::Vector4;
 use vulkano::{
     buffer::Subbuffer,
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
@@ -18,8 +19,7 @@ use super::{
         material::Shader,
         texture::{create_sampler, load_texture},
     },
-    renderer::systems::DrawSystem,
-    Context, RenderObject, RenderSubmit,
+    Context, DeferredRenderer, RenderObject, RenderSubmit,
 };
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -39,7 +39,7 @@ pub enum MeshID {
 const LOST_EMPIRE_MESH_COUNT: u8 = 45;
 
 /// Unique ID to identify materials, descriminant corresponds to shader
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
 pub enum MaterialID {
     Texture(TextureID),
     Color(u32),
@@ -49,7 +49,24 @@ pub enum MaterialID {
     // Parameter(u32),
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
+/// Unique ID to identify shaders
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
+pub enum ShaderID {
+    Texture,
+    Color,
+    UV,
+    Gradient,
+    Billboard,
+    // Parameter(u32),
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
+pub enum ColoredID {
+    Solid,
+    Billboard,
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
 pub enum TextureID {
     InaBody,
     InaCloth,
@@ -64,6 +81,7 @@ pub enum TextureID {
 pub struct ResourceManager {
     loaded_meshes: HashMap<MeshID, Arc<MeshBuffers<VertexFull>>>,
     loaded_materials: HashMap<(MaterialID, bool), RenderSubmit<()>>,
+    loaded_colored: HashMap<(ColoredID, bool), RenderSubmit<Vector4<f32>>>,
     loaded_textures: HashMap<TextureID, Arc<ImageView>>,
     linear_sampler: Arc<Sampler>,
     next_color_id: u32,
@@ -72,8 +90,30 @@ pub struct ResourceManager {
 pub struct ResourceRetriever<'a> {
     loaded_resources: &'a mut ResourceManager,
     context: &'a Context,
-    lit_system: &'a mut DrawSystem<()>,
-    unlit_system: &'a mut DrawSystem<()>,
+    renderer: &'a mut DeferredRenderer,
+}
+
+impl From<MaterialID> for ShaderID {
+    fn from(value: MaterialID) -> Self {
+        match value {
+            MaterialID::Texture(_) => ShaderID::Texture,
+            MaterialID::Color(_) => ShaderID::Color,
+            MaterialID::UV => ShaderID::UV,
+            MaterialID::Gradient => ShaderID::Gradient,
+            MaterialID::Billboard => ShaderID::Billboard,
+        }
+    }
+}
+impl<'a> From<&'a MaterialID> for &'a ShaderID {
+    fn from(value: &'a MaterialID) -> Self {
+        match value {
+            MaterialID::Texture(_) => &ShaderID::Texture,
+            MaterialID::Color(_) => &ShaderID::Color,
+            MaterialID::UV => &ShaderID::UV,
+            MaterialID::Gradient => &ShaderID::Gradient,
+            MaterialID::Billboard => &ShaderID::Billboard,
+        }
+    }
 }
 
 impl ResourceManager {
@@ -81,6 +121,7 @@ impl ResourceManager {
         ResourceManager {
             loaded_meshes: HashMap::new(),
             loaded_materials: HashMap::new(),
+            loaded_colored: HashMap::new(),
             loaded_textures: HashMap::new(),
             linear_sampler: create_sampler(
                 context.device.clone(),
@@ -93,14 +134,12 @@ impl ResourceManager {
     pub fn begin_retrieving<'a>(
         &'a mut self,
         context: &'a Context,
-        lit_system: &'a mut DrawSystem<()>,
-        unlit_system: &'a mut DrawSystem<()>,
+        renderer: &'a mut DeferredRenderer,
     ) -> ResourceRetriever {
         ResourceRetriever {
             loaded_resources: self,
             context,
-            lit_system,
-            unlit_system,
+            renderer,
         }
     }
 }
@@ -203,13 +242,13 @@ impl<'a> ResourceRetriever<'a> {
             None => {
                 // Narrow down system
                 let system = if lit {
-                    &mut self.lit_system
+                    &mut self.renderer.lit_draw_system
                 } else {
-                    &mut self.unlit_system
+                    &mut self.renderer.unlit_draw_system
                 };
 
                 // Narrow down shader
-                let shader = match system.find_shader(id) {
+                let shader = match system.find_shader(&id) {
                     Some(s) => s,
                     None => {
                         {
@@ -253,7 +292,7 @@ impl<'a> ResourceRetriever<'a> {
                                     ),
                                 ),
                             };
-                            system.find_shader(id).unwrap()
+                            system.find_shader(&id).unwrap()
                         }
                     }
                 };
@@ -275,18 +314,6 @@ impl<'a> ResourceRetriever<'a> {
                         panic!(
                             "Solid material not found, it must be loaded with load_solid_material"
                         )
-                        // let color_buffer = create_material_buffer(
-                        //     self.context,
-                        //     draw::SolidData {
-                        //         color: color.map(|v| (v as f32) / (u8::MAX as f32)),
-                        //     },
-                        //     vulkano::buffer::BufferUsage::empty(),
-                        // );
-                        // init_material(
-                        //     self.context,
-                        //     shader,
-                        //     [WriteDescriptorSet::buffer(0, color_buffer)],
-                        // )
                     }
                     MaterialID::Billboard => {
                         let color_buffer = create_material_buffer(
@@ -320,12 +347,12 @@ impl<'a> ResourceRetriever<'a> {
     ) -> (MaterialID, Subbuffer<SolidData>, RenderSubmit<()>) {
         // Narrow down system
         let system = if lit {
-            &mut self.lit_system
+            &mut self.renderer.lit_draw_system
         } else {
-            &mut self.unlit_system
+            &mut self.renderer.unlit_draw_system
         };
 
-        if let None = system.find_shader(MaterialID::Color(0)) {
+        if let None = system.find_shader(&ShaderID::Color) {
             system.add_shader(
                 self.context,
                 MaterialID::Color(0),
@@ -336,7 +363,7 @@ impl<'a> ResourceRetriever<'a> {
                 ),
             );
         }
-        let shader = system.find_shader(MaterialID::Color(0)).unwrap();
+        let shader = system.find_shader(&ShaderID::Color).unwrap();
 
         let id = MaterialID::Color(self.loaded_resources.next_color_id);
         self.loaded_resources.next_color_id += 1;
@@ -356,6 +383,59 @@ impl<'a> ResourceRetriever<'a> {
             .insert((id, lit), mat.clone());
 
         (id, color_buffer, mat)
+    }
+
+    pub fn load_colored_material(
+        &mut self,
+        id: ColoredID,
+        lit: bool,
+    ) -> RenderSubmit<Vector4<f32>> {
+        match self.loaded_resources.loaded_colored.get(&(id, lit)) {
+            Some(mat) => mat.clone(),
+            None => {
+                // Narrow down system
+                let system = if lit {
+                    &mut self.renderer.lit_colored_system
+                } else {
+                    &mut self.renderer.unlit_colored_system
+                };
+
+                // Narrow down shader
+                let shader = match system.find_shader(&id) {
+                    Some(s) => s,
+                    None => {
+                        {
+                            // load shader
+                            match id {
+                                ColoredID::Solid => {
+                                    panic!("Colored solid shader should be loaded by default")
+                                }
+                                ColoredID::Billboard => {
+                                    system.add_shader(
+                                        self.context,
+                                        id,
+                                        mod_to_stages(
+                                            self.context.device.clone(),
+                                            shaders::load_new_billboard_vs,
+                                            shaders::load_new_solid_fs,
+                                        ),
+                                    );
+                                }
+                            };
+                            system.find_shader(&id).unwrap()
+                        }
+                    }
+                };
+                // make material
+                let material = match id {
+                    _ => shader.add_material(None),
+                };
+                self.loaded_resources
+                    .loaded_colored
+                    .insert((id, lit), material.clone());
+                material
+            }
+        }
     }
 
     pub fn get_texture(

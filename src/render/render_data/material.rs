@@ -12,7 +12,6 @@ use vulkano::{
 };
 
 use crate::{
-    render::resource_manager::MaterialID,
     vulkano_objects::{buffers::MeshBuffers, pipeline::PipelineHandler},
     VertexFull,
 };
@@ -21,7 +20,7 @@ use crate::{
 ///
 /// T: Type of additional data in render object
 pub struct Shader<T: Clone> {
-    id: MaterialID,
+    // id: MaterialID,
     pub pipeline: PipelineHandler,
     materials: Vec<Material<T>>,
 }
@@ -38,24 +37,19 @@ struct Material<T: Clone> {
 impl<T: Clone> Display for Shader<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
-            "Shader {:?} with {} material(s)",
-            self.id,
+            "Shader with {} material(s)",
             self.materials.len()
         ))
     }
 }
 
 impl<T: Clone> Shader<T> {
-    pub fn new(id: MaterialID, pipeline: PipelineHandler) -> Self {
+    pub fn new(pipeline: PipelineHandler) -> Self {
         Shader {
-            id,
+            // id,
             pipeline,
             materials: vec![],
         }
-    }
-
-    pub fn get_id(&self) -> MaterialID {
-        self.id
     }
 
     /// Add draw calls of each object in each material of this pipeline

@@ -5,8 +5,12 @@ use super::{
     Renderer,
 };
 use crate::{
-    render::{render_data::material::Shader, resource_manager::MaterialID, Context},
-    shaders::{self, DirectionLight, GPUGlobalData, GPUObjectData, PointLight},
+    render::{
+        render_data::material::Shader,
+        resource_manager::{ColoredID, ShaderID},
+        Context,
+    },
+    shaders::{self, DirectionLight, GPUColoredData, GPUGlobalData, GPUObjectData, PointLight},
     vulkano_objects::{
         self,
         buffers::{write_to_buffer, write_to_storage_buffer, Uniform},
@@ -15,6 +19,7 @@ use crate::{
     },
 };
 
+use cgmath::Vector4;
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage},
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
@@ -26,19 +31,25 @@ use vulkano::{
     swapchain::Swapchain,
 };
 
+/// 3D render that supports both lit and unlit meshes with deferred lighting
 pub struct DeferredRenderer {
     render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
     attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
     pub frame_data: Vec<FrameData>,
-    pub lit_draw_system: DrawSystem<()>,
+    pub lit_draw_system: DrawSystem<ShaderID, ()>,
+    pub unlit_draw_system: DrawSystem<ShaderID, ()>,
+
+    pub lit_colored_system: DrawSystem<ColoredID, Vector4<f32>>,
+    pub unlit_colored_system: DrawSystem<ColoredID, Vector4<f32>>,
+
     pub lighting_system: LightingSystem,
-    pub unlit_draw_system: DrawSystem<()>,
 }
 
 pub struct FrameData {
     global_data: Uniform<GPUGlobalData>,
     objects_data: Uniform<[GPUObjectData]>,
+    colored_data: Uniform<[GPUColoredData]>,
 
     point_data: Uniform<[PointLight]>,
     last_point_index: Option<usize>,
@@ -65,6 +76,11 @@ impl DeferredRenderer {
             shaders::load_basic_vs,
             shaders::load_basic_fs,
         );
+        let colored_stages = mod_to_stages(
+            context.device.clone(),
+            shaders::load_new_colored_vs,
+            shaders::load_new_solid_fs,
+        );
 
         // global descriptor set layout
         let global_des_layout =
@@ -76,21 +92,37 @@ impl DeferredRenderer {
         let lit_draw_system = DrawSystem::new(
             context,
             &Subpass::from(render_pass.clone(), 0).unwrap(),
-            MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
+            ShaderID::Texture,
             stages.clone(),
             layout_override.clone(),
         );
+        let lit_colored_system = DrawSystem::new(
+            context,
+            &Subpass::from(render_pass.clone(), 0).unwrap(),
+            ColoredID::Solid,
+            colored_stages.clone(),
+            layout_override.clone(),
+        );
+
         let lighting_system = LightingSystem::new(
             context,
             &Subpass::from(render_pass.clone(), 1).unwrap(),
             &attachments,
             &layout_override,
         );
+
         let unlit_draw_system = DrawSystem::new(
             context,
             &Subpass::from(render_pass.clone(), 2).unwrap(),
-            MaterialID::Texture(crate::render::resource_manager::TextureID::InaBody),
+            ShaderID::Texture,
             stages,
+            layout_override.clone(),
+        );
+        let unlit_colored_system = DrawSystem::new(
+            context,
+            &Subpass::from(render_pass.clone(), 0).unwrap(),
+            ColoredID::Solid,
+            colored_stages.clone(),
             layout_override,
         );
 
@@ -115,18 +147,24 @@ impl DeferredRenderer {
                 Default::default(),
             )
             .unwrap();
-            let global_set = lit_draw_system.shaders[0].pipeline.create_descriptor_set(
-                &context.allocators.descriptor_set,
-                global_buffer.clone(),
-                0,
-            );
+            let global_set = lit_draw_system
+                .first_shader()
+                .pipeline
+                .create_descriptor_set(
+                    &context.allocators.descriptor_set,
+                    global_buffer.clone(),
+                    0,
+                );
 
             // draw data
-            let objects_data = lit_draw_system.shaders[0].pipeline.create_storage_buffer(
-                &context.allocators,
-                1000,
-                1,
-            ); //object_data.pop().unwrap();
+            let objects_data = lit_draw_system
+                .first_shader()
+                .pipeline
+                .create_storage_buffer(&context.allocators, 1000, 1); //object_data.pop().unwrap();
+            let colored_data = lit_colored_system
+                .first_shader()
+                .pipeline
+                .create_storage_buffer(&context.allocators, 1000, 1);
 
             // lighting data
             let point_data =
@@ -144,6 +182,7 @@ impl DeferredRenderer {
             frame_data.push(FrameData {
                 global_data: (global_buffer, global_set),
                 objects_data,
+                colored_data,
 
                 point_data,
                 last_point_index: None,
@@ -158,9 +197,14 @@ impl DeferredRenderer {
             framebuffers,
             attachments,
             frame_data,
+
             lit_draw_system,
             unlit_draw_system,
+
             lighting_system,
+
+            lit_colored_system,
+            unlit_colored_system,
         }
     }
 
@@ -193,11 +237,17 @@ impl Renderer for DeferredRenderer {
         // get frame data
         let frame = &self.frame_data[index];
         let mut object_index = 0;
+        let mut colored_index = 0;
 
         // draw subpass
         self.lit_draw_system.render(
             &mut object_index,
             vec![frame.global_data.1.clone(), frame.objects_data.1.clone()],
+            command_builder,
+        );
+        self.lit_colored_system.render(
+            &mut colored_index,
+            vec![frame.global_data.1.clone(), frame.colored_data.1.clone()],
             command_builder,
         );
         // end subpass
@@ -223,6 +273,11 @@ impl Renderer for DeferredRenderer {
         self.unlit_draw_system.render(
             &mut object_index,
             vec![frame.global_data.1.clone(), frame.objects_data.1.clone()],
+            command_builder,
+        );
+        self.unlit_colored_system.render(
+            &mut colored_index,
+            vec![frame.global_data.1.clone(), frame.colored_data.1.clone()],
             command_builder,
         );
         // end render pass
@@ -258,6 +313,16 @@ impl FrameData {
     pub fn update_objects_data<'a>(&self, shaders: impl Iterator<Item = &'a mut Shader<()>>) {
         let obj_iter = shaders.flat_map(|pipeline| pipeline.upload_pending_objects());
         write_to_storage_buffer(&self.objects_data.0, obj_iter, 0);
+    }
+    /// write colored data to storage buffer
+    ///
+    /// `RenderObject::upload(&self)` must have been called beforehand
+    pub fn update_colored_data<'a>(
+        &self,
+        shaders: impl Iterator<Item = &'a mut Shader<Vector4<f32>>>,
+    ) {
+        let obj_iter = shaders.flat_map(|pipeline| pipeline.upload_pending_objects());
+        write_to_storage_buffer(&self.colored_data.0, obj_iter, 0);
     }
 
     pub fn update_point_lights(&mut self, point_lights: impl Iterator<Item = PointLight>) {
