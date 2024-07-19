@@ -20,7 +20,7 @@ use crate::{
     game_objects::{
         light::PointLightComponent,
         transform::{TransformCreateInfo, TransformID},
-        Camera, DisabledLERP, GameWorld, MaterialSwapper, WorldLoader,
+        Camera, GameWorld, MaterialSwapper, WorldLoader,
     },
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
@@ -319,23 +319,29 @@ impl App {
                 let global_data = GPUGlobalData::from_camera(camera, extends);
 
                 // update basic render objects
-                let mut query = <(&TransformID, &mut RenderObject<()>)>::query()
-                    .filter(!component::<DisabledLERP>());
+                let mut query = <(&TransformID, &mut RenderObject<()>)>::query();
                 // println!("==== RENDER OBJECT DATA ====");
                 for (transform_id, render_object) in query.iter_mut(world) {
-                    let transfrom_matrix = transforms.get_lerp_model(transform_id).unwrap();
+                    let transfrom_matrix = if render_object.lerp {
+                        transforms.get_lerp_model(transform_id)
+                    } else {
+                        transforms.get_global_model(transform_id)
+                    };
                     // println!("Obj {:?}: {:?}", transform_id, obj);
-                    render_object.model = transfrom_matrix;
+                    render_object.model = transfrom_matrix.unwrap();
                     render_object.upload();
                 }
 
-                let mut query = <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query()
-                    .filter(!component::<DisabledLERP>());
+                let mut query = <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query();
                 // println!("==== RENDER COLORED DATA ====");
                 for (transform_id, render_object) in query.iter_mut(world) {
-                    let transfrom_matrix = transforms.get_lerp_model(transform_id).unwrap();
+                    let transfrom_matrix = if render_object.lerp {
+                        transforms.get_lerp_model(transform_id)
+                    } else {
+                        transforms.get_global_model(transform_id)
+                    };
                     // println!("Obj {:?}: {:?}", transform_id, obj);
-                    render_object.model = transfrom_matrix;
+                    render_object.model = transfrom_matrix.unwrap();
                     render_object.upload();
                 }
 

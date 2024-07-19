@@ -19,7 +19,6 @@ use self::transform::{TransformCreateInfo, TransformID};
 #[derive(Debug)]
 pub struct NameComponent(pub String);
 pub struct Rotate(pub Vector3<f32>, pub Rad<f32>);
-pub struct DisabledLERP;
 
 #[derive(Clone)]
 pub struct MaterialSwapper<T: Clone> {

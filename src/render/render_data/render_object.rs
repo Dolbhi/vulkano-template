@@ -14,6 +14,7 @@ pub struct RenderObject<T: Clone> {
     pub model: Matrix4<f32>,
     pub material: RenderSubmit<T>,
     pub data: T,
+    pub lerp: bool,
 }
 
 impl<T: Clone> RenderObject<T> {
@@ -23,6 +24,7 @@ impl<T: Clone> RenderObject<T> {
             model: Matrix4::identity(),
             material,
             data,
+            lerp: true,
         }
     }
 
