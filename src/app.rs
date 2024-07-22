@@ -322,27 +322,13 @@ impl App {
                 let mut query = <(&TransformID, &mut RenderObject<()>)>::query();
                 // println!("==== RENDER OBJECT DATA ====");
                 for (transform_id, render_object) in query.iter_mut(world) {
-                    let transfrom_matrix = if render_object.lerp {
-                        transforms.get_lerp_model(transform_id)
-                    } else {
-                        transforms.get_global_model(transform_id)
-                    };
-                    // println!("Obj {:?}: {:?}", transform_id, obj);
-                    render_object.model = transfrom_matrix.unwrap();
-                    render_object.upload();
+                    render_object.update_and_upload(transform_id, transforms);
                 }
 
                 let mut query = <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query();
                 // println!("==== RENDER COLORED DATA ====");
                 for (transform_id, render_object) in query.iter_mut(world) {
-                    let transfrom_matrix = if render_object.lerp {
-                        transforms.get_lerp_model(transform_id)
-                    } else {
-                        transforms.get_global_model(transform_id)
-                    };
-                    // println!("Obj {:?}: {:?}", transform_id, obj);
-                    render_object.model = transfrom_matrix.unwrap();
-                    render_object.upload();
+                    render_object.update_and_upload(transform_id, transforms);
                 }
 
                 // upload draw data

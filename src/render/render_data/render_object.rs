@@ -2,7 +2,11 @@ use std::sync::Arc;
 
 use cgmath::{Matrix4, SquareMatrix};
 
-use crate::{vulkano_objects::buffers::MeshBuffers, VertexFull};
+use crate::{
+    game_objects::transform::{TransformID, TransformSystem},
+    vulkano_objects::buffers::MeshBuffers,
+    VertexFull,
+};
 
 use super::material::RenderSubmit;
 
@@ -26,6 +30,21 @@ impl<T: Clone> RenderObject<T> {
             data,
             lerp: true,
         }
+    }
+
+    pub fn update_and_upload(
+        &mut self,
+        transform_id: &TransformID,
+        transforms: &mut TransformSystem,
+    ) {
+        let transfrom_matrix = if self.lerp {
+            transforms.get_lerp_model(transform_id)
+        } else {
+            transforms.get_global_model(transform_id)
+        };
+        // println!("Obj {:?}: {:?}", transform_id, obj);
+        self.model = transfrom_matrix.unwrap();
+        self.upload();
     }
 
     /// Adds the render object's mesh and data to its material's render queue
