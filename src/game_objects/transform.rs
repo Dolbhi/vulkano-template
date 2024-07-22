@@ -199,17 +199,14 @@ impl TransformSystem {
     pub fn get_global_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
         let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
 
-        transform
-            .global_model
-            .ok_or(TransformError::IDNotFound)
-            .or({
-                let parent_model = match transform.parent {
-                    Some(parent_id) => self.get_global_model(&parent_id)?,
-                    None => Matrix4::identity(),
-                };
+        Ok(transform.global_model.unwrap_or({
+            let parent_model = match transform.parent {
+                Some(parent_id) => self.get_global_model(&parent_id)?,
+                None => Matrix4::identity(),
+            };
 
-                Ok(self.transforms.get_mut(id).unwrap().clean(&parent_model))
-            })
+            self.transforms.get_mut(id).unwrap().clean(&parent_model)
+        }))
     }
     // pub fn get_parent_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
     //     let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
