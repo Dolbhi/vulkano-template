@@ -33,10 +33,15 @@ use vulkano::{
 
 /// 3D render that supports both lit and unlit meshes with deferred lighting
 pub struct DeferredRenderer {
+    /// Vulkan render pass for the framebuffer recreation
     render_pass: Arc<RenderPass>,
-    framebuffers: Vec<Arc<Framebuffer>>, // for starting renderpass (deferred examples remakes fb's every frame)
-    attachments: FramebufferAttachments, // misc attachments (depth, diffuse e.g)
+    /// for starting renderpass (deferred examples remakes fb's every frame)
+    framebuffers: Vec<Arc<Framebuffer>>,
+    /// misc attachments (depth, diffuse e.g)
+    attachments: FramebufferAttachments,
+    /// Data for rendering each frame
     pub frame_data: Vec<FrameData>,
+
     pub lit_draw_system: DrawSystem<ShaderID, ()>,
     pub unlit_draw_system: DrawSystem<ShaderID, ()>,
 
@@ -45,7 +50,7 @@ pub struct DeferredRenderer {
 
     pub lighting_system: LightingSystem,
 }
-
+/// Stores the buffers and descriptor sets needed for rendering a frame
 pub struct FrameData {
     global_data: Uniform<GPUGlobalData>,
     objects_data: Uniform<[GPUObjectData]>,
@@ -57,6 +62,20 @@ pub struct FrameData {
     dir_data: Uniform<[DirectionLight]>,
     last_dir_index: Option<usize>,
 }
+// pub trait DataLoader<P, D>
+// where
+//     P: Iterator<Item = PointLight>,
+//     D: Iterator<Item = DirectionLight>,
+// {
+//     fn get_global(&mut self) -> GPUGlobalData;
+//     fn give_points<F>(&mut self, point_uploader: F)
+//     where
+//         F: FnOnce(&mut dyn Iterator<Item = PointLight>);
+//     fn get_dir<F>(&mut self, dir_uploader: F)
+//     where
+//         F: FnOnce(impl Iterator<Item = DirectionLight>);
+//     fn get_ambient(&mut self) -> [f32; 4];
+// }
 
 impl DeferredRenderer {
     pub fn new(context: &Context) -> Self {
@@ -208,8 +227,39 @@ impl DeferredRenderer {
         }
     }
 
-    // pub fn get_frame_mut(&mut self, index: usize) -> Option<&mut FrameData> {
-    //     self.frame_data.get_mut(index)
+    // /// Uploads global, object and lighting data
+    // pub fn update_frame_data<P, D>(&mut self, image_i: usize, mut data: impl DataLoader<P, D>)
+    // where
+    //     P: Iterator<Item = PointLight>,
+    //     D: Iterator<Item = DirectionLight>,
+    // {
+    //     let frame = self
+    //         .frame_data
+    //         .get_mut(image_i)
+    //         .expect("Renderer should have a frame for every swapchain image");
+
+    //     // write_to_buffer(&frame.global_data.0, data.get_global());
+    //     frame.update_global_data(data.get_global());
+
+    //     frame.update_objects_data(
+    //         self.lit_draw_system
+    //             .shaders
+    //             .values_mut()
+    //             .chain(self.unlit_draw_system.shaders.values_mut()),
+    //     );
+    //     frame.update_colored_data(
+    //         self.lit_colored_system
+    //             .shaders
+    //             .values_mut()
+    //             .chain(self.unlit_colored_system.shaders.values_mut()),
+    //     );
+
+    //     // frame.last_point_index = write_to_storage_buffer(&frame.point_data.0, data.get_points(), 0);
+    //     // frame.last_dir_index = write_to_storage_buffer(&frame.dir_data.0, data.get_dir(), 0);
+    //     frame.update_point_lights(data.get_points());
+    //     frame.update_directional_lights(data.get_dir());
+
+    //     self.lighting_system.set_ambient_color(data.get_ambient());
     // }
 }
 impl Renderer for DeferredRenderer {

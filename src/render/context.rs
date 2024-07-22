@@ -35,15 +35,22 @@ pub type Fence = FenceSignalFuture<PresentFuture<Box<dyn GpuFuture>>>;
 
 const INIT_WINDOW_SIZE: LogicalSize<f32> = LogicalSize::new(1000.0f32, 600.0);
 
+/// All relevant structs for rendering to a single window including GUI
+///
+/// Has implementations for swapchain recreation and command buffer building and executing
 pub struct Context {
     _instance: Arc<Instance>,
-    pub window: Arc<Window>, // for get inner size and request redraw
+    /// For get inner size and request redraw
+    pub window: Arc<Window>,
     // pub surface: Arc<Surface>, // for making gui
-    pub viewport: Viewport, // just for pipeline creation
+    /// Just for pipeline creation
+    pub viewport: Viewport,
     pub device: Arc<Device>,
-    pub queue: Arc<Queue>, // for submitting command buffers
+    /// For submitting command buffers
+    pub queue: Arc<Queue>,
     pub allocators: Allocators,
-    pub swapchain: Arc<Swapchain>, // swapchain recreation and image presenting
+    /// For swapchain recreation and image presenting
+    pub swapchain: Arc<Swapchain>,
     pub images: Vec<Arc<Image>>,
     // pub gui_image_views: Vec<Arc<ImageView>>,
     pub gui: Gui,
@@ -155,7 +162,7 @@ impl Context {
         // self.swapchain.image_count() as usize
     }
 
-    /// recreates swapchain and framebuffers
+    /// recreates swapchain and swapchain images
     pub fn recreate_swapchain(&mut self) {
         let (new_swapchain, new_images) = match self.swapchain.recreate(SwapchainCreateInfo {
             image_extent: self.window.inner_size().into(),
@@ -232,7 +239,7 @@ impl Context {
         let combuf_time = now.elapsed().as_micros() as u32;
         let now = std::time::Instant::now();
 
-        // Join given futures then execute new commands and present the swapchain image corresponding to the given image_i
+        // Join given futures then execute new draw commands
         let draw_future = previous_future
             .join(swapchain_acquire_future)
             .then_execute(self.queue.clone(), builder.build().unwrap())
@@ -241,6 +248,7 @@ impl Context {
             .unwrap();
 
         let image = &self.images[image_i as usize];
+        // cache this????
         let gui_image_view = ImageView::new(
             image.clone(),
             ImageViewCreateInfo {
@@ -250,6 +258,7 @@ impl Context {
         )
         .unwrap();
 
+        // Execute new GUI commands, then present the swapchain image corresponding to the given image_i
         let result = self
             .gui
             .draw_on_image(draw_future, gui_image_view)
@@ -276,102 +285,4 @@ impl Context {
 
         result
     }
-
-    // pub fn get_resource_loader(&self) -> ResourceLoader {
-    //     ResourceLoader { context: &self }
-    // }
 }
-
-// pub struct ResourceLoader<'a> {
-//     context: &'a Context,
-//     // draw_system: &'a mut DrawSystem<GPUObjectData, Matrix4<f32>>,
-// }
-
-// impl<'a> ResourceLoader<'a> {
-//     pub fn load_texture(&self, path: &Path) -> Arc<ImageView> {
-//         load_texture(&self.context.allocators, &self.context.queue, path)
-//     }
-//     pub fn load_sampler(&self, filter: vulkano::image::sampler::Filter) -> Arc<Sampler> {
-//         create_sampler(self.context.device.clone(), filter)
-//     }
-//     pub fn load_mesh(
-//         &self,
-//         vertices: Vec<VertexFull>,
-//         indices: Vec<u32>,
-//     ) -> Arc<Buffers<VertexFull>> {
-//         Arc::new(Buffers::initialize_device_local(
-//             &self.context.allocators,
-//             self.context.queue.clone(),
-//             vertices,
-//             indices,
-//         ))
-//     }
-
-//     pub fn load_pipeline<V: Vertex>(
-//         &self,
-//         vs: Arc<ShaderModule>,
-//         fs: Arc<ShaderModule>,
-//         subpass: Subpass,
-//         dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
-//         pipeline_type: crate::vulkano_objects::pipeline::PipelineType,
-//     ) -> PipelineHandler<V> {
-//         PipelineHandler::new(
-//             self.context.device.clone(),
-//             vs.entry_point("main").unwrap(),
-//             fs.entry_point("main").unwrap(),
-//             self.context.viewport.clone(),
-//             subpass,
-//             dynamic_bindings,
-//             pipeline_type,
-//         )
-//     }
-//     pub fn load_pipelines<V: Vertex, const SHADERS: usize>(
-//         &self,
-//         modules: [(Arc<ShaderModule>, Arc<ShaderModule>); SHADERS],
-//         subpass: Subpass,
-//         dynamic_bindings: impl IntoIterator<Item = (usize, u32)> + Clone,
-//         pipeline_type: crate::vulkano_objects::pipeline::PipelineType,
-//     ) -> [PipelineHandler<V>; SHADERS] {
-//         modules.map(|(vs, fs)| {
-//             self.load_pipeline(
-//                 vs,
-//                 fs,
-//                 subpass.clone(),
-//                 dynamic_bindings.clone(), // [(0, 0)],
-//                 pipeline_type,
-//             )
-//         })
-//     }
-
-//     /// creates a material of the given pipeline with a corresponding descriptor set as set 2
-//     pub fn init_material(
-//         &self,
-//         shader: &mut Shader,
-//         descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
-//     ) -> RenderSubmit {
-//         shader.add_material(Some(
-//             PersistentDescriptorSet::new(
-//                 &self.context.allocators.descriptor_set,
-//                 shader
-//                     .pipeline
-//                     .layout()
-//                     .set_layouts()
-//                     .get(2)
-//                     .unwrap()
-//                     .clone(),
-//                 descriptor_writes,
-//                 [],
-//             )
-//             .unwrap(), // pipeline_group.create_material_set(&self.context.allocators, descriptor_writes),
-//         ))
-//     }
-//     pub fn create_material_buffer<T: BufferContents>(
-//         &self,
-//         data: T,
-//         usage: BufferUsage,
-//     ) -> Subbuffer<T> {
-//         buffers::create_material_buffer(&self.context.allocators, data, usage)
-//     }
-//     // pub fn build_material
-//     // pub fn
-// }

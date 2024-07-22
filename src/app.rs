@@ -96,6 +96,21 @@ pub struct App {
     current_level: i32,
 }
 
+const FIXED_DELTA_TIME: f32 = 0.02;
+/// Struct for handling the logic thread of the game world
+struct GameWorldThread {
+    thread: JoinHandle<()>,
+    delta_micros: Arc<AtomicU64>,
+    paused: Arc<AtomicBool>,
+}
+
+// struct GameDataLoader<'a> {
+//     global_data: GPUGlobalData,
+//     ambient_light: [f32; 4],
+//     world: &'a mut World,
+//     transforms: &'a mut TransformSystem,
+// }
+
 impl App {
     pub fn start(event_loop: &EventLoop<()>) -> Self {
         println!("Welcome to THE RUSTY RENDERER!");
@@ -453,13 +468,24 @@ impl App {
     }
 }
 
-const FIXED_DELTA_TIME: f32 = 0.02;
+// impl<'a, P, D> DataLoader<P, D> for GameDataLoader<'a>
+// where
+//     P: Iterator<Item = PointLight>,
+//     D: Iterator<Item = DirectionLight>,
+// {
+//     fn get_global(&mut self) -> GPUGlobalData {
+//         self.global_data.clone()
+//     }
 
-struct GameWorldThread {
-    thread: JoinHandle<()>,
-    delta_micros: Arc<AtomicU64>,
-    paused: Arc<AtomicBool>,
-}
+//     fn get_points(&'a mut self) -> impl Iterator<Item = PointLight> {
+//         let mut point_query = <(&TransformID, &PointLightComponent)>::query();
+//         point_query.iter(self.world).map(|(t, pl)| {
+//             let pos = self.transforms.get_lerp_model(t).unwrap()[3];
+//             pl.clone().into_light(pos.truncate() / pos.w)
+//         })
+//     }
+// }
+
 impl GameWorldThread {
     fn new(game_world: Arc<Mutex<GameWorld>>) -> Self {
         let paused = Arc::new(AtomicBool::new(false));

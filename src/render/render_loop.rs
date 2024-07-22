@@ -10,6 +10,7 @@ use crate::RENDER_PROFILER;
 use super::renderer::Renderer;
 use super::{context::Context, context::Fence};
 
+/// Struct that handles when to do various object recreation in a frame
 pub struct RenderLoop {
     pub context: Context,
     recreate_swapchain: bool,
@@ -73,7 +74,7 @@ impl RenderLoop {
             self.recreate_swapchain = true;
         }
 
-        // Pre-render
+        // [Profiling] Pre-render
         let mut profiler = unsafe { RENDER_PROFILER.take().unwrap() };
         profiler.add_sample(now.elapsed().as_micros() as u32, 1);
         let now = std::time::Instant::now();
@@ -85,13 +86,13 @@ impl RenderLoop {
             image_fence.cleanup_finished();
         }
 
-        // Frame cleanup
+        // [Profiling] Frame cleanup
         profiler.add_sample(now.elapsed().as_micros() as u32, 2);
         let now = std::time::Instant::now();
 
         upload_render_data(renderer, index);
 
-        // Render upload
+        // [Profiling] Render upload
         profiler.add_sample(now.elapsed().as_micros() as u32, 3);
         let now = std::time::Instant::now();
 
@@ -110,7 +111,7 @@ impl RenderLoop {
             // logic that can use every GPU resource (the GPU is sleeping)
         }
 
-        // Wait last frame
+        // [Profiling] Wait last frame
         profiler.add_sample(now.elapsed().as_micros() as u32, 4);
         unsafe {
             RENDER_PROFILER = Some(profiler);
