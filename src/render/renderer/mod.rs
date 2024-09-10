@@ -1,5 +1,6 @@
 mod deferred_renderer;
 pub mod systems {
+    mod bounding_box_system;
     mod draw_system;
     mod lighting_system;
 

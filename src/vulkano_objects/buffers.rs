@@ -98,12 +98,13 @@ pub fn create_material_buffer<T: BufferContents>(
 }
 
 /// returns a device only buffer and a future that copies data to it
-pub fn create_device_local_buffer<T: BufferContents>(
+pub fn create_device_local_buffer<T: BufferContents, I: ExactSizeIterator<Item = T>>(
     allocators: &Allocators,
     queue: Arc<Queue>,
-    values: Vec<T>,
+    values: impl IntoIterator<IntoIter = I>,
     usage: BufferUsage,
 ) -> (Subbuffer<[T]>, CommandBufferExecFuture<NowFuture>) {
+    let values = values.into_iter();
     let buffer = Buffer::new_slice(
         allocators.memory.clone(),
         BufferCreateInfo {

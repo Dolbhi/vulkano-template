@@ -17,6 +17,7 @@ use vulkano::{
                 AttachmentBlend, BlendFactor, BlendOp, ColorBlendAttachmentState, ColorBlendState,
             },
             depth_stencil::{DepthState, DepthStencilState},
+            input_assembly::InputAssemblyState,
             rasterization::{CullMode, RasterizationState},
             vertex_input::VertexInputState,
             viewport::{Viewport, ViewportState},
@@ -41,6 +42,7 @@ pub struct PipelineHandler {
 pub enum PipelineType {
     Drawing,
     Lighting,
+    Lines,
 }
 
 #[derive(Clone, Default)]
@@ -162,6 +164,29 @@ impl PipelineType {
                     ..create_info
                 }
             }
+            Self::Lines => GraphicsPipelineCreateInfo {
+                rasterization_state: Some(RasterizationState {
+                    polygon_mode: vulkano::pipeline::graphics::rasterization::PolygonMode::Line,
+                    cull_mode: CullMode::Back,
+                    ..Default::default()
+                }),
+                input_assembly_state: Some(InputAssemblyState {
+                    topology:
+                        vulkano::pipeline::graphics::input_assembly::PrimitiveTopology::LineList,
+                    ..Default::default()
+                }),
+                depth_stencil_state: Some(DepthStencilState {
+                    depth: Some(DepthState::simple()),
+                    ..Default::default()
+                }),
+                multisample_state: Some(Default::default()),
+                color_blend_state: Some(ColorBlendState::with_attachment_states(
+                    subpass.num_color_attachments(),
+                    Default::default(),
+                )),
+                subpass: Some(subpass.into()),
+                ..create_info
+            },
         }
     }
 }
@@ -213,6 +238,7 @@ impl LayoutOverrides {
     }
 }
 
+/// Utility function to generate array of `PipelineShaderStageCreateInfo` from macro generated shader loading functions
 pub fn mod_to_stages<T: Debug>(
     device: Arc<Device>,
     vs: impl FnOnce(Arc<Device>) -> Result<Arc<ShaderModule>, T>,

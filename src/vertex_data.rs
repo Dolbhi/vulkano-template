@@ -27,3 +27,9 @@ pub struct VertexFull {
     #[format(R32G32_SFLOAT)]
     pub uv: [f32; 2],
 }
+
+impl From<[f32; 3]> for Vertex3d {
+    fn from(value: [f32; 3]) -> Self {
+        Vertex3d { position: value }
+    }
+}

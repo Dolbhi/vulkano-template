@@ -346,27 +346,30 @@ impl App {
                     render_object.update_and_upload(transform_id, transforms);
                 }
 
-                // upload draw data
-                let frame = renderer
-                    .frame_data
-                    .get_mut(image_i)
-                    .expect("Renderer should have a frame for every swapchain image");
+                // upload draw data (make into renderer function)
+                let frame = {
+                    let frame = renderer
+                        .frame_data
+                        .get_mut(image_i)
+                        .expect("Renderer should have a frame for every swapchain image");
 
-                frame.update_global_data(global_data);
-                frame.update_objects_data(
-                    renderer
-                        .lit_draw_system
-                        .shaders
-                        .values_mut()
-                        .chain(renderer.unlit_draw_system.shaders.values_mut()),
-                );
-                frame.update_colored_data(
-                    renderer
-                        .lit_colored_system
-                        .shaders
-                        .values_mut()
-                        .chain(renderer.unlit_colored_system.shaders.values_mut()),
-                );
+                    frame.update_global_data(global_data);
+                    frame.update_objects_data(
+                        renderer
+                            .lit_draw_system
+                            .shaders
+                            .values_mut()
+                            .chain(renderer.unlit_draw_system.shaders.values_mut()),
+                    );
+                    frame.update_colored_data(
+                        renderer
+                            .lit_colored_system
+                            .shaders
+                            .values_mut()
+                            .chain(renderer.unlit_colored_system.shaders.values_mut()),
+                    );
+                    frame
+                };
 
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();
