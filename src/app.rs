@@ -124,7 +124,7 @@ impl App {
         println!(
             "Press O to add a random bounding box to the BVH, press P to filter the depth shown"
         );
-        println!("[TODO] Press F to toggle flash light");
+        println!("[TODO] Press F to toggle camera light");
 
         let init_start_time = Instant::now();
 
