@@ -24,7 +24,7 @@ use crate::{
     },
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
-    shaders::{DirectionLight, GPUGlobalData},
+    shaders::{DirectionLight, GPUGlobalData, GPUAABB},
     ui::{self, MenuOption},
     RENDER_PROFILER,
 };
@@ -368,8 +368,19 @@ impl App {
                             .values_mut()
                             .chain(renderer.unlit_colored_system.shaders.values_mut()),
                     );
+
                     frame
                 };
+
+                // bounding box
+                frame.upload_box_data(
+                    [GPUAABB {
+                        min: [-1., -1., -1.].into(),
+                        max: [1., 1., 1.].into(),
+                        color: [1., 0., 0., 1.],
+                    }]
+                    .into_iter(),
+                );
 
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();

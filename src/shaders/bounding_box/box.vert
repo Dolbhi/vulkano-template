@@ -15,7 +15,7 @@ layout(location = 2) out uint v_object_index;
 void main() {
     GPUAABB box_data = box_buffer.boxes[gl_InstanceIndex];
     
-    gl_Position = vec4(position * (box_data.max - box_data.min) + box_data.min, 1.0);
+    gl_Position = global_data.view_proj * vec4(position * (box_data.max - box_data.min) + box_data.min, 1.0);
     v_tex_coord = vec2(0, 0);
     v_normal = vec3(0, 0, 0);
     v_object_index = gl_InstanceIndex;
