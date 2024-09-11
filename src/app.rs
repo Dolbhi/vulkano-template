@@ -121,6 +121,10 @@ impl App {
     pub fn start(event_loop: &EventLoop<()>) -> Self {
         println!("Welcome to THE RUSTY RENDERER!");
         println!("Press WASD, SPACE and LSHIFT to move and Q to swap materials");
+        println!(
+            "Press O to add a random bounding box to the BVH, press P to filter the depth shown"
+        );
+        println!("[TODO] Press F to toggle flash light");
 
         let init_start_time = Instant::now();
 

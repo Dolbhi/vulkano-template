@@ -14,7 +14,6 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [x] Refactor renderobjects
 
 ### Features
-- [ ] Wireframe renderer
 - [ ] Asset loader
 	- [ ] Mesh, material and scene loading from files (with universal IDs)
 	- [ ] Conversion into fast loading format
@@ -30,6 +29,9 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 	- [x] Point light range and volumes
 	- [x] Unlit shaders
 	- [x] Multiple lighting materials
+- [x] Bounding volume hierarchy
+	- [x] BVH visualiser
+- [x] Wireframe renderer
 - [x] GUI
 - [x] Light data streaming
 - [x] Multiple subpasses
