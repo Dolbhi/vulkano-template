@@ -307,6 +307,13 @@ impl Renderer for DeferredRenderer {
             vec![frame.global_data.1.clone(), frame.colored_data.1.clone()],
             command_builder,
         );
+        self.bounding_box_system.render(
+            frame.global_data.1.clone().into(),
+            frame.bounding_box_data.1.clone().into(),
+            frame.last_box_index,
+            command_builder,
+        );
+
         // end render pass
         command_builder.end_render_pass(Default::default()).unwrap();
     }
@@ -350,6 +357,10 @@ impl FrameData {
     ) {
         let obj_iter = shaders.flat_map(|pipeline| pipeline.upload_pending_objects());
         write_to_storage_buffer(&self.colored_data.0, obj_iter, 0);
+    }
+
+    pub fn upload_box_data(&mut self, boxes: impl Iterator<Item = GPUAABB>) {
+        self.last_box_index = write_to_storage_buffer(&self.bounding_box_data.0, boxes, 0);
     }
 
     pub fn update_point_lights(&mut self, point_lights: impl Iterator<Item = PointLight>) {
