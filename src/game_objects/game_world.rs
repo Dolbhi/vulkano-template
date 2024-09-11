@@ -19,7 +19,6 @@ impl Default for Inputs {
         }
     }
 }
-
 impl Inputs {
     fn move_transform(&self, transform: &mut Transform, seconds_passed: f32) {
         let view = transform.get_local_transform();

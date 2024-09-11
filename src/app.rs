@@ -10,6 +10,7 @@ use std::{
 use cgmath::{One, Quaternion, Vector3, Vector4};
 use legion::*;
 
+use rand::Rng;
 use winit::{
     dpi::PhysicalPosition,
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -22,6 +23,7 @@ use crate::{
         transform::{TransformCreateInfo, TransformID},
         Camera, GameWorld, MaterialSwapper, WorldLoader,
     },
+    physics::CuboidCollider,
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
     shaders::{DirectionLight, GPUGlobalData, GPUAABB},
@@ -46,10 +48,13 @@ struct InputState {
     d: KeyState,
     q: KeyState,
     r: KeyState,
+    o: KeyState,
+    p: KeyState,
     space: KeyState,
     shift: KeyState,
     escape: KeyState,
     q_triggered: bool,
+    o_triggered: bool,
 }
 
 impl InputState {
@@ -94,6 +99,7 @@ pub struct App {
     game_state: GameState,
     last_frame_time: Instant,
     current_level: i32,
+    bounds_debug_depth: u32,
 }
 
 const FIXED_DELTA_TIME: f32 = 0.02;
@@ -143,6 +149,7 @@ impl App {
             game_state: Default::default(),
             last_frame_time: Instant::now(),
             current_level: -1,
+            bounds_debug_depth: 0,
         }
     }
 
@@ -173,6 +180,7 @@ impl App {
             world,
             transforms,
             camera,
+            colliders,
             ..
         } = world;
         loader(WorldLoader(world, transforms, resources));
@@ -183,8 +191,13 @@ impl App {
                 .set_parent(Some(camera.transform))
                 .set_translation((0., 0., 0.2)), // light pos cannot = cam pos else the light will glitch
         );
-
         world.push((camera_light, PointLightComponent::new([1., 1., 1., 2.], 4.)));
+
+        // initial bounds
+        // let collider_transform = transforms.add_transform(
+        //     TransformCreateInfo::from([-2.0, -2.0, -2.0]).set_scale([4.0, 4.0, 4.0]),
+        // );
+        // colliders.add(CuboidCollider::new(transforms, collider_transform));
 
         self.current_level = id;
 
@@ -301,6 +314,7 @@ impl App {
                 let GameWorld {
                     world,
                     transforms,
+                    colliders,
                     camera,
                     fixed_seconds,
                     last_delta_time,
@@ -327,6 +341,39 @@ impl App {
                     });
 
                     self.inputs.q_triggered = false;
+                }
+
+                // add random bounds
+                if self.inputs.o_triggered {
+                    let mut rng = rand::thread_rng();
+
+                    let mut min = Vector3::new(
+                        rng.gen_range(-2.0..2.0),
+                        rng.gen_range(-2.0..2.0),
+                        rng.gen_range(-2.0..2.0),
+                    );
+                    let mut max = Vector3::new(
+                        rng.gen_range(-2.0..2.0),
+                        rng.gen_range(-2.0..2.0),
+                        rng.gen_range(-2.0..2.0),
+                    );
+
+                    if min.x > max.x {
+                        std::mem::swap(&mut min.x, &mut max.x);
+                    }
+                    if min.y > max.y {
+                        std::mem::swap(&mut min.y, &mut max.y);
+                    }
+                    if min.z > max.z {
+                        std::mem::swap(&mut min.z, &mut max.z);
+                    }
+
+                    let transform = transforms
+                        .add_transform(TransformCreateInfo::from(min).set_scale(max - min));
+                    let collider = CuboidCollider::new(transforms, transform);
+
+                    colliders.add(collider);
+                    println!("[Depth] {}", colliders.tree_depth());
                 }
 
                 // camera data
@@ -373,14 +420,23 @@ impl App {
                 };
 
                 // bounding box
-                frame.upload_box_data(
-                    [GPUAABB {
-                        min: [-1., -1., -1.].into(),
-                        max: [1., 1., 1.].into(),
-                        color: [1., 0., 0., 1.],
-                    }]
-                    .into_iter(),
-                );
+                if self.bounds_debug_depth > colliders.tree_depth() {
+                    self.bounds_debug_depth = 0;
+                }
+                let bounding_boxes = colliders
+                    .bounds_iter()
+                    .filter(|(_, depth)| *depth == self.bounds_debug_depth)
+                    .map(|(bounds, depth)| {
+                        let mag = 1. / (depth as f32 + 1.);
+                        let min_cast: [f32; 3] = bounds.min.into();
+                        let max_cast: [f32; 3] = bounds.max.into();
+                        GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [1., mag, mag, 1.],
+                        }
+                    });
+                frame.upload_box_data(bounding_boxes);
 
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();
@@ -454,6 +510,18 @@ impl App {
                 };
                 self.inputs.escape = state;
             }
+            VirtualKeyCode::O => {
+                // add bounding box
+                self.inputs.o_triggered = state == Pressed && self.inputs.o == Released;
+                self.inputs.o = state;
+            }
+            VirtualKeyCode::P => {
+                // scroll through depths
+                if state == Pressed && self.inputs.p == Released {
+                    self.bounds_debug_depth += 1;
+                }
+                self.inputs.p = state;
+            }
             _ => {}
         }
     }
@@ -481,24 +549,6 @@ impl App {
             .unwrap();
     }
 }
-
-// impl<'a, P, D> DataLoader<P, D> for GameDataLoader<'a>
-// where
-//     P: Iterator<Item = PointLight>,
-//     D: Iterator<Item = DirectionLight>,
-// {
-//     fn get_global(&mut self) -> GPUGlobalData {
-//         self.global_data.clone()
-//     }
-
-//     fn get_points(&'a mut self) -> impl Iterator<Item = PointLight> {
-//         let mut point_query = <(&TransformID, &PointLightComponent)>::query();
-//         point_query.iter(self.world).map(|(t, pl)| {
-//             let pos = self.transforms.get_lerp_model(t).unwrap()[3];
-//             pl.clone().into_light(pos.truncate() / pos.w)
-//         })
-//     }
-// }
 
 impl GameWorldThread {
     fn new(game_world: Arc<Mutex<GameWorld>>) -> Self {

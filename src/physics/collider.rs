@@ -5,19 +5,28 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use cgmath::{InnerSpace, Rotation, Zero};
+use bounds_tree::TreeIter;
+use cgmath::{InnerSpace, Rotation, Vector3, Zero};
 
-use crate::game_objects::transform::{TransformID, TransformSystem, TransformView};
+use crate::game_objects::transform::{self, TransformID, TransformSystem, TransformView};
 
 use self::bounds_tree::{BoundsTree, Leaf};
 
 use super::Vector;
 
 #[derive(Clone, Copy, Debug)]
-struct BoundingBox {
+pub struct BoundingBox {
     pub max: Vector,
     pub min: Vector,
 }
+pub struct CuboidCollider {
+    transform: TransformID,
+    bounding_box: BoundingBox,
+}
+pub struct ColliderSystem {
+    bounds_tree: BoundsTree,
+}
+
 impl BoundingBox {
     fn from_vertices<'a>(vertices: impl IntoIterator<Item = &'a Vector>) -> Self {
         let mut vertices = vertices.into_iter();
@@ -78,7 +87,7 @@ impl PartialEq for BoundingBox {
 impl Default for BoundingBox {
     fn default() -> Self {
         Self {
-            max: Vector::zero(),
+            max: [1., 1., 1.].into(),
             min: Vector::zero(),
         }
     }
@@ -102,16 +111,29 @@ const CUBE_BOUNDING: [Vector; 3] = [
     },
 ];
 
-pub struct CuboidCollider {
-    transform: TransformID,
-    bounding_box: BoundingBox,
-}
 impl CuboidCollider {
-    fn update_bounding(&mut self, view: TransformView) {
-        let vertices = CUBE_BOUNDING.map(|v| view.rotation.rotate_vector(v));
+    pub fn new(transforms: &TransformSystem, transform: TransformID) -> Self {
+        let mut collider = CuboidCollider {
+            transform,
+            bounding_box: BoundingBox::default(),
+        };
+        collider.update_bounding(transforms);
+        collider
+    }
 
-        self.bounding_box = BoundingBox::from_vertices(&vertices);
-        self.bounding_box.translate(*view.translation);
+    pub fn update_bounding(&mut self, transforms: &TransformSystem) {
+        let view = transforms
+            .get_transform(&self.transform)
+            .unwrap()
+            .get_local_transform();
+
+        self.bounding_box.min = view.translation.clone();
+        self.bounding_box.max = view.translation + view.scale;
+
+        // let vertices = CUBE_BOUNDING.map(|v| view.rotation.rotate_vector(v));
+
+        // self.bounding_box = BoundingBox::from_vertices(&vertices);
+        // self.bounding_box.translate(*view.translation);
     }
 }
 impl Debug for CuboidCollider {
@@ -120,9 +142,6 @@ impl Debug for CuboidCollider {
     }
 }
 
-pub struct ColliderSystem {
-    bounds_tree: BoundsTree,
-}
 impl ColliderSystem {
     pub fn new() -> Self {
         Self {
@@ -130,21 +149,19 @@ impl ColliderSystem {
         }
     }
 
-    pub fn add(&mut self, transform: TransformID) {
-        self.bounds_tree.insert(CuboidCollider {
-            transform,
-            bounding_box: Default::default(),
-        });
+    pub fn tree_depth(&self) -> u32 {
+        self.bounds_tree.depth()
+    }
+
+    /// adds collider to bounds tree, returns a reference to its leaf node
+    pub fn add(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
+        self.bounds_tree.insert(collider)
     }
     pub fn remove(&mut self, target: Arc<Mutex<Leaf>>) {
         self.bounds_tree.remove(target);
     }
 
-    pub fn update(&mut self, mut collider: CuboidCollider, transforms: TransformSystem) {
-        let view = transforms
-            .get_transform(&collider.transform)
-            .unwrap()
-            .get_local_transform();
-        collider.update_bounding(view);
+    pub fn bounds_iter(&self) -> TreeIter {
+        self.bounds_tree.iter()
     }
 }

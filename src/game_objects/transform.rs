@@ -153,8 +153,11 @@ impl TransformCreateInfo {
         self
     }
 }
-impl From<[f32; 3]> for TransformCreateInfo {
-    fn from(value: [f32; 3]) -> Self {
+impl<T> From<T> for TransformCreateInfo
+where
+    T: Into<Vector3<f32>>,
+{
+    fn from(value: T) -> Self {
         Self::default().set_translation(value)
     }
 }

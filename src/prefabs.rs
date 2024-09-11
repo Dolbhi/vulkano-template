@@ -135,4 +135,9 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         bivelocity: (0.0, 0.0, -5.0).into(),
     };
     loader.add_2_comp([0., 1., 0.], ro, rb);
+
+    let min_marker = TransformCreateInfo::from([-2., -2., -2.]).set_scale([0.1, 0.1, 0.1]);
+    let max_marker = TransformCreateInfo::from([2., 2., 2.]).set_scale([0.1, 0.1, 0.1]);
+    loader.quick_ro(min_marker, Cube, yellow_mat, true);
+    loader.quick_ro(max_marker, Cube, green_mat, true);
 }

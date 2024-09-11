@@ -14,12 +14,6 @@ pub struct BoundsTree {
     /// Depth is invalid LOL
     root: Option<Link>,
 }
-#[derive(Clone)]
-struct Link {
-    node: Arc<Mutex<dyn Node>>,
-    bounds: BoundingBox,
-    depth: u32,
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ChildSide {
@@ -38,10 +32,42 @@ struct Branch {
     right_child: ChildSide,
     children: [Link; 2],
 }
+#[derive(Clone)]
+struct Link {
+    node: Arc<Mutex<dyn Node>>,
+    bounds: BoundingBox,
+    depth: u32,
+}
+
+trait Node: Debug + Send + Sync {
+    fn parent(&self) -> &Weak<Mutex<Branch>>;
+    fn right_child(&self) -> ChildSide;
+    fn set_parent(&mut self, parent: Weak<Mutex<Branch>>, right_child: ChildSide);
+    fn bounds(&self) -> BoundingBox;
+    fn depth(&self) -> u32;
+    fn is_leaf(&self) -> bool;
+    fn try_into_branch(&self) -> Option<&Branch>;
+    fn try_into_branch_mut(&mut self) -> Option<&mut Branch>;
+    // fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>>;
+}
+
+/// Depth first iterator for `BoundsTree`
+pub struct TreeIter {
+    current: Vec<Link>,
+    next: Vec<Link>,
+}
 
 impl BoundsTree {
     pub fn new() -> Self {
         Self { root: None }
+    }
+
+    pub fn depth(&self) -> u32 {
+        if let Some(ref root) = self.root {
+            root.depth
+        } else {
+            0
+        }
     }
 
     pub fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
@@ -90,6 +116,60 @@ impl BoundsTree {
                     // existing root, use insert func
                     node.bounds = node.bounds.join(other_root.bounds);
                     node.insert(other_root);
+                }
+            }
+        }
+    }
+
+    pub fn iter(&self) -> TreeIter {
+        if let Some(ref root) = self.root {
+            TreeIter {
+                current: vec![root.clone()],
+                next: vec![],
+            }
+        } else {
+            TreeIter {
+                current: vec![],
+                next: vec![],
+            }
+        }
+    }
+}
+impl IntoIterator for &BoundsTree {
+    type IntoIter = TreeIter;
+    type Item = (BoundingBox, u32);
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl Iterator for TreeIter {
+    type Item = (BoundingBox, u32);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.current.pop() {
+            Some(link) => {
+                if let Some(branch) = link.node.lock().unwrap().try_into_branch() {
+                    self.next.push(branch.children[0].clone());
+                    self.next.push(branch.children[1].clone());
+                }
+                Some((link.bounds, link.depth))
+            }
+            None => {
+                // swap current and next
+                std::mem::swap(&mut self.current, &mut self.next);
+
+                // try pop current again
+                if let Some(link) = self.current.pop() {
+                    if let Some(branch) = link.node.lock().unwrap().try_into_branch() {
+                        self.next.push(branch.children[0].clone());
+                        self.next.push(branch.children[1].clone());
+                    }
+                    Some((link.bounds, link.depth))
+                } else {
+                    // both vecs empty
+                    None
                 }
             }
         }
@@ -183,18 +263,6 @@ impl Debug for Link {
             self.node.lock().unwrap()
         ))
     }
-}
-
-trait Node: Debug + Send + Sync {
-    fn parent(&self) -> &Weak<Mutex<Branch>>;
-    fn right_child(&self) -> ChildSide;
-    fn set_parent(&mut self, parent: Weak<Mutex<Branch>>, right_child: ChildSide);
-    fn bounds(&self) -> BoundingBox;
-    fn depth(&self) -> u32;
-    fn is_leaf(&self) -> bool;
-    fn try_into_branch(&self) -> Option<&Branch>;
-    fn try_into_branch_mut(&mut self) -> Option<&mut Branch>;
-    // fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>>;
 }
 
 impl Not for ChildSide {
