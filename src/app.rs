@@ -23,7 +23,7 @@ use crate::{
         transform::{TransformCreateInfo, TransformID},
         Camera, GameWorld, MaterialSwapper, WorldLoader,
     },
-    physics::CuboidCollider,
+    physics::{ColliderRef, CuboidCollider},
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
     shaders::{DirectionLight, GPUGlobalData, GPUAABB},
@@ -100,6 +100,7 @@ pub struct App {
     last_frame_time: Instant,
     current_level: i32,
     bounds_debug_depth: u32,
+    moving_bounds: Option<(TransformID, ColliderRef)>,
 }
 
 const FIXED_DELTA_TIME: f32 = 0.02;
@@ -150,6 +151,7 @@ impl App {
             last_frame_time: Instant::now(),
             current_level: -1,
             bounds_debug_depth: 0,
+            moving_bounds: None,
         }
     }
 
@@ -193,11 +195,11 @@ impl App {
         );
         world.push((camera_light, PointLightComponent::new([1., 1., 1., 2.], 4.)));
 
-        // initial bounds
-        // let collider_transform = transforms.add_transform(
-        //     TransformCreateInfo::from([-2.0, -2.0, -2.0]).set_scale([4.0, 4.0, 4.0]),
-        // );
-        // colliders.add(CuboidCollider::new(transforms, collider_transform));
+        // moving bounds
+        let transform = transforms.next().unwrap();
+        let collider = CuboidCollider::new(transforms, transform);
+        let coll_ref = colliders.add(collider);
+        self.moving_bounds = Some((transform, coll_ref));
 
         self.current_level = id;
 
@@ -347,33 +349,33 @@ impl App {
                 if self.inputs.o_triggered {
                     let mut rng = rand::thread_rng();
 
-                    let mut min = Vector3::new(
-                        rng.gen_range(-2.0..2.0),
-                        rng.gen_range(-2.0..2.0),
-                        rng.gen_range(-2.0..2.0),
+                    let pos = Vector3::new(
+                        rng.gen_range(-4.0..4.0),
+                        rng.gen_range(-4.0..4.0),
+                        rng.gen_range(-4.0..4.0),
                     );
-                    let mut max = Vector3::new(
-                        rng.gen_range(-2.0..2.0),
-                        rng.gen_range(-2.0..2.0),
-                        rng.gen_range(-2.0..2.0),
+                    let scale = Vector3::new(
+                        rng.gen_range(0.0..2.0),
+                        rng.gen_range(0.0..2.0),
+                        rng.gen_range(0.0..2.0),
                     );
 
-                    if min.x > max.x {
-                        std::mem::swap(&mut min.x, &mut max.x);
-                    }
-                    if min.y > max.y {
-                        std::mem::swap(&mut min.y, &mut max.y);
-                    }
-                    if min.z > max.z {
-                        std::mem::swap(&mut min.z, &mut max.z);
-                    }
-
-                    let transform = transforms
-                        .add_transform(TransformCreateInfo::from(min).set_scale(max - min));
+                    let transform =
+                        transforms.add_transform(TransformCreateInfo::from(pos).set_scale(scale));
                     let collider = CuboidCollider::new(transforms, transform);
 
                     colliders.add(collider);
                     println!("[Depth] {}", colliders.tree_depth());
+                }
+
+                // move bounds
+                if let Some((transfrom, reference)) = &self.moving_bounds {
+                    let angle = *fixed_seconds * 0.5;
+                    transforms
+                        .get_transform_mut(transfrom)
+                        .unwrap()
+                        .set_translation([3. * angle.sin(), 0.0, 3. * angle.cos()]);
+                    colliders.update(reference, &transforms);
                 }
 
                 // camera data

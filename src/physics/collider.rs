@@ -5,14 +5,16 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use bounds_tree::TreeIter;
 use cgmath::{InnerSpace, Rotation, Vector3, Zero};
+
+use bounds_tree::{BoundsTree, TreeIter};
 
 use crate::game_objects::transform::{self, TransformID, TransformSystem, TransformView};
 
-use self::bounds_tree::{BoundsTree, Leaf};
-
 use super::Vector;
+
+pub use self::bounds_tree::Leaf;
+pub type ColliderRef = Arc<Mutex<Leaf>>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct BoundingBox {
@@ -121,7 +123,7 @@ impl CuboidCollider {
         collider
     }
 
-    pub fn update_bounding(&mut self, transforms: &TransformSystem) {
+    fn update_bounding(&mut self, transforms: &TransformSystem) {
         let view = transforms
             .get_transform(&self.transform)
             .unwrap()
@@ -153,11 +155,26 @@ impl ColliderSystem {
         self.bounds_tree.depth()
     }
 
-    /// adds collider to bounds tree, returns a reference to its leaf node
-    pub fn add(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
-        self.bounds_tree.insert(collider)
+    // removed update and reinsert given collider
+    pub fn update(&mut self, target: &ColliderRef, transforms: &TransformSystem) {
+        println!("[Updating bounds]");
+        self.bounds_tree.remove(target);
+        println!("\t[Removed]");
+        let bounds = {
+            let mut lock = target.lock().unwrap();
+            lock.collider.update_bounding(transforms);
+            lock.collider.bounding_box
+        };
+        println!("\t[Updated]");
+        self.bounds_tree.insert_leaf(target, bounds);
+        println!("\t[Inserted]");
     }
-    pub fn remove(&mut self, target: Arc<Mutex<Leaf>>) {
+
+    /// adds collider to bounds tree, returns a reference to its leaf node
+    pub fn add(&mut self, collider: CuboidCollider) -> ColliderRef {
+        self.bounds_tree.insert_new(collider)
+    }
+    pub fn remove(&mut self, target: &Arc<Mutex<Leaf>>) {
         self.bounds_tree.remove(target);
     }
 

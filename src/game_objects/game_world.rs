@@ -1,6 +1,6 @@
 use cgmath::{InnerSpace, Quaternion, Rotation, Rotation3, Vector3, Zero};
 
-use crate::physics::{ColliderSystem, RigidBody};
+use crate::physics::{ColliderRef, ColliderSystem, RigidBody};
 
 use super::{
     transform::{Transform, TransformID, TransformSystem},
@@ -122,6 +122,12 @@ impl GameWorld {
                 Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
                     * transform.get_local_transform().rotation,
             );
+        }
+
+        // update bounds
+        let mut query = <(&TransformID, &ColliderRef)>::query();
+        for (_, collider) in query.iter(&self.world) {
+            self.colliders.update(collider, &self.transforms);
         }
     }
 

@@ -70,14 +70,18 @@ impl BoundsTree {
         }
     }
 
-    pub fn insert(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
+    pub fn insert_new(&mut self, collider: CuboidCollider) -> Arc<Mutex<Leaf>> {
         let bounds = collider.bounding_box;
         let new_leaf_node = arcmutex(Leaf {
             parent: Weak::new(),
             right_child: Right,
             collider,
         });
-        let new_leaf = Link::new(new_leaf_node.clone(), bounds, 0);
+        self.insert_leaf(&new_leaf_node, bounds);
+        new_leaf_node
+    }
+    pub fn insert_leaf(&mut self, leaf: &Arc<Mutex<Leaf>>, bounds: BoundingBox) {
+        let new_leaf = Link::new(leaf.clone(), bounds, 0);
         match &mut self.root {
             None => {
                 // empty root, make new leaf
@@ -89,13 +93,17 @@ impl BoundsTree {
                 node.insert(new_leaf);
             }
         }
-        new_leaf_node
     }
 
-    pub fn remove(&mut self, target: Arc<Mutex<Leaf>>) {
-        let lock = target.lock().unwrap();
-        if let Some(parent) = lock.parent.upgrade() {
-            if let Some(new_root) = parent.lock().unwrap().delete_child(lock.right_child) {
+    pub fn remove(&mut self, target: &Arc<Mutex<Leaf>>) {
+        let (maybe_parent, side) = {
+            let lock = target.lock().unwrap();
+            println!("\t[Locked target]");
+            (lock.parent.upgrade(), lock.right_child)
+        };
+
+        if let Some(parent) = maybe_parent {
+            if let Some(new_root) = parent.lock().unwrap().delete_child(side) {
                 // leaf as a new root
                 self.root = Some(new_root);
             }
@@ -103,6 +111,9 @@ impl BoundsTree {
             // single leaf on root, remove it
             self.root = None;
         }
+        println!("\t[Locked Parent]");
+        // let leaf = Arc::into_inner(target).unwrap_or_else(|| {panic!("")}).into_inner().unwrap();
+        // leaf.collider
     }
 
     pub fn merge(&mut self, other: BoundsTree) {
@@ -209,14 +220,15 @@ impl Link {
                 .collect();
 
             // pick child and update bounds
-            let next_child = (if new_bounds[0].1 < new_bounds[1].1 {
+            let next_side = (if new_bounds[0].1 < new_bounds[1].1 {
                 Left
             } else {
                 Right
             }) as usize;
-            branch.children[next_child].bounds = new_bounds[next_child].0;
+            let next_child = &mut branch.children[next_side];
 
-            branch.children[next_child].insert(new_leaf);
+            next_child.bounds = new_bounds[next_side].0;
+            next_child.insert(new_leaf);
 
             // rebalance if needed
             branch.rebalance();
@@ -325,19 +337,27 @@ impl Debug for Leaf {
 impl Branch {
     /// If self has no parent, return the replacement instead
     fn delete_child(&mut self, right_child: ChildSide) -> Option<Link> {
-        let replacement = self.children[1 - right_child as usize].clone();
+        let other_child = self.children[1 - right_child as usize].clone();
+        let self_side = self.right_child;
+        let some_parent = self.parent.upgrade();
 
-        if let Some(parent) = self.parent.upgrade() {
+        if let Some(parent) = some_parent {
+            // set other child's parent
             {
-                let mut lock = replacement.node.lock().unwrap();
-                lock.set_parent(Arc::downgrade(&parent), self.right_child)
+                let mut lock = other_child.node.lock().unwrap();
+                lock.set_parent(Arc::downgrade(&parent), self_side)
             }
+            println!("\t[Locked other child]");
 
             let mut parent_lock = parent.lock().unwrap();
             // replace self in parent
-            parent_lock.children[self.right_child as usize] = replacement;
+            parent_lock.children[self_side as usize] = other_child;
 
             parent_lock.rebalance();
+
+            // let some_grandparent = parent_lock.parent.upgrade();
+            // let
+            // println!("\t[Locked parent's parent]");
 
             if let Some(grandparent) = parent_lock.parent.upgrade() {
                 grandparent.lock().unwrap().update_removed(
@@ -346,14 +366,15 @@ impl Branch {
                     parent_lock.depth(),
                 );
             }
+
             None
         } else {
             // self is root, make replacement the new root
             {
-                let mut lock = replacement.node.lock().unwrap();
-                lock.set_parent(Weak::new(), self.right_child)
+                let mut lock = other_child.node.lock().unwrap();
+                lock.set_parent(Weak::new(), self_side)
             }
-            Some(replacement)
+            Some(other_child)
         }
     }
     fn update_removed(&mut self, right_child: ChildSide, bounds: BoundingBox, depth: u32) {
@@ -543,15 +564,15 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        tree.insert(super::CuboidCollider {
+        tree.insert_new(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
         });
-        tree.insert(super::CuboidCollider {
+        tree.insert_new(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
         });
-        tree.insert(super::CuboidCollider {
+        tree.insert_new(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
         });
@@ -572,20 +593,20 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        tree.insert(super::CuboidCollider {
+        tree.insert_new(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
         });
-        let to_remove = tree.insert(super::CuboidCollider {
+        let to_remove = tree.insert_new(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
         });
-        tree.insert(super::CuboidCollider {
+        tree.insert_new(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
         });
 
-        tree.remove(to_remove);
+        tree.remove(&to_remove);
 
         assert_valid_tree(&tree.root.unwrap());
     }
@@ -622,7 +643,7 @@ mod tree_tests {
         for bounding_box in [
             crap_box, box_2, box_3, box_4, crap_box, box_5, box_6, box_2, box_4, box_6,
         ] {
-            tree.insert(CuboidCollider {
+            tree.insert_new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 bounding_box,
             });
@@ -660,7 +681,7 @@ mod tree_tests {
             min: (2.0, -5.0, 5.0).into(),
         };
 
-        let a = tree.insert(CuboidCollider {
+        let a = tree.insert_new(CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_6,
         });
@@ -668,19 +689,19 @@ mod tree_tests {
         for bounding_box in [
             crap_box, box_2, box_3, box_4, crap_box, box_5, box_6, box_2, box_4, box_6,
         ] {
-            tree.insert(CuboidCollider {
+            tree.insert_new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 bounding_box,
             });
         }
 
-        let b = tree.insert(CuboidCollider {
+        let b = tree.insert_new(CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
         });
 
-        tree.remove(a);
-        tree.remove(b);
+        tree.remove(&a);
+        tree.remove(&b);
 
         assert_valid_tree(&tree.root.unwrap())
     }
@@ -698,16 +719,16 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        tree.insert(super::CuboidCollider {
+        tree.insert_new(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
         });
-        let remove = tree.insert(super::CuboidCollider {
+        let remove = tree.insert_new(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
         });
 
-        tree.remove(remove);
+        tree.remove(&remove);
         assert_valid_tree(&tree.root.unwrap());
     }
     #[test]
@@ -719,12 +740,12 @@ mod tree_tests {
             max: (1.0, 1.0, 1.0).into(),
             min: (0.0, 0.0, 0.0).into(),
         };
-        let remove = tree.insert(super::CuboidCollider {
+        let remove = tree.insert_new(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
         });
 
-        tree.remove(remove);
+        tree.remove(&remove);
         assert!(tree.root.is_none());
         // assert_depth(0, tree.root.unwrap());
     }
@@ -760,25 +781,25 @@ mod tree_tests {
         };
 
         for bounding_box in [crap_box, box_2, box_5, box_6, box_2, box_4, box_6] {
-            tree1.insert(CuboidCollider {
+            tree1.insert_new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 bounding_box,
             });
         }
         for bounding_box in [box_5, box_2, box_3] {
-            tree2.insert(CuboidCollider {
+            tree2.insert_new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 bounding_box,
             });
         }
-        let uwu = tree2.insert(CuboidCollider {
+        let uwu = tree2.insert_new(CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
         });
 
         tree1.merge(tree2);
 
-        tree1.remove(uwu);
+        tree1.remove(&uwu);
 
         assert_valid_tree(&tree1.root.unwrap());
     }
