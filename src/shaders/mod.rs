@@ -48,6 +48,16 @@ vulkano_shaders::shader! {
             path: "src/shaders/colored/billboard.vert",
         },
 
+        // axis aligned bounding box
+        bounding_box_vs: {
+            ty: "vertex",
+            path: "src/shaders/bounding_box/box.vert"
+        },
+        bounding_box_fs: {
+            ty: "fragment",
+            path: "src/shaders/bounding_box/box.frag"
+        },
+
         // lighting
         point_vs: {
             ty: "vertex",

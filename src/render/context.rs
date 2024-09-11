@@ -7,7 +7,7 @@ use crate::{
 use egui_winit_vulkano::{Gui, GuiConfig};
 use vulkano::{
     command_buffer::{self, AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
-    device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo},
+    device::{Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo},
     image::{
         view::{ImageView, ImageViewCreateInfo},
         Image,
@@ -80,11 +80,16 @@ impl Context {
             khr_swapchain_mutable_format: true,
             ..DeviceExtensions::empty()
         };
+        let device_features = Features {
+            fill_mode_non_solid: true,
+            ..Features::empty()
+        };
         let (physical_device, queue_family_index) =
             vulkano_objects::physical_device::select_physical_device(
                 &instance,
                 surface.clone(),
                 &device_extensions,
+                &device_features,
             );
 
         let (device, mut queues) = Device::new(
@@ -95,6 +100,7 @@ impl Context {
                     ..Default::default()
                 }],
                 enabled_extensions: device_extensions, // new
+                enabled_features: device_features,
                 ..Default::default()
             },
         )

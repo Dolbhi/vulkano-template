@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use super::{
-    systems::{DrawSystem, LightingSystem},
+    systems::{BoundingBoxSystem, DrawSystem, LightingSystem},
     Renderer,
 };
 use crate::{
@@ -10,7 +10,9 @@ use crate::{
         resource_manager::{ColoredID, ShaderID},
         Context,
     },
-    shaders::{self, DirectionLight, GPUColoredData, GPUGlobalData, GPUObjectData, PointLight},
+    shaders::{
+        self, DirectionLight, GPUColoredData, GPUGlobalData, GPUObjectData, PointLight, GPUAABB,
+    },
     vulkano_objects::{
         self,
         buffers::{write_to_buffer, write_to_storage_buffer, Uniform},
@@ -48,6 +50,8 @@ pub struct DeferredRenderer {
     pub lit_colored_system: DrawSystem<ColoredID, Vector4<f32>>,
     pub unlit_colored_system: DrawSystem<ColoredID, Vector4<f32>>,
 
+    pub bounding_box_system: BoundingBoxSystem,
+
     pub lighting_system: LightingSystem,
 }
 /// Stores the buffers and descriptor sets needed for rendering a frame
@@ -56,26 +60,15 @@ pub struct FrameData {
     objects_data: Uniform<[GPUObjectData]>,
     colored_data: Uniform<[GPUColoredData]>,
 
+    bounding_box_data: Uniform<[GPUAABB]>,
+    last_box_index: Option<usize>,
+
     point_data: Uniform<[PointLight]>,
     last_point_index: Option<usize>,
 
     dir_data: Uniform<[DirectionLight]>,
     last_dir_index: Option<usize>,
 }
-// pub trait DataLoader<P, D>
-// where
-//     P: Iterator<Item = PointLight>,
-//     D: Iterator<Item = DirectionLight>,
-// {
-//     fn get_global(&mut self) -> GPUGlobalData;
-//     fn give_points<F>(&mut self, point_uploader: F)
-//     where
-//         F: FnOnce(&mut dyn Iterator<Item = PointLight>);
-//     fn get_dir<F>(&mut self, dir_uploader: F)
-//     where
-//         F: FnOnce(impl Iterator<Item = DirectionLight>);
-//     fn get_ambient(&mut self) -> [f32; 4];
-// }
 
 impl DeferredRenderer {
     pub fn new(context: &Context) -> Self {
@@ -89,7 +82,14 @@ impl DeferredRenderer {
                 &context.allocators,
             );
 
-        // create render systems
+        // global descriptor set layout
+        let global_des_layout =
+            LayoutOverrides::single_uniform_set(ShaderStages::VERTEX | ShaderStages::FRAGMENT);
+        let layout_override = LayoutOverrides {
+            set_layout_overrides: vec![(0, global_des_layout.clone())],
+        };
+
+        // create draw render systems
         let stages = mod_to_stages(
             context.device.clone(),
             shaders::load_basic_vs,
@@ -100,13 +100,6 @@ impl DeferredRenderer {
             shaders::load_new_colored_vs,
             shaders::load_new_solid_fs,
         );
-
-        // global descriptor set layout
-        let global_des_layout =
-            LayoutOverrides::single_uniform_set(ShaderStages::VERTEX | ShaderStages::FRAGMENT);
-        let layout_override = LayoutOverrides {
-            set_layout_overrides: vec![(0, global_des_layout.clone())],
-        };
 
         let lit_draw_system = DrawSystem::new(
             context,
@@ -123,13 +116,6 @@ impl DeferredRenderer {
             layout_override.clone(),
         );
 
-        let lighting_system = LightingSystem::new(
-            context,
-            &Subpass::from(render_pass.clone(), 1).unwrap(),
-            &attachments,
-            &layout_override,
-        );
-
         let unlit_draw_system = DrawSystem::new(
             context,
             &Subpass::from(render_pass.clone(), 2).unwrap(),
@@ -139,10 +125,25 @@ impl DeferredRenderer {
         );
         let unlit_colored_system = DrawSystem::new(
             context,
-            &Subpass::from(render_pass.clone(), 0).unwrap(),
+            &Subpass::from(render_pass.clone(), 2).unwrap(),
             ColoredID::Solid,
-            colored_stages.clone(),
-            layout_override,
+            colored_stages,
+            layout_override.clone(),
+        );
+
+        // create bounding box system
+        let bounding_box_system = BoundingBoxSystem::new(
+            context,
+            &Subpass::from(render_pass.clone(), 2).unwrap(),
+            &layout_override,
+        );
+
+        // create lighting render system
+        let lighting_system = LightingSystem::new(
+            context,
+            &Subpass::from(render_pass.clone(), 1).unwrap(),
+            &attachments,
+            &layout_override,
         );
 
         // create buffers and descriptor sets
@@ -185,6 +186,12 @@ impl DeferredRenderer {
                 .pipeline
                 .create_storage_buffer(&context.allocators, 1000, 1);
 
+            // box data
+            let bounding_box_data =
+                bounding_box_system
+                    .pipeline
+                    .create_storage_buffer(&context.allocators, 1000, 1);
+
             // lighting data
             let point_data =
                 lighting_system
@@ -203,6 +210,9 @@ impl DeferredRenderer {
                 objects_data,
                 colored_data,
 
+                bounding_box_data,
+                last_box_index: None,
+
                 point_data,
                 last_point_index: None,
 
@@ -217,6 +227,8 @@ impl DeferredRenderer {
             attachments,
             frame_data,
 
+            bounding_box_system,
+
             lit_draw_system,
             unlit_draw_system,
 
@@ -226,41 +238,6 @@ impl DeferredRenderer {
             unlit_colored_system,
         }
     }
-
-    // /// Uploads global, object and lighting data
-    // pub fn update_frame_data<P, D>(&mut self, image_i: usize, mut data: impl DataLoader<P, D>)
-    // where
-    //     P: Iterator<Item = PointLight>,
-    //     D: Iterator<Item = DirectionLight>,
-    // {
-    //     let frame = self
-    //         .frame_data
-    //         .get_mut(image_i)
-    //         .expect("Renderer should have a frame for every swapchain image");
-
-    //     // write_to_buffer(&frame.global_data.0, data.get_global());
-    //     frame.update_global_data(data.get_global());
-
-    //     frame.update_objects_data(
-    //         self.lit_draw_system
-    //             .shaders
-    //             .values_mut()
-    //             .chain(self.unlit_draw_system.shaders.values_mut()),
-    //     );
-    //     frame.update_colored_data(
-    //         self.lit_colored_system
-    //             .shaders
-    //             .values_mut()
-    //             .chain(self.unlit_colored_system.shaders.values_mut()),
-    //     );
-
-    //     // frame.last_point_index = write_to_storage_buffer(&frame.point_data.0, data.get_points(), 0);
-    //     // frame.last_dir_index = write_to_storage_buffer(&frame.dir_data.0, data.get_dir(), 0);
-    //     frame.update_point_lights(data.get_points());
-    //     frame.update_directional_lights(data.get_dir());
-
-    //     self.lighting_system.set_ambient_color(data.get_ambient());
-    // }
 }
 impl Renderer for DeferredRenderer {
     fn build_command_buffer(

@@ -4,6 +4,7 @@ pub mod systems {
     mod draw_system;
     mod lighting_system;
 
+    pub use bounding_box_system::BoundingBoxSystem;
     pub use draw_system::DrawSystem;
     pub use lighting_system::LightingSystem;
 }

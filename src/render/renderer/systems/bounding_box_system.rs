@@ -1,4 +1,4 @@
-use cgmath::{Matrix4, Vector3, Vector4};
+// use cgmath::{Matrix4, Vector3, Vector4};
 use vulkano::{
     buffer::{BufferUsage, Subbuffer},
     command_buffer::AutoCommandBufferBuilder,
@@ -25,16 +25,16 @@ use crate::{
 };
 
 pub struct BoundingBoxSystem {
-    pipeline: PipelineHandler,
+    pub pipeline: PipelineHandler,
     line_list: Subbuffer<[Vertex3d]>,
 }
 
 impl BoundingBoxSystem {
-    pub fn new(context: &Context, subpass: &Subpass, layout_overrides: LayoutOverrides) -> Self {
+    pub fn new(context: &Context, subpass: &Subpass, layout_overrides: &LayoutOverrides) -> Self {
         let stages = mod_to_stages(
             context.device.clone(),
-            shaders::load_colored_vs,
-            shaders::load_solid_fs,
+            shaders::load_bounding_box_vs,
+            shaders::load_bounding_box_fs,
         );
 
         let vertex_input_state = Vertex3d::per_vertex()
@@ -106,15 +106,15 @@ impl BoundingBoxSystem {
             .recreate_pipeline(context.device.clone(), context.viewport.clone())
     }
 
-    pub fn bounding_box_to_transform(
-        min: Vector3<f32>,
-        max: Vector3<f32>,
-        colour: Vector4<f32>,
-    ) -> (Matrix4<f32>, Vector4<f32>) {
-        let (x, y, z) = (max - min).into();
-        let transform = Matrix4::from_translation(min) * Matrix4::from_nonuniform_scale(x, y, z);
-        (transform, colour)
-    }
+    // pub fn bounding_box_to_transform(
+    //     min: Vector3<f32>,
+    //     max: Vector3<f32>,
+    //     colour: Vector4<f32>,
+    // ) -> (Matrix4<f32>, Vector4<f32>) {
+    //     let (x, y, z) = (max - min).into();
+    //     let transform = Matrix4::from_translation(min) * Matrix4::from_nonuniform_scale(x, y, z);
+    //     (transform, colour)
+    // }
 
     pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &mut self,
