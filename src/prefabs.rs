@@ -7,7 +7,7 @@ use crate::{
         light::PointLightComponent, transform::TransformCreateInfo, MaterialSwapper, Rotate,
         WorldLoader,
     },
-    physics::RigidBody,
+    physics::{CuboidCollider, RigidBody},
     render::resource_manager::{MaterialID::*, MeshID::*, TextureID},
 };
 
@@ -27,13 +27,22 @@ pub fn init_world(mut loader: WorldLoader) {
     ]
     .map(|id| Texture(id));
     // colored materials
-    let red_mat = loader.2.load_solid_material([1., 0., 0., 1.], false).0;
-    let blue_mat = loader.2.load_solid_material([0., 0., 1., 1.], false).0;
-    let green_mat = loader.2.load_solid_material([0., 1., 0., 1.], true).0;
+    let red_mat = loader
+        .resources
+        .load_solid_material([1., 0., 0., 1.], false)
+        .0;
+    let blue_mat = loader
+        .resources
+        .load_solid_material([0., 0., 1., 1.], false)
+        .0;
+    let green_mat = loader
+        .resources
+        .load_solid_material([0., 1., 0., 1.], true)
+        .0;
 
     // objects
     //      Suzanne
-    let suzanne_obj = loader.2.load_ro(Suzanne, UV, true);
+    let suzanne_obj = loader.resources.load_ro(Suzanne, UV, true);
     let rotate = Rotate(Vector3::new(1.0, 1.0, 0.0).normalize(), Rad(5.0));
     loader.add_2_comp([0., 0., 0.], suzanne_obj, rotate);
 
@@ -46,7 +55,7 @@ pub fn init_world(mut loader: WorldLoader) {
     }
 
     //      Squares
-    let obj = loader.2.load_ro(Square, Gradient, false);
+    let obj = loader.resources.load_ro(Square, Gradient, false);
     for (x, y, z) in [(1., 0., 0.), (0., 1., 0.), (0., 0., 1.)] {
         loader.add_1_comp([x, y, z], obj.clone());
     }
@@ -59,9 +68,14 @@ pub fn init_world(mut loader: WorldLoader) {
     }
 
     //      lost empires
-    let le_transform = loader.1.add_transform(TransformCreateInfo::default());
+    let le_transform = loader
+        .world
+        .transforms
+        .add_transform(TransformCreateInfo::default());
     for mesh in le_meshes {
-        let le_obj = loader.2.load_ro(mesh, Texture(TextureID::LostEmpire), true);
+        let le_obj = loader
+            .resources
+            .load_ro(mesh, Texture(TextureID::LostEmpire), true);
         let mat_swapper = MaterialSwapper::new(
             [
                 (Texture(TextureID::LostEmpire), true),
@@ -69,20 +83,20 @@ pub fn init_world(mut loader: WorldLoader) {
                 (UV, false),
                 (ina_mats[1], true),
             ]
-            .map(|(id, lit)| loader.2.get_material(id, lit)),
+            .map(|(id, lit)| loader.resources.get_material(id, lit)),
         );
 
         loader.add_2_comp(le_transform, le_obj, mat_swapper);
     }
 
     // lights
-    let ro = loader.2.load_ro(Cube, red_mat, false);
+    let ro = loader.resources.load_ro(Cube, red_mat, false);
     loader.add_2_comp(
         TransformCreateInfo::from([0., 5., -1.]).set_scale([0.1, 0.1, 0.1]),
         PointLightComponent::new([1., 0., 0., 3.], 3.),
         ro,
     );
-    let ro = loader.2.load_ro(Cube, blue_mat, false);
+    let ro = loader.resources.load_ro(Cube, blue_mat, false);
     loader.add_2_comp(
         TransformCreateInfo::from([0.0, 6.0, -0.5]).set_scale([0.1, 0.1, 0.1]),
         PointLightComponent::new([0., 0., 1., 2.], 3.),
@@ -90,7 +104,7 @@ pub fn init_world(mut loader: WorldLoader) {
     );
 
     // spam lights
-    let ro = loader.2.load_ro(Cube, red_mat, false);
+    let ro = loader.resources.load_ro(Cube, red_mat, false);
     for x in 0..20 {
         for z in -10..10 {
             loader.add_2_comp(
@@ -119,8 +133,14 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     // let plane_mesh = resources.get_mesh(Square);
     // let cube_mesh = resources.get_mesh(Cube);
 
-    let yellow_mat = loader.2.load_solid_material([1., 1., 0., 1.], true).0;
-    let green_mat = loader.2.load_solid_material([0., 1., 0., 1.], true).0;
+    let yellow_mat = loader
+        .resources
+        .load_solid_material([1., 1., 0., 1.], true)
+        .0;
+    let green_mat = loader
+        .resources
+        .load_solid_material([0., 1., 0., 1.], true)
+        .0;
 
     let plane_trans = TransformCreateInfo {
         rotation: Quaternion::from_axis_angle([1., 0., 0.].into(), Rad(-PI / 2.)),
@@ -129,15 +149,21 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     };
     loader.quick_ro(plane_trans, Square, yellow_mat, true);
 
-    let ro = loader.2.load_ro(Cube, green_mat, true);
+    let ro = loader.resources.load_ro(Cube, green_mat, true);
     let rb = RigidBody {
         velocity: (1.0, 10.0, 0.0).into(),
         bivelocity: (0.0, 0.0, -5.0).into(),
     };
     loader.add_2_comp([0., 1., 0.], ro, rb);
 
-    let min_marker = TransformCreateInfo::from([-2., -2., -2.]).set_scale([0.1, 0.1, 0.1]);
-    let max_marker = TransformCreateInfo::from([2., 2., 2.]).set_scale([0.1, 0.1, 0.1]);
-    loader.quick_ro(min_marker, Cube, yellow_mat, true);
-    loader.quick_ro(max_marker, Cube, green_mat, true);
+    let (pivot, _) = loader.add_1_comp([0., 0., 0.], Rotate([0., 1., 0.].into(), Rad(0.5)));
+    let mover = loader
+        .world
+        .transforms
+        .add_transform(TransformCreateInfo::from([3., 0., 0.]).set_parent(Some(pivot)));
+    let collider = loader
+        .world
+        .colliders
+        .add(CuboidCollider::new(&mut loader.world.transforms, mover));
+    loader.add_1_comp(mover, collider);
 }

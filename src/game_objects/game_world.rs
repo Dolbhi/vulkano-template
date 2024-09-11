@@ -127,7 +127,7 @@ impl GameWorld {
         // update bounds
         let mut query = <(&TransformID, &ColliderRef)>::query();
         for (_, collider) in query.iter(&self.world) {
-            self.colliders.update(collider, &self.transforms);
+            self.colliders.update(collider, &mut self.transforms);
         }
     }
 

@@ -23,7 +23,7 @@ use crate::{
         transform::{TransformCreateInfo, TransformID},
         Camera, GameWorld, MaterialSwapper, WorldLoader,
     },
-    physics::{ColliderRef, CuboidCollider},
+    physics::CuboidCollider,
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
     shaders::{DirectionLight, GPUGlobalData, GPUAABB},
@@ -100,7 +100,6 @@ pub struct App {
     last_frame_time: Instant,
     current_level: i32,
     bounds_debug_depth: u32,
-    moving_bounds: Option<(TransformID, ColliderRef)>,
 }
 
 const FIXED_DELTA_TIME: f32 = 0.02;
@@ -151,7 +150,6 @@ impl App {
             last_frame_time: Instant::now(),
             current_level: -1,
             bounds_debug_depth: 0,
-            moving_bounds: None,
         }
     }
 
@@ -178,28 +176,18 @@ impl App {
         let resources = &mut self
             .resources
             .begin_retrieving(&self.render_loop.context, &mut self.renderer);
-        let GameWorld {
-            world,
-            transforms,
-            camera,
-            colliders,
-            ..
-        } = world;
-        loader(WorldLoader(world, transforms, resources));
+
+        loader(WorldLoader { world, resources });
 
         // camera light, child of the camera
-        let camera_light = transforms.add_transform(
+        let camera_light = world.transforms.add_transform(
             TransformCreateInfo::default()
-                .set_parent(Some(camera.transform))
+                .set_parent(Some(world.camera.transform))
                 .set_translation((0., 0., 0.2)), // light pos cannot = cam pos else the light will glitch
         );
-        world.push((camera_light, PointLightComponent::new([1., 1., 1., 2.], 4.)));
-
-        // moving bounds
-        let transform = transforms.next().unwrap();
-        let collider = CuboidCollider::new(transforms, transform);
-        let coll_ref = colliders.add(collider);
-        self.moving_bounds = Some((transform, coll_ref));
+        world
+            .world
+            .push((camera_light, PointLightComponent::new([1., 1., 1., 2.], 4.)));
 
         self.current_level = id;
 
@@ -366,16 +354,6 @@ impl App {
 
                     colliders.add(collider);
                     println!("[Depth] {}", colliders.tree_depth());
-                }
-
-                // move bounds
-                if let Some((transfrom, reference)) = &self.moving_bounds {
-                    let angle = *fixed_seconds * 0.5;
-                    transforms
-                        .get_transform_mut(transfrom)
-                        .unwrap()
-                        .set_translation([3. * angle.sin(), 0.0, 3. * angle.cos()]);
-                    colliders.update(reference, &transforms);
                 }
 
                 // camera data

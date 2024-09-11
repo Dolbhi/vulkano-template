@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use cgmath::{InnerSpace, Rotation, Vector3, Zero};
+use cgmath::{InnerSpace, Rotation, Vector3, Vector4, Zero};
 
 use bounds_tree::{BoundsTree, TreeIter};
 
@@ -114,7 +114,7 @@ const CUBE_BOUNDING: [Vector; 3] = [
 ];
 
 impl CuboidCollider {
-    pub fn new(transforms: &TransformSystem, transform: TransformID) -> Self {
+    pub fn new(transforms: &mut TransformSystem, transform: TransformID) -> Self {
         let mut collider = CuboidCollider {
             transform,
             bounding_box: BoundingBox::default(),
@@ -123,14 +123,17 @@ impl CuboidCollider {
         collider
     }
 
-    fn update_bounding(&mut self, transforms: &TransformSystem) {
+    fn update_bounding(&mut self, transforms: &mut TransformSystem) {
+        let global_model = transforms.get_global_model(&self.transform).unwrap();
         let view = transforms
             .get_transform(&self.transform)
             .unwrap()
             .get_local_transform();
 
-        self.bounding_box.min = view.translation.clone();
-        self.bounding_box.max = view.translation + view.scale;
+        let pos = global_model * Vector4::new(1.0, 0.0, 0.0, 1.0);
+
+        self.bounding_box.min = pos.truncate() / pos.w;
+        self.bounding_box.max = self.bounding_box.min + view.scale;
 
         // let vertices = CUBE_BOUNDING.map(|v| view.rotation.rotate_vector(v));
 
@@ -156,18 +159,18 @@ impl ColliderSystem {
     }
 
     // removed update and reinsert given collider
-    pub fn update(&mut self, target: &ColliderRef, transforms: &TransformSystem) {
-        println!("[Updating bounds]");
+    pub fn update(&mut self, target: &ColliderRef, transforms: &mut TransformSystem) {
+        // println!("[Updating bounds]");
         self.bounds_tree.remove(target);
-        println!("\t[Removed]");
+        // println!("\t[Removed]");
         let bounds = {
             let mut lock = target.lock().unwrap();
             lock.collider.update_bounding(transforms);
             lock.collider.bounding_box
         };
-        println!("\t[Updated]");
+        // println!("\t[Updated]");
         self.bounds_tree.insert_leaf(target, bounds);
-        println!("\t[Inserted]");
+        // println!("\t[Inserted]");
     }
 
     /// adds collider to bounds tree, returns a reference to its leaf node

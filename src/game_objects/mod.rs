@@ -26,11 +26,10 @@ pub struct MaterialSwapper<T: Clone> {
     curent_index: usize,
 }
 
-pub struct WorldLoader<'a, 'b: 'a>(
-    pub &'a mut legion::World,
-    pub &'a mut transform::TransformSystem,
-    pub &'a mut ResourceRetriever<'b>,
-);
+pub struct WorldLoader<'a, 'b: 'a> {
+    pub world: &'a mut GameWorld,
+    pub resources: &'a mut ResourceRetriever<'b>,
+}
 
 impl<T: Clone> MaterialSwapper<T> {
     pub fn new(materials: impl IntoIterator<Item = RenderSubmit<T>>) -> Self {
@@ -55,7 +54,7 @@ impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
         material: MaterialID,
         lit: bool,
     ) -> (TransformID, legion::Entity) {
-        let ro = self.2.load_ro(mesh, material, lit);
+        let ro = self.resources.load_ro(mesh, material, lit);
         self.add_1_comp(transform, ro)
     }
 
@@ -67,8 +66,8 @@ impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
     where
         T: legion::storage::Component,
     {
-        let id = self.1.add_transform(transform.into());
-        (id, self.0.push((id, comp)))
+        let id = self.world.transforms.add_transform(transform.into());
+        (id, self.world.world.push((id, comp)))
     }
 
     pub fn add_2_comp<T1, T2>(
@@ -81,8 +80,8 @@ impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
         T1: legion::storage::Component,
         T2: legion::storage::Component,
     {
-        let id = self.1.add_transform(transform.into());
-        (id, self.0.push((id, comp_1, comp_2)))
+        let id = self.world.transforms.add_transform(transform.into());
+        (id, self.world.world.push((id, comp_1, comp_2)))
     }
 
     pub fn add_3_comp<T1, T2, T3>(
@@ -97,7 +96,7 @@ impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
         T2: legion::storage::Component,
         T3: legion::storage::Component,
     {
-        let id = self.1.add_transform(transform.into());
-        (id, self.0.push((id, comp_1, comp_2, comp_3)))
+        let id = self.world.transforms.add_transform(transform.into());
+        (id, self.world.world.push((id, comp_1, comp_2, comp_3)))
     }
 }

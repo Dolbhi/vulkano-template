@@ -98,7 +98,7 @@ impl BoundsTree {
     pub fn remove(&mut self, target: &Arc<Mutex<Leaf>>) {
         let (maybe_parent, side) = {
             let lock = target.lock().unwrap();
-            println!("\t[Locked target]");
+            // println!("\t[Locked target]");
             (lock.parent.upgrade(), lock.right_child)
         };
 
@@ -111,7 +111,7 @@ impl BoundsTree {
             // single leaf on root, remove it
             self.root = None;
         }
-        println!("\t[Locked Parent]");
+        // println!("\t[Locked Parent]");
         // let leaf = Arc::into_inner(target).unwrap_or_else(|| {panic!("")}).into_inner().unwrap();
         // leaf.collider
     }
@@ -347,7 +347,7 @@ impl Branch {
                 let mut lock = other_child.node.lock().unwrap();
                 lock.set_parent(Arc::downgrade(&parent), self_side)
             }
-            println!("\t[Locked other child]");
+            // println!("\t[Locked other child]");
 
             let mut parent_lock = parent.lock().unwrap();
             // replace self in parent
@@ -355,16 +355,18 @@ impl Branch {
 
             parent_lock.rebalance();
 
-            // let some_grandparent = parent_lock.parent.upgrade();
-            // let
+            let some_grandparent = parent_lock.parent.upgrade();
+            let sibling_side = parent_lock.right_child;
+            let bounds = parent_lock.bounds();
+            let depth = parent_lock.depth();
+            drop(parent_lock);
             // println!("\t[Locked parent's parent]");
 
-            if let Some(grandparent) = parent_lock.parent.upgrade() {
-                grandparent.lock().unwrap().update_removed(
-                    parent_lock.right_child,
-                    parent_lock.bounds(),
-                    parent_lock.depth(),
-                );
+            if let Some(grandparent) = some_grandparent {
+                grandparent
+                    .lock()
+                    .unwrap()
+                    .update_removed(sibling_side, bounds, depth);
             }
 
             None
