@@ -106,9 +106,14 @@ impl BoundsTree {
             if let Some(new_root) = parent.lock().unwrap().delete_child(side) {
                 // leaf as a new root
                 self.root = Some(new_root);
+            } else {
+                // manually update root bounds
+                let root = self.root.as_mut().unwrap();
+                let lock = root.node.lock().unwrap();
+                root.bounds = lock.bounds();
             }
         } else {
-            // single leaf on root, remove it
+            // single leaf at root, remove it
             self.root = None;
         }
         // println!("\t[Locked Parent]");
@@ -116,11 +121,12 @@ impl BoundsTree {
         // leaf.collider
     }
 
+    /// WARNING: this merges the other's root node as if it was a leaf (i.e. its fucked up)
     pub fn merge(&mut self, other: BoundsTree) {
         if let Some(other_root) = other.root {
             match &mut self.root {
                 None => {
-                    // empty root, make new leaf
+                    // empty root, simply replace with other
                     self.root = Some(other_root);
                 }
                 Some(node) => {
@@ -335,7 +341,7 @@ impl Debug for Leaf {
 }
 
 impl Branch {
-    /// If self has no parent, return the replacement instead
+    /// If self has no parent (is the root), return the replacement to be the new root
     fn delete_child(&mut self, right_child: ChildSide) -> Option<Link> {
         let other_child = self.children[1 - right_child as usize].clone();
         let self_side = self.right_child;
@@ -355,6 +361,7 @@ impl Branch {
 
             parent_lock.rebalance();
 
+            // update bounds and depth from grandparent onwards
             let some_grandparent = parent_lock.parent.upgrade();
             let sibling_side = parent_lock.right_child;
             let bounds = parent_lock.bounds();
@@ -540,6 +547,7 @@ mod tree_tests {
         {
             let lock = root.node.lock().unwrap();
             root.depth = lock.depth(); // manually validate root depth
+            root.bounds = lock.bounds();
         }
         let validation = validate_tree(&root, None, ChildSide::Right);
 

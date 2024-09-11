@@ -30,6 +30,7 @@ pub struct ColliderSystem {
 }
 
 impl BoundingBox {
+    /// find upper and lower bounds of given verticies
     fn from_vertices<'a>(vertices: impl IntoIterator<Item = &'a Vector>) -> Self {
         let mut vertices = vertices.into_iter();
         let mut max = *vertices.next().unwrap();

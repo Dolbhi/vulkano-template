@@ -99,7 +99,7 @@ pub struct App {
     game_state: GameState,
     last_frame_time: Instant,
     current_level: i32,
-    bounds_debug_depth: u32,
+    bounds_debug_depth: Option<u32>,
 }
 
 const FIXED_DELTA_TIME: f32 = 0.02;
@@ -149,7 +149,7 @@ impl App {
             game_state: Default::default(),
             last_frame_time: Instant::now(),
             current_level: -1,
-            bounds_debug_depth: 0,
+            bounds_debug_depth: None,
         }
     }
 
@@ -353,7 +353,8 @@ impl App {
                     let collider = CuboidCollider::new(transforms, transform);
 
                     colliders.add(collider);
-                    println!("[Depth] {}", colliders.tree_depth());
+
+                    self.inputs.o_triggered = false;
                 }
 
                 // camera data
@@ -400,13 +401,27 @@ impl App {
                 };
 
                 // bounding box
-                if self.bounds_debug_depth > colliders.tree_depth() {
-                    self.bounds_debug_depth = 0;
+                if self.bounds_debug_depth == Some(colliders.tree_depth()) {
+                    self.bounds_debug_depth = None;
                 }
-                let bounding_boxes = colliders
-                    .bounds_iter()
-                    .filter(|(_, depth)| *depth == self.bounds_debug_depth)
-                    .map(|(bounds, depth)| {
+
+                if let Some(debug_depth) = self.bounds_debug_depth {
+                    let bounding_boxes = colliders
+                        .bounds_iter()
+                        .filter(|(_, depth)| *depth == debug_depth)
+                        .map(|(bounds, depth)| {
+                            let mag = 1. / (depth as f32 + 1.);
+                            let min_cast: [f32; 3] = bounds.min.into();
+                            let max_cast: [f32; 3] = bounds.max.into();
+                            GPUAABB {
+                                min: min_cast.into(),
+                                max: max_cast.into(),
+                                color: [1., mag, mag, 1.],
+                            }
+                        });
+                    frame.upload_box_data(bounding_boxes);
+                } else {
+                    let bounding_boxes = colliders.bounds_iter().map(|(bounds, depth)| {
                         let mag = 1. / (depth as f32 + 1.);
                         let min_cast: [f32; 3] = bounds.min.into();
                         let max_cast: [f32; 3] = bounds.max.into();
@@ -416,7 +431,8 @@ impl App {
                             color: [1., mag, mag, 1.],
                         }
                     });
-                frame.upload_box_data(bounding_boxes);
+                    frame.upload_box_data(bounding_boxes);
+                }
 
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();
@@ -498,7 +514,11 @@ impl App {
             VirtualKeyCode::P => {
                 // scroll through depths
                 if state == Pressed && self.inputs.p == Released {
-                    self.bounds_debug_depth += 1;
+                    if let Some(depth) = self.bounds_debug_depth {
+                        self.bounds_debug_depth = Some(depth + 1);
+                    } else {
+                        self.bounds_debug_depth = Some(0);
+                    }
                 }
                 self.inputs.p = state;
             }
