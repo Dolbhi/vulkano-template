@@ -134,6 +134,23 @@ pub fn profiler_window(ctx: &Context) {
     ctx.style_mut(|style| style.spacing.item_spacing = old_spaceing);
 }
 
+pub fn debug_window(ctx: &Context, bounds_showing: u32) {
+    let old_spaceing = ctx.style().spacing.item_spacing;
+    ctx.style_mut(|style| style.spacing.item_spacing = (5.0, 5.0).into());
+
+    egui::Window::new("Debug")
+        .resizable(false)
+        .default_pos((20.0, 20.0))
+        .show(ctx, |ui| {
+            ui.label(RichText::new(format!(
+                "Bounds Tree Depth: {}",
+                bounds_showing
+            )));
+        });
+
+    ctx.style_mut(|style| style.spacing.item_spacing = old_spaceing);
+}
+
 pub fn test_area(ctx: &Context) {
     egui::Area::new("Pause Menu")
         .default_pos((500., 300.))
