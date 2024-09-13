@@ -23,9 +23,9 @@ pub fn from_obj(file_name: &Path) -> Vec<(Vec<VertexFull>, Vec<u32>)> {
             for i in 0..length {
                 let first = i * 3;
                 let position = [
-                    mesh.positions[first] / 3.,
-                    mesh.positions[first + 1] / 3.,
-                    mesh.positions[first + 2] / 3.,
+                    mesh.positions[first],
+                    mesh.positions[first + 1],
+                    mesh.positions[first + 2],
                 ];
                 let normal = [
                     mesh.normals[first],

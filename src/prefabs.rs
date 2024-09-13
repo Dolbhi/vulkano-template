@@ -50,7 +50,7 @@ pub fn init_world(mut loader: WorldLoader) {
     for x in 0..20 {
         for z in 0..20 {
             let mat = [ina_mats[1], green_mat][(x + z) % 2];
-            loader.quick_ro([x as f32, 7f32, z as f32], Suzanne, mat, true);
+            loader.quick_ro([(x * 3) as f32, 21.0, (z * 3) as f32], Suzanne, mat, true);
         }
     }
 
@@ -62,7 +62,7 @@ pub fn init_world(mut loader: WorldLoader) {
 
     //      Ina
     let rotate = Rotate([0., 1., 0.].into(), Rad(0.5));
-    let (ina_transform, _) = loader.add_1_comp([0.0, 5.0, -1.0], rotate);
+    let (ina_transform, _) = loader.add_1_comp([0.0, 15.0, -3.0], rotate);
     for (mesh, mat) in zip(ina_meshes, ina_mats.clone()) {
         loader.quick_ro(ina_transform, mesh, mat, true);
     }
@@ -92,14 +92,14 @@ pub fn init_world(mut loader: WorldLoader) {
     // lights
     let ro = loader.resources.load_ro(Cube, red_mat, false);
     loader.add_2_comp(
-        TransformCreateInfo::from([0., 5., -1.]).set_scale([0.1, 0.1, 0.1]),
-        PointLightComponent::new([1., 0., 0., 3.], 3.),
+        TransformCreateInfo::from([0., 15., -3.]).set_scale([0.1, 0.1, 0.1]),
+        PointLightComponent::new([1., 0., 0., 3.], 9.),
         ro,
     );
     let ro = loader.resources.load_ro(Cube, blue_mat, false);
     loader.add_2_comp(
-        TransformCreateInfo::from([0.0, 6.0, -0.5]).set_scale([0.1, 0.1, 0.1]),
-        PointLightComponent::new([0., 0., 1., 2.], 3.),
+        TransformCreateInfo::from([0.0, 18.0, -1.5]).set_scale([0.1, 0.1, 0.1]),
+        PointLightComponent::new([0., 0., 1., 2.], 9.),
         ro,
     );
 
@@ -108,8 +108,9 @@ pub fn init_world(mut loader: WorldLoader) {
     for x in 0..20 {
         for z in -10..10 {
             loader.add_2_comp(
-                TransformCreateInfo::from([x as f32, 6.1, z as f32]).set_scale([0.1, 0.1, 0.1]),
-                PointLightComponent::new([1., 0., 0., 1.], 1.),
+                TransformCreateInfo::from([(x * 3) as f32, 18.3, (z * 3) as f32])
+                    .set_scale([0.1, 0.1, 0.1]),
+                PointLightComponent::new([1., 0., 0., 1.], 3.),
                 ro.clone(),
             );
         }
@@ -162,23 +163,11 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     let mover = loader
         .world
         .transforms
-        .add_transform(TransformCreateInfo::from([3., 0., 0.]).set_parent(Some(pivot)));
+        .add_transform(TransformCreateInfo::from([9., 0., 0.]).set_parent(Some(pivot)));
     let collider = loader
         .world
         .colliders
         .add(CuboidCollider::new(&mut loader.world.transforms, mover));
     let ro = loader.resources.load_ro(Cube, green_mat, true);
     loader.add_2_comp(mover, collider, ro);
-
-    // test
-    let transform = loader.world.transforms.next().unwrap();
-    let collider = loader
-        .world
-        .colliders
-        .add(CuboidCollider::new(&mut loader.world.transforms, transform));
-    let ro = loader.resources.load_ro(Cube, yellow_mat, true);
-    loader.add_2_comp(transform, collider, ro.clone());
-
-    loader.add_1_comp([1.0, 1.0, 1.0], ro.clone());
-    loader.add_1_comp([-1.0, -1.0, -1.0], ro.clone());
 }

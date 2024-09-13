@@ -161,25 +161,25 @@ impl<'a> ResourceRetriever<'a> {
                     MeshID::Square => {
                         let vertices = vec![
                             VertexFull {
-                                position: [-0.25, -0.25, 0.0],
+                                position: [-0.5, -0.5, 0.0],
                                 normal: [0.0, 0.0, 1.0],
                                 colour: [0.0, 1.0, 0.0],
                                 uv: [0.0, 0.0],
                             },
                             VertexFull {
-                                position: [0.25, -0.25, 0.0],
+                                position: [0.5, -0.5, 0.0],
                                 normal: [0.0, 0.0, 1.0],
                                 colour: [0.0, 1.0, 0.0],
                                 uv: [1.0, 0.0],
                             },
                             VertexFull {
-                                position: [-0.25, 0.25, 0.0],
+                                position: [-0.5, 0.5, 0.0],
                                 normal: [0.0, 0.0, 1.0],
                                 colour: [0.0, 1.0, 0.0],
                                 uv: [0.0, 1.0],
                             },
                             VertexFull {
-                                position: [0.25, 0.25, 0.0],
+                                position: [0.5, 0.5, 0.0],
                                 normal: [0.0, 0.0, 1.0],
                                 colour: [0.0, 1.0, 0.0],
                                 uv: [1.0, 1.0],

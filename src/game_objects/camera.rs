@@ -9,6 +9,7 @@ use super::{
 
 // const CAM_SPEED: f32 = 2.;
 const MOUSE_SENSITIVITY: f32 = 0.01;
+const CAM_DAMP_STRENGTH: f32 = 40.;
 
 pub struct Camera {
     pub fov: Rad<f32>,
@@ -68,7 +69,7 @@ impl Camera {
             rotation: Quaternion::one(),
             smooth_pos: Vector3::zero(),
             transform,
-            damper: VectorDamp::new(40.),
+            damper: VectorDamp::new(CAM_DAMP_STRENGTH),
         }
     }
 }

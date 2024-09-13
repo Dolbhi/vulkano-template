@@ -8,6 +8,8 @@ use super::{
 };
 use legion::*;
 
+const CAM_SPEED: f32 = 6.;
+
 pub struct Inputs {
     pub movement: Vector3<f32>,
 }
@@ -46,7 +48,7 @@ impl Inputs {
         final_move.y = self.movement.y;
 
         // apply movement
-        transform.set_translation(view.translation + final_move * 2. * seconds_passed);
+        transform.set_translation(view.translation + final_move * CAM_SPEED * seconds_passed);
     }
 }
 

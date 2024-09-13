@@ -3,6 +3,7 @@ use std::time::Instant;
 use cgmath::{InnerSpace, Vector3, Zero};
 
 // const MAX_COUNTER_DV: f32 = -1.;
+const MAX_SQR_VEL: f32 = 200.;
 
 pub struct VectorDamp {
     last_time: Instant,
@@ -41,9 +42,9 @@ impl VectorDamp {
         // }
         self.velocity += delta_vel;
         let sqr_vel = self.velocity.magnitude2();
-        if sqr_vel > 16.0 {
+        if sqr_vel > MAX_SQR_VEL {
             println!("[Warning] Vel maxed out, square vel: {sqr_vel}");
-            self.velocity *= (16.0 / sqr_vel).sqrt();
+            self.velocity *= (MAX_SQR_VEL / sqr_vel).sqrt();
         }
 
         let delta_pos = (self.velocity) * elapsed_time;
