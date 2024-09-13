@@ -9,6 +9,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 ### Misc.
 - [ ] Add camera light toggle (bound to 'f')
 - [ ] Add lerp light toggle (bound to 'x')
+- [ ] Early exit on BVH updating (e.g when bounds and depth are unchanged)
 - [ ] Place billboards in test world
 - [x] Smarter transform matrix calculation
 - [x] Refactor renderobjects
