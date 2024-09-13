@@ -5,11 +5,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use cgmath::{InnerSpace, Rotation, Vector3, Vector4, Zero};
+use cgmath::{InnerSpace, Zero};
 
 use bounds_tree::{BoundsTree, TreeIter};
 
-use crate::game_objects::transform::{self, TransformID, TransformSystem, TransformView};
+use crate::game_objects::transform::{TransformID, TransformSystem};
 
 use super::Vector;
 
@@ -96,7 +96,7 @@ impl Default for BoundingBox {
     }
 }
 
-const CUBE_BOUNDING: [Vector; 3] = [
+const CUBE_BOUNDING: [Vector; 8] = [
     Vector {
         x: 1.0,
         y: -1.0,
@@ -112,6 +112,31 @@ const CUBE_BOUNDING: [Vector; 3] = [
         y: -1.0,
         z: 1.0,
     },
+    Vector {
+        x: 1.0,
+        y: 1.0,
+        z: -1.0,
+    },
+    Vector {
+        x: 1.0,
+        y: -1.0,
+        z: 1.0,
+    },
+    Vector {
+        x: -1.0,
+        y: 1.0,
+        z: 1.0,
+    },
+    Vector {
+        x: 1.0,
+        y: 1.0,
+        z: 1.0,
+    },
+    Vector {
+        x: -1.0,
+        y: -1.0,
+        z: -1.0,
+    },
 ];
 
 impl CuboidCollider {
@@ -126,19 +151,22 @@ impl CuboidCollider {
 
     fn update_bounding(&mut self, transforms: &mut TransformSystem) {
         let global_model = transforms.get_global_model(&self.transform).unwrap();
-        let view = transforms
-            .get_transform(&self.transform)
-            .unwrap()
-            .get_local_transform();
+        // let view = transforms
+        //     .get_transform(&self.transform)
+        //     .unwrap()
+        //     .get_local_transform();
 
-        let pos = global_model * Vector4::new(1.0, 0.0, 0.0, 1.0);
+        // let pos = global_model * Vector4::new(1.0, 0.0, 0.0, 1.0);
 
-        self.bounding_box.min = pos.truncate() / pos.w;
-        self.bounding_box.max = self.bounding_box.min + view.scale;
+        // self.bounding_box.min = pos.truncate() / pos.w;
+        // self.bounding_box.max = self.bounding_box.min + view.scale;
 
-        // let vertices = CUBE_BOUNDING.map(|v| view.rotation.rotate_vector(v));
+        let vertices = CUBE_BOUNDING.map(|v| {
+            let v = global_model * v.extend(1.0);
+            v.truncate() / v.w
+        });
 
-        // self.bounding_box = BoundingBox::from_vertices(&vertices);
+        self.bounding_box = BoundingBox::from_vertices(&vertices);
         // self.bounding_box.translate(*view.translation);
     }
 }

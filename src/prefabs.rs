@@ -156,7 +156,9 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     };
     loader.add_2_comp([0., 1., 0.], ro, rb);
 
+    // moving collider
     let (pivot, _) = loader.add_1_comp([0., 0., 0.], Rotate([0., 1., 0.].into(), Rad(0.5)));
+
     let mover = loader
         .world
         .transforms
@@ -165,5 +167,18 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         .world
         .colliders
         .add(CuboidCollider::new(&mut loader.world.transforms, mover));
-    loader.add_1_comp(mover, collider);
+    let ro = loader.resources.load_ro(Cube, green_mat, true);
+    loader.add_2_comp(mover, collider, ro);
+
+    // test
+    let transform = loader.world.transforms.next().unwrap();
+    let collider = loader
+        .world
+        .colliders
+        .add(CuboidCollider::new(&mut loader.world.transforms, transform));
+    let ro = loader.resources.load_ro(Cube, yellow_mat, true);
+    loader.add_2_comp(transform, collider, ro.clone());
+
+    loader.add_1_comp([1.0, 1.0, 1.0], ro.clone());
+    loader.add_1_comp([-1.0, -1.0, -1.0], ro.clone());
 }
