@@ -9,6 +9,8 @@ pub mod ui;
 mod vertex_data;
 pub mod vulkano_objects;
 
+use std::sync::Mutex;
+
 pub use vertex_data::{Vertex2d, Vertex3d, VertexFull};
 
 use profiler::Profiler;
@@ -22,8 +24,13 @@ pub static mut RENDER_PROFILER: Option<Profiler<7, 128>> = Some(Profiler::new([
     "ComBuf building",
     "Execute",
 ]));
-pub static mut LOGIC_PROFILER: Option<Profiler<2, 128>> =
-    Some(Profiler::new(["Lock wait", "Logic update"]));
+pub static mut LOGIC_PROFILER: Mutex<Profiler<5, 128>> = Mutex::new(Profiler::new([
+    "Lock wait",
+    "Colliders",
+    "Physics",
+    "Interpolate",
+    "Others",
+]));
 
 #[cfg(test)]
 mod tests {

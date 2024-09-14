@@ -28,7 +28,7 @@ use crate::{
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
     shaders::{DirectionLight, GPUGlobalData, GPUAABB},
     ui::{self, MenuOption},
-    RENDER_PROFILER,
+    LOGIC_PROFILER, RENDER_PROFILER,
 };
 
 #[derive(Default, PartialEq)]
@@ -570,15 +570,20 @@ impl GameWorldThread {
             loop {
                 if !thread_paused.load(std::sync::atomic::Ordering::Relaxed) {
                     {
-                        // let update_start = Instant::now();
+                        let update_start = std::time::Instant::now();
+
                         let new_micros = thread_micros.load(std::sync::atomic::Ordering::Relaxed);
                         let mut world = game_world.lock().unwrap();
                         // let lock_wait = update_start.elapsed().as_millis();
 
-                        // let pre_update = Instant::now();
+                        // [Profiling] Lock Wait
+                        unsafe {
+                            let mut profiler = LOGIC_PROFILER.lock().unwrap();
+                            profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
+                        }
+
                         world.update(update_period.as_secs_f32());
                         update_period = Duration::from_micros(new_micros);
-                        // let update_time = pre_update.elapsed().as_millis();
 
                         // skip frames if update took too long
                         let now = Instant::now();

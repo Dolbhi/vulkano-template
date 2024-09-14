@@ -188,6 +188,7 @@ impl TransformSystem {
         }
     }
 
+    /// Sets fixed time of last update used for interpolation
     pub fn update_last_fixed(&mut self) {
         self.last_fixed_time = Instant::now();
     }

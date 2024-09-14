@@ -1,6 +1,6 @@
 use egui_winit_vulkano::egui::{self, Align2, Color32, Context, FontId, Layout, RichText, Style};
 
-use crate::RENDER_PROFILER;
+use crate::{LOGIC_PROFILER, RENDER_PROFILER};
 
 pub enum MenuOption {
     None,
@@ -118,7 +118,7 @@ pub fn profiler_window(ctx: &Context) {
     let old_spaceing = ctx.style().spacing.item_spacing;
     ctx.style_mut(|style| style.spacing.item_spacing = (5.0, 5.0).into());
 
-    egui::Window::new("Profiler")
+    egui::Window::new("Render")
         .resizable(false)
         .default_pos((20.0, 20.0))
         .show(ctx, |ui| {
@@ -131,9 +131,19 @@ pub fn profiler_window(ctx: &Context) {
             }
         });
 
+    egui::Window::new("Logic")
+        .resizable(false)
+        .default_pos((20.0, 200.0))
+        .show(ctx, |ui| {
+            let profiler = unsafe { LOGIC_PROFILER.lock().unwrap() };
+
+            ui.label(RichText::new(profiler.summary()).monospace());
+        });
+
     ctx.style_mut(|style| style.spacing.item_spacing = old_spaceing);
 }
 
+// unused for now
 pub fn debug_window(ctx: &Context, bounds_showing: u32) {
     let old_spaceing = ctx.style().spacing.item_spacing;
     ctx.style_mut(|style| style.spacing.item_spacing = (5.0, 5.0).into());
