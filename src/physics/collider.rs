@@ -1,4 +1,5 @@
 mod bounds_tree;
+mod bvh;
 
 use std::{
     fmt::Debug,
@@ -48,6 +49,7 @@ impl BoundingBox {
         BoundingBox { max, min }
     }
 
+    #[allow(unused)]
     fn check_overlap(&self, other: Self) -> bool {
         let d1 = other.min - self.min;
         let d2 = other.max - self.max;
@@ -55,11 +57,13 @@ impl BoundingBox {
         d1.x < 0.0 && d1.y < 0.0 && d1.z < 0.0 && d2.x < 0.0 && d2.y < 0.0 && d2.z < 0.0
     }
 
+    #[allow(unused)]
     fn translate(&mut self, translation: Vector) {
         self.max += translation;
         self.min += translation;
     }
 
+    /// returns new bounds which encapsulates both input bounds
     fn join(self, rhs: Self) -> Self {
         let max_x = rhs.max.x.max(self.max.x);
         let max_y = rhs.max.y.max(self.max.y);

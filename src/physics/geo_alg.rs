@@ -24,6 +24,7 @@ use super::Vector;
 //     (a2, b2, l)
 // }
 
+#[allow(unused)]
 pub fn geo_prod(lhs: Vector, rhs: Vector) -> FullMultiVector {
     FullMultiVector {
         s: lhs.dot(rhs),
@@ -36,6 +37,7 @@ pub fn geo_prod(lhs: Vector, rhs: Vector) -> FullMultiVector {
         ..FullMultiVector::zero()
     }
 }
+#[allow(unused)]
 pub fn vec_exp(vec: Vector) -> FullMultiVector {
     let l = vec.magnitude();
     let v = vec / l;
