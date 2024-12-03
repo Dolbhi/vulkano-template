@@ -191,7 +191,7 @@ impl ColliderSystem {
     // removed update and reinsert given collider
     pub fn update(&mut self, target: &mut LeafInHierachy, transforms: &mut TransformSystem) {
         self.bounds_tree
-            .modify_leaf(target, |collider| collider.update_bounding(transforms))
+            .modify_collider(target, |collider| collider.update_bounding(transforms))
             .unwrap();
 
         // // println!("[Updating bounds]");
@@ -208,9 +208,7 @@ impl ColliderSystem {
 
     /// adds collider to bounds tree, returns a reference to its leaf node
     pub fn add(&mut self, collider: CuboidCollider) -> LeafInHierachy {
-        self.bounds_tree
-            .insert(self.bounds_tree.register_collider(collider))
-            .unwrap()
+        self.bounds_tree.insert(BVH::register_collider(collider))
     }
     pub fn remove(
         &mut self,

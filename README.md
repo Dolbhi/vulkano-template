@@ -6,6 +6,8 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [VulkanGuide](https://vkguide.dev/): Focused Vulkan guide on renderers for game engines
 
 ## To Do
+- [ ] Custom pointer for modifying colliders that updates bvh on drop
+
 ### Misc.
 - [ ] Add camera light toggle (bound to 'f')
 - [ ] Add lerp light toggle (bound to 'x')
