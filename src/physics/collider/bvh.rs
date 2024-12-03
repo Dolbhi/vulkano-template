@@ -47,6 +47,12 @@ pub struct LeafOutsideHierachy {
     hierachy: *const BVH,
 }
 
+/// Depth first iterator for `BoundsTree`
+pub struct DepthIter {
+    current: Vec<NonNull<Node>>,
+    next: Vec<NonNull<Node>>,
+}
+
 #[allow(unused)]
 impl BVH {
     pub fn new() -> Self {
@@ -262,6 +268,20 @@ impl BVH {
 
     pub unsafe fn get_root(&self) -> Option<NonNull<Node>> {
         self.root
+    }
+
+    pub fn iter(&self) -> DepthIter {
+        if let Some(root) = self.root {
+            DepthIter {
+                current: vec![root],
+                next: vec![],
+            }
+        } else {
+            DepthIter {
+                current: vec![],
+                next: vec![],
+            }
+        }
     }
 }
 
@@ -481,6 +501,49 @@ impl Drop for LeafOutsideHierachy {
     fn drop(&mut self) {
         unsafe {
             let _ = Box::from_raw(self.leaf.as_ptr());
+        }
+    }
+}
+
+impl IntoIterator for &BVH {
+    type IntoIter = DepthIter;
+    type Item = (BoundingBox, usize);
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl Iterator for DepthIter {
+    type Item = (BoundingBox, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        unsafe {
+            match self.current.pop() {
+                Some(node) => {
+                    if let NodeContent::Branch(branch) = node.as_ref().content {
+                        self.next.push(branch.as_ref().left);
+                        self.next.push(branch.as_ref().right);
+                    }
+                    Some((node.as_ref().bounds, node.as_ref().depth))
+                }
+                None => {
+                    // swap current and next
+                    std::mem::swap(&mut self.current, &mut self.next);
+
+                    // try pop current again
+                    if let Some(node) = self.current.pop() {
+                        if let NodeContent::Branch(branch) = node.as_ref().content {
+                            self.next.push(branch.as_ref().left);
+                            self.next.push(branch.as_ref().right);
+                        }
+                        Some((node.as_ref().bounds, node.as_ref().depth))
+                    } else {
+                        // both vecs empty
+                        None
+                    }
+                }
+            }
         }
     }
 }
