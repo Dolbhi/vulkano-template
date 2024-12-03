@@ -2,7 +2,7 @@ use std::{
     fmt::Debug,
     marker::PhantomData,
     mem::{self, ManuallyDrop},
-    ptr::{self, NonNull},
+    ptr::NonNull,
 };
 
 use super::{BoundingBox, CuboidCollider};
@@ -438,28 +438,6 @@ impl Node {
         }
     }
 }
-// unsafe impl Send for Node {}
-// unsafe impl Sync for Node {}
-
-impl BranchContent {
-    fn new(node: NonNull<Node>, left: NonNull<Node>, right: NonNull<Node>) -> NonNull<Self> {
-        unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(Self { node, left, right }))) }
-    }
-
-    fn recalculate_depth(&mut self) {
-        unsafe {
-            (*self.node.as_ptr()).depth =
-                self.left.as_ref().depth.max(self.right.as_ref().depth) + 1;
-        }
-    }
-
-    fn recalculate_bounds(&mut self) {
-        unsafe {
-            (*self.node.as_ptr()).bounds =
-                self.left.as_ref().bounds.join(self.right.as_ref().bounds);
-        }
-    }
-}
 
 impl Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -485,6 +463,26 @@ impl Debug for Node {
     }
 }
 
+impl BranchContent {
+    fn new(node: NonNull<Node>, left: NonNull<Node>, right: NonNull<Node>) -> NonNull<Self> {
+        unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(Self { node, left, right }))) }
+    }
+
+    fn recalculate_depth(&mut self) {
+        unsafe {
+            (*self.node.as_ptr()).depth =
+                self.left.as_ref().depth.max(self.right.as_ref().depth) + 1;
+        }
+    }
+
+    fn recalculate_bounds(&mut self) {
+        unsafe {
+            (*self.node.as_ptr()).bounds =
+                self.left.as_ref().bounds.join(self.right.as_ref().bounds);
+        }
+    }
+}
+
 // impl<T> LeafReference<T> {
 //     fn get_leaf(&self, hierachy: &BVH) -> Option<&Node> {
 //         if self.hierachy == hierachy {
@@ -506,19 +504,19 @@ impl LeafInHierachy {
         LeafOutsideHierachy { leaf: self.leaf }
     }
 
-    pub fn get_collider(&self, hierachy: &BVH) -> Option<&CuboidCollider> {
-        if ptr::eq(self.hierachy, hierachy) {
-            unsafe {
-                if let NodeContent::Leaf(collider) = &self.leaf.as_ref().content {
-                    Some(collider)
-                } else {
-                    None
-                }
-            }
-        } else {
-            None
-        }
-    }
+    // pub fn get_collider(&self, hierachy: &BVH) -> Option<&CuboidCollider> {
+    //     if ptr::eq(self.hierachy, hierachy) {
+    //         unsafe {
+    //             if let NodeContent::Leaf(collider) = &self.leaf.as_ref().content {
+    //                 Some(collider)
+    //             } else {
+    //                 None
+    //             }
+    //         }
+    //     } else {
+    //         None
+    //     }
+    // }
 
     /// Having 2 copies of a leaf reference and using one for removal leaves a LeafInHierachy that references a leaf outside hierachy
     /// Not to mention dropping the newly converted LeafOutsideHierachy leaves dangling pointers
