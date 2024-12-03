@@ -326,6 +326,7 @@ impl Node {
     fn rebalance(&mut self) {
         // println!("Right bigger: {}", right_bigger);
         unsafe {
+            // determine larger child
             let branch_content = match self.content {
                 NodeContent::Branch(branch) => branch,
                 NodeContent::Leaf(_) => return,
@@ -336,122 +337,53 @@ impl Node {
             let right_depth = branch_content.as_ref().right.as_ref().depth as i32;
 
             let balance = left_depth - right_depth;
-            let right_bigger = if balance > 1 {
-                false
+            let larger_child = if balance > 1 {
+                branch_content.as_ref().left
             } else if balance < -1 {
-                true
+                branch_content.as_ref().right
             } else {
                 self.depth = (left_depth.max(right_depth) + 1) as usize;
                 return;
             };
 
-            if right_bigger {
-                let right_content = if let NodeContent::Branch(branch) =
-                    branch_content.as_ref().right.as_ref().content
-                {
-                    branch
-                } else {
-                    panic!("During rebalancing, found larger node to have actual depth < 2");
-                };
-                let branch_raw = &mut *(branch_content.as_ptr());
-                let right_raw = &mut *right_content.as_ptr();
-
-                if right_raw.left.as_ref().depth < right_raw.right.as_ref().depth {
-                    // swap left with grand_right
-                    mem::swap(&mut branch_raw.left, &mut right_raw.right);
-
-                    // replace smaller child with larger grandchild
-                    (*branch_raw.left.as_ptr()).right_child = false;
-                    (*branch_raw.left.as_ptr()).parent = Some(branch_content);
-
-                    // replace larger grandchild with smaller child
-                    (*right_raw.right.as_ptr()).right_child = true;
-                    (*right_raw.right.as_ptr()).parent = Some(right_content);
-                } else {
-                    // swap left with grand_left
-                    mem::swap(&mut branch_raw.left, &mut right_raw.left);
-
-                    // replace smaller child with larger grandchild
-                    // (*branch_raw.left.as_ptr()).right_child = false;
-                    (*branch_raw.left.as_ptr()).parent = Some(branch_content);
-
-                    // replace larger grandchild with smaller child
-                    // (*right_raw.left.as_ptr()).right_child = false;
-                    (*right_raw.left.as_ptr()).parent = Some(right_content);
-                }
-
-                (*branch_raw.right.as_ptr()).depth = right_raw
-                    .right
-                    .as_ref()
-                    .depth
-                    .max(right_raw.left.as_ref().depth)
-                    + 1;
-                (*branch_raw.right.as_ptr()).bounds = right_raw
-                    .right
-                    .as_ref()
-                    .bounds
-                    .join(right_raw.left.as_ref().bounds);
-
-                self.depth = branch_raw
-                    .right
-                    .as_ref()
-                    .depth
-                    .max(branch_raw.left.as_ref().depth)
-                    + 1;
+            // determine larger grandchild in larger child
+            let child_content = if let NodeContent::Branch(branch) = larger_child.as_ref().content {
+                branch
             } else {
-                let left_content = if let NodeContent::Branch(branch) =
-                    branch_content.as_ref().left.as_ref().content
-                {
-                    branch
-                } else {
-                    panic!("During rebalancing, found larger node to have actual depth < 2");
-                };
-                let branch_raw = &mut *(branch_content.as_ptr());
-                let left_raw = &mut *left_content.as_ptr();
+                panic!("During rebalancing, found larger node to have actual depth < 2");
+            };
 
-                if left_raw.left.as_ref().depth < left_raw.right.as_ref().depth {
-                    // swap right with grand_right
-                    mem::swap(&mut branch_raw.right, &mut left_raw.right);
+            let branch_raw = &mut *branch_content.as_ptr();
+            let child_raw = &mut *child_content.as_ptr();
 
-                    // replace smaller child with larger grandchild
-                    // (*branch_raw.right.as_ptr()).right_child = true;
-                    (*branch_raw.right.as_ptr()).parent = Some(branch_content);
+            let small_child = if larger_child.as_ref().right_child {
+                &mut branch_raw.left
+            } else {
+                &mut branch_raw.right
+            };
+            let large_grand = if child_raw.left.as_ref().depth < child_raw.right.as_ref().depth {
+                &mut child_raw.right
+            } else {
+                &mut child_raw.left
+            };
 
-                    // replace larger grandchild with smaller child
-                    // (*left_raw.right.as_ptr()).right_child = true;
-                    (*left_raw.right.as_ptr()).parent = Some(left_content);
-                } else {
-                    // swap right with grand_left
-                    mem::swap(&mut branch_raw.right, &mut left_raw.left);
+            // swap smaller child and larger grandchild's positions
+            mem::swap(small_child, large_grand);
+            mem::swap(
+                &mut small_child.as_mut().right_child,
+                &mut large_grand.as_mut().right_child,
+            );
+            mem::swap(
+                &mut small_child.as_mut().parent,
+                &mut large_grand.as_mut().parent,
+            );
 
-                    // replace smaller child with larger grandchild
-                    (*branch_raw.right.as_ptr()).right_child = true;
-                    (*branch_raw.right.as_ptr()).parent = Some(branch_content);
+            // update larger child's depth and bounds
+            child_raw.recalculate_depth();
+            child_raw.recalculate_bounds();
 
-                    // replace larger grandchild with smaller child
-                    (*left_raw.left.as_ptr()).right_child = false;
-                    (*left_raw.left.as_ptr()).parent = Some(left_content);
-                }
-
-                (*branch_raw.left.as_ptr()).depth = left_raw
-                    .right
-                    .as_ref()
-                    .depth
-                    .max(left_raw.left.as_ref().depth)
-                    + 1;
-                (*branch_raw.left.as_ptr()).bounds = left_raw
-                    .right
-                    .as_ref()
-                    .bounds
-                    .join(left_raw.left.as_ref().bounds);
-
-                self.depth = branch_raw
-                    .right
-                    .as_ref()
-                    .depth
-                    .max(branch_raw.left.as_ref().depth)
-                    + 1;
-            }
+            // update self depth (asumming an initial imbalance of 2)
+            self.depth = (left_depth as usize + right_depth as usize) / 2 + 1;
         }
     }
 }
@@ -459,6 +391,20 @@ impl Node {
 impl BranchContent {
     fn new(node: NonNull<Node>, left: NonNull<Node>, right: NonNull<Node>) -> NonNull<Self> {
         unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(Self { node, left, right }))) }
+    }
+
+    fn recalculate_depth(&mut self) {
+        unsafe {
+            (*self.node.as_ptr()).depth =
+                self.left.as_ref().depth.max(self.right.as_ref().depth) + 1;
+        }
+    }
+
+    fn recalculate_bounds(&mut self) {
+        unsafe {
+            (*self.node.as_ptr()).bounds =
+                self.left.as_ref().bounds.join(self.right.as_ref().bounds);
+        }
     }
 }
 
