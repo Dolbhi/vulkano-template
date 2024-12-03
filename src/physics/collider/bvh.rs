@@ -139,26 +139,14 @@ impl BVH {
                 while let Some(mut parent) = last_node.parent {
                     let parent_raw = parent.as_mut();
 
-                    let (mut left, mut right) = parent_raw.get_children().unwrap();
-
                     if depth_changed {
-                        // rebalance tree if needed
-                        let left_depth = left.as_ref().depth as i32;
-                        let right_depth = right.as_ref().depth as i32;
-                        let balance = left_depth - right_depth;
+                        let old_depth = parent_raw.depth;
 
-                        if balance > 1 {
-                            parent_raw.rebalance(false);
-                            (left, right) = parent_raw.get_children().unwrap();
-                        } else if balance < -1 {
-                            parent_raw.rebalance(true);
-                            (left, right) = parent_raw.get_children().unwrap();
-                        }
+                        // rebalance tree if needed
+                        parent_raw.rebalance();
 
                         // check if depth changed
-                        let new_depth = left.as_ref().depth.max(right.as_ref().depth) + 1;
-                        depth_changed = parent_raw.depth != new_depth;
-                        parent_raw.depth = new_depth;
+                        depth_changed = old_depth != parent_raw.depth;
                     }
 
                     if !depth_changed {
@@ -234,29 +222,18 @@ impl BVH {
                 while let Some(mut parent) = last_node.parent {
                     let parent_raw = parent.as_mut();
 
-                    let (mut left, mut right) = parent_raw.get_children().unwrap();
-
                     if depth_changed {
-                        // rebalance tree if needed
-                        let left_depth = left.as_ref().depth as i32;
-                        let right_depth = right.as_ref().depth as i32;
-                        let balance = left_depth - right_depth;
+                        let old_depth = parent_raw.depth;
 
-                        if balance > 1 {
-                            parent_raw.rebalance(false);
-                            (left, right) = parent_raw.get_children().unwrap();
-                        } else if balance < -1 {
-                            parent_raw.rebalance(true);
-                            (left, right) = parent_raw.get_children().unwrap();
-                        }
+                        // rebalance tree if needed
+                        parent_raw.rebalance();
 
                         // check if depth changed
-                        let new_depth = left.as_ref().depth.max(right.as_ref().depth) + 1;
-                        depth_changed = parent_raw.depth != new_depth;
-                        parent_raw.depth = new_depth;
+                        depth_changed = old_depth != parent_raw.depth;
                     }
 
                     if bounds_changed {
+                        let (left, right) = parent_raw.get_children().unwrap();
                         let new_bounds = left.as_ref().bounds.join(right.as_ref().bounds);
 
                         bounds_changed = new_bounds != parent_raw.bounds;
@@ -349,11 +326,21 @@ impl Node {
     }
 
     /// calculate depths and rebalances tree if needed
-    fn rebalance(&mut self, right_bigger: bool) {
-        println!("Right bigger: {}", right_bigger);
+    fn rebalance(&mut self) {
+        // println!("Right bigger: {}", right_bigger);
         let (left, right) = self.get_children().unwrap();
 
         unsafe {
+            let balance = (left.as_ref().depth as i32) - (right.as_ref().depth as i32);
+            let right_bigger = if balance > 1 {
+                false
+            } else if balance < -1 {
+                true
+            } else {
+                self.depth = left.as_ref().depth.max(right.as_ref().depth) + 1;
+                return;
+            };
+
             let self_node = left.as_ref().parent.unwrap();
 
             assert!(ptr::eq(self_node.as_ptr(), self), "SELF NODE IS NOT SELF");
@@ -379,7 +366,7 @@ impl Node {
                     (*right.as_ptr()).bounds =
                         grand_left.as_ref().bounds.join(left.as_ref().bounds);
 
-                    // update bounds of right
+                    self.depth = grand_right.as_ref().depth.max(right.as_ref().depth) + 1;
                 } else {
                     // swap left with grand_left
 
@@ -397,6 +384,8 @@ impl Node {
                         grand_right.as_ref().depth.max(left.as_ref().depth) + 1;
                     (*right.as_ptr()).bounds =
                         grand_right.as_ref().bounds.join(left.as_ref().bounds);
+
+                    self.depth = grand_left.as_ref().depth.max(right.as_ref().depth) + 1;
                 }
             } else {
                 let (grand_left, grand_right) = left.as_ref().get_children().unwrap();
@@ -418,6 +407,8 @@ impl Node {
                         grand_left.as_ref().depth.max(right.as_ref().depth) + 1;
                     (*left.as_ptr()).bounds =
                         grand_left.as_ref().bounds.join(right.as_ref().bounds);
+
+                    self.depth = left.as_ref().depth.max(grand_right.as_ref().depth) + 1;
                 } else {
                     // swap right with grand_left
 
@@ -435,6 +426,8 @@ impl Node {
                         grand_right.as_ref().depth.max(right.as_ref().depth) + 1;
                     (*left.as_ptr()).bounds =
                         grand_right.as_ref().bounds.join(right.as_ref().bounds);
+
+                    self.depth = left.as_ref().depth.max(grand_left.as_ref().depth) + 1;
                 }
             }
         }
