@@ -1,7 +1,7 @@
 use std::{
     fmt::Debug,
-    mem::ManuallyDrop,
-    ptr::{self, NonNull},
+    mem::{self, ManuallyDrop},
+    ptr::NonNull,
     sync::Arc,
 };
 
@@ -15,7 +15,7 @@ pub struct BVH {
 
 #[allow(dead_code)]
 pub struct Node {
-    parent: Option<NonNull<Node>>,
+    parent: Option<NonNull<BranchContent>>,
     right_child: bool,
     bounds: BoundingBox,
     depth: usize,
@@ -24,8 +24,14 @@ pub struct Node {
 
 #[allow(dead_code)]
 enum NodeContent {
-    Branch(NonNull<Node>, NonNull<Node>),
+    Branch(NonNull<BranchContent>),
     Leaf(Arc<CuboidCollider>),
+    None,
+}
+struct BranchContent {
+    node: NonNull<Node>,
+    left: NonNull<Node>,
+    right: NonNull<Node>,
 }
 
 /// unique external reference, return to bvh to remove the corresponding leaf node
@@ -80,11 +86,11 @@ impl BVH {
                 let mut current = root;
                 let mut new_bounds = (*current.as_ptr()).bounds.join(leaf_bounds);
 
-                while let NodeContent::Branch(mut left, mut right) = (*current.as_ptr()).content {
+                while let NodeContent::Branch(branch) = (*current.as_ptr()).content {
                     (*current.as_ptr()).bounds = new_bounds;
 
-                    let left_raw: &mut Node = left.as_mut();
-                    let right_raw = right.as_mut();
+                    let left_raw = (*branch.as_ptr()).left.as_mut();
+                    let right_raw = (*branch.as_ptr()).right.as_mut();
 
                     let new_left_bounds = left_raw.bounds.join(leaf_bounds);
                     let new_right_bounds = right_raw.bounds.join(leaf_bounds);
@@ -92,10 +98,10 @@ impl BVH {
                     if new_left_bounds.volume() - left_raw.bounds.volume()
                         <= new_right_bounds.volume() - right_raw.bounds.volume()
                     {
-                        current = left;
+                        current = (*branch.as_ptr()).left;
                         new_bounds = new_left_bounds;
                     } else {
-                        current = right;
+                        current = (*branch.as_ptr()).right;
                         new_bounds = new_right_bounds;
                     }
                 }
@@ -109,24 +115,22 @@ impl BVH {
                     right_child,
                     bounds: new_bounds,
                     depth: 1,
-                    content: NodeContent::Branch(current, leaf_ref.leaf),
+                    content: NodeContent::None,
                 })));
-                (*current.as_ptr()).parent = Some(new_branch);
+                let branch_content = BranchContent::new(new_branch, current, leaf_ref.leaf);
+                (*new_branch.as_ptr()).content = NodeContent::Branch(branch_content);
+
+                (*current.as_ptr()).parent = Some(branch_content);
                 (*current.as_ptr()).right_child = false;
-                (*leaf_ref.leaf.as_ptr()).parent = Some(new_branch);
+                (*leaf_ref.leaf.as_ptr()).parent = Some(branch_content);
                 (*leaf_ref.leaf.as_ptr()).right_child = true;
 
                 // update parent's content
                 if let Some(mut parent) = parent {
-                    let parent_raw = parent.as_mut();
-                    if let NodeContent::Branch(left, right) = parent_raw.content {
-                        if right_child {
-                            parent_raw.content = NodeContent::Branch(left, new_branch);
-                        } else {
-                            parent_raw.content = NodeContent::Branch(new_branch, right);
-                        }
+                    if right_child {
+                        parent.as_mut().right = new_branch;
                     } else {
-                        // REEEEEEE
+                        parent.as_mut().left = new_branch;
                     }
                 } else {
                     self.root = Some(new_branch);
@@ -136,23 +140,24 @@ impl BVH {
                 let mut last_node = new_branch.as_mut();
                 let mut depth_changed = true;
                 // let mut bounds_changed = false;
-                while let Some(mut parent) = last_node.parent {
-                    let parent_raw = parent.as_mut();
+                while let Some(parent) = last_node.parent {
+                    // let parent_raw = parent.as_mut();
+                    let parent_node = (*parent.as_ptr()).node;
 
                     if depth_changed {
-                        let old_depth = parent_raw.depth;
+                        let old_depth = parent_node.as_ref().depth;
 
                         // rebalance tree if needed
-                        parent_raw.rebalance();
+                        (*parent_node.as_ptr()).rebalance();
 
                         // check if depth changed
-                        depth_changed = old_depth != parent_raw.depth;
+                        depth_changed = old_depth != parent_node.as_ref().depth;
                     }
 
                     if !depth_changed {
                         break;
                     }
-                    last_node = parent_raw;
+                    last_node = &mut *parent_node.as_ptr();
                 }
             }
         } else {
@@ -176,75 +181,72 @@ impl BVH {
             let leaf_node = leaf_ref.leaf.as_mut();
 
             // convert parent branch to leaf
-            if let Some(parent) = leaf_node.parent.take() {
-                let raw_parent = parent.as_ref();
-                let mut sibling_leaf = if let NodeContent::Branch(left, right) = raw_parent.content
-                {
-                    if leaf_node.right_child {
-                        left
-                    } else {
-                        right
-                    }
+            if let Some(parent_content) = leaf_node.parent.take() {
+                let raw_parent = parent_content.as_ref();
+                let mut sibling_leaf = if leaf_node.right_child {
+                    raw_parent.left
                 } else {
-                    panic!("Parent should always be branch")
+                    raw_parent.right
                 };
 
                 let raw_sibling = sibling_leaf.as_mut();
 
                 // replace parent with sibling leaf in grandparent
-                if let Some(mut grandparent) = raw_parent.parent {
+                let parent_node = &mut (*raw_parent.node.as_ptr());
+                if let Some(mut grandparent) = parent_node.parent {
                     // replace grandparent content
                     let raw_grandparent = grandparent.as_mut();
-                    if let NodeContent::Branch(left, right) = raw_grandparent.content {
-                        if raw_parent.right_child {
-                            raw_grandparent.content = NodeContent::Branch(left, sibling_leaf);
-                            raw_sibling.right_child = true;
-                        } else {
-                            raw_grandparent.content = NodeContent::Branch(sibling_leaf, right);
-                            raw_sibling.right_child = false;
-                        }
+                    if parent_node.right_child {
+                        raw_grandparent.right = sibling_leaf;
+                        raw_sibling.right_child = true;
                     } else {
-                        panic!("Parent should always be branch")
-                    };
+                        raw_grandparent.left = sibling_leaf;
+                        raw_sibling.right_child = false;
+                    }
                 } else {
                     // parent is root
                     self.root = Some(sibling_leaf);
                 }
-                raw_sibling.parent = raw_parent.parent;
+                raw_sibling.parent = parent_node.parent;
 
                 // drop parent
-                let _ = Box::from_raw(parent.as_ptr());
+                let _ = Box::from_raw(parent_content.as_ref().node.as_ptr());
+                let _ = Box::from_raw(parent_content.as_ptr());
 
                 // update parent depth and bounds
-                let mut last_node = raw_sibling;
+                let mut last_node = sibling_leaf;
                 let mut depth_changed = true;
                 let mut bounds_changed = true;
-                while let Some(mut parent) = last_node.parent {
-                    let parent_raw = parent.as_mut();
+                while let Some(parent) = last_node.as_ref().parent {
+                    let parent_node = parent.as_ref().node;
 
                     if depth_changed {
-                        let old_depth = parent_raw.depth;
+                        let old_depth = parent_node.as_ref().depth;
 
                         // rebalance tree if needed
-                        parent_raw.rebalance();
+                        (*parent_node.as_ptr()).rebalance();
 
                         // check if depth changed
-                        depth_changed = old_depth != parent_raw.depth;
+                        depth_changed = old_depth != parent_node.as_ref().depth;
                     }
 
                     if bounds_changed {
-                        let (left, right) = parent_raw.get_children().unwrap();
-                        let new_bounds = left.as_ref().bounds.join(right.as_ref().bounds);
+                        let new_bounds = parent
+                            .as_ref()
+                            .left
+                            .as_ref()
+                            .bounds
+                            .join(parent.as_ref().right.as_ref().bounds);
 
-                        bounds_changed = new_bounds != parent_raw.bounds;
-                        parent_raw.bounds = new_bounds;
+                        bounds_changed = new_bounds != parent_node.as_ref().bounds;
+                        (*parent_node.as_ptr()).bounds = new_bounds;
                     }
 
                     if !depth_changed && !bounds_changed {
                         break;
                     }
 
-                    last_node = parent_raw;
+                    last_node = parent_node;
                 }
             } else {
                 // leaf on root
@@ -273,13 +275,16 @@ impl Drop for BVH {
 
                 while self.size > 0 {
                     // check node contents before dropping
-                    if let NodeContent::Branch(mut left, mut right) = current.content {
+                    if let NodeContent::Branch(branch_content) = current.content {
                         // drop node
                         let _ = Box::from_raw(current);
 
                         // set right child as next
-                        branch_stack.push(left.as_mut());
-                        current = right.as_mut();
+                        branch_stack.push((*branch_content.as_ptr()).left.as_mut());
+                        current = (*branch_content.as_ptr()).right.as_mut();
+
+                        // drop branch content
+                        let _ = Box::from_raw(branch_content.as_ptr());
                     } else {
                         // drop node
                         let _ = Box::from_raw(current);
@@ -317,133 +322,156 @@ impl Node {
         }
     }
 
-    fn get_children(&self) -> Option<(NonNull<Node>, NonNull<Node>)> {
-        if let NodeContent::Branch(left, right) = self.content {
-            Some((left, right))
-        } else {
-            None
-        }
-    }
-
     /// calculate depths and rebalances tree if needed
     fn rebalance(&mut self) {
         // println!("Right bigger: {}", right_bigger);
-        let (left, right) = self.get_children().unwrap();
-
         unsafe {
-            let balance = (left.as_ref().depth as i32) - (right.as_ref().depth as i32);
+            let branch_content = match self.content {
+                NodeContent::Branch(branch) => branch,
+                NodeContent::Leaf(_) => return,
+                NodeContent::None => return,
+            };
+
+            let left_depth = branch_content.as_ref().left.as_ref().depth as i32;
+            let right_depth = branch_content.as_ref().right.as_ref().depth as i32;
+
+            let balance = left_depth - right_depth;
             let right_bigger = if balance > 1 {
                 false
             } else if balance < -1 {
                 true
             } else {
-                self.depth = left.as_ref().depth.max(right.as_ref().depth) + 1;
+                self.depth = (left_depth.max(right_depth) + 1) as usize;
                 return;
             };
 
-            let self_node = left.as_ref().parent.unwrap();
-
-            assert!(ptr::eq(self_node.as_ptr(), self), "SELF NODE IS NOT SELF");
-
             if right_bigger {
-                let (grand_left, grand_right) = right.as_ref().get_children().unwrap();
+                let right_content = if let NodeContent::Branch(branch) =
+                    branch_content.as_ref().right.as_ref().content
+                {
+                    branch
+                } else {
+                    panic!("During rebalancing, found larger node to have actual depth < 2");
+                };
+                let branch_raw = &mut *(branch_content.as_ptr());
+                let right_raw = &mut *right_content.as_ptr();
 
-                if grand_left.as_ref().depth < grand_right.as_ref().depth {
+                if right_raw.left.as_ref().depth < right_raw.right.as_ref().depth {
                     // swap left with grand_right
+                    mem::swap(&mut branch_raw.left, &mut right_raw.right);
 
                     // replace smaller child with larger grandchild
-                    self.content = NodeContent::Branch(grand_right, right);
-                    (*grand_right.as_ptr()).right_child = false;
-                    (*grand_right.as_ptr()).parent = Some(self_node);
+                    (*branch_raw.left.as_ptr()).right_child = false;
+                    (*branch_raw.left.as_ptr()).parent = Some(branch_content);
 
                     // replace larger grandchild with smaller child
-                    (*right.as_ptr()).content = NodeContent::Branch(grand_left, left);
-                    (*left.as_ptr()).right_child = true;
-                    (*left.as_ptr()).parent = Some(right);
-
-                    (*right.as_ptr()).depth =
-                        grand_left.as_ref().depth.max(left.as_ref().depth) + 1;
-                    (*right.as_ptr()).bounds =
-                        grand_left.as_ref().bounds.join(left.as_ref().bounds);
-
-                    self.depth = grand_right.as_ref().depth.max(right.as_ref().depth) + 1;
+                    (*right_raw.right.as_ptr()).right_child = true;
+                    (*right_raw.right.as_ptr()).parent = Some(right_content);
                 } else {
                     // swap left with grand_left
+                    mem::swap(&mut branch_raw.left, &mut right_raw.left);
 
                     // replace smaller child with larger grandchild
-                    self.content = NodeContent::Branch(grand_left, right);
-                    // (*grand_left.as_ptr()).right_child = false;
-                    (*grand_left.as_ptr()).parent = Some(self_node);
+                    // (*branch_raw.left.as_ptr()).right_child = false;
+                    (*branch_raw.left.as_ptr()).parent = Some(branch_content);
 
                     // replace larger grandchild with smaller child
-                    (*right.as_ptr()).content = NodeContent::Branch(left, grand_right);
-                    // (*left.as_ptr()).right_child = false;
-                    (*left.as_ptr()).parent = Some(right);
-
-                    (*right.as_ptr()).depth =
-                        grand_right.as_ref().depth.max(left.as_ref().depth) + 1;
-                    (*right.as_ptr()).bounds =
-                        grand_right.as_ref().bounds.join(left.as_ref().bounds);
-
-                    self.depth = grand_left.as_ref().depth.max(right.as_ref().depth) + 1;
+                    // (*right_raw.left.as_ptr()).right_child = false;
+                    (*right_raw.left.as_ptr()).parent = Some(right_content);
                 }
-            } else {
-                let (grand_left, grand_right) = left.as_ref().get_children().unwrap();
 
-                if grand_left.as_ref().depth < grand_right.as_ref().depth {
+                (*branch_raw.right.as_ptr()).depth = right_raw
+                    .right
+                    .as_ref()
+                    .depth
+                    .max(right_raw.left.as_ref().depth)
+                    + 1;
+                (*branch_raw.right.as_ptr()).bounds = right_raw
+                    .right
+                    .as_ref()
+                    .bounds
+                    .join(right_raw.left.as_ref().bounds);
+
+                self.depth = branch_raw
+                    .right
+                    .as_ref()
+                    .depth
+                    .max(branch_raw.left.as_ref().depth)
+                    + 1;
+            } else {
+                let left_content = if let NodeContent::Branch(branch) =
+                    branch_content.as_ref().left.as_ref().content
+                {
+                    branch
+                } else {
+                    panic!("During rebalancing, found larger node to have actual depth < 2");
+                };
+                let branch_raw = &mut *(branch_content.as_ptr());
+                let left_raw = &mut *left_content.as_ptr();
+
+                if left_raw.left.as_ref().depth < left_raw.right.as_ref().depth {
                     // swap right with grand_right
+                    mem::swap(&mut branch_raw.right, &mut left_raw.right);
 
                     // replace smaller child with larger grandchild
-                    self.content = NodeContent::Branch(left, grand_right);
-                    // (*grand_right.as_ptr()).right_child = true;
-                    (*grand_right.as_ptr()).parent = Some(self_node);
+                    // (*branch_raw.right.as_ptr()).right_child = true;
+                    (*branch_raw.right.as_ptr()).parent = Some(branch_content);
 
                     // replace larger grandchild with smaller child
-                    (*left.as_ptr()).content = NodeContent::Branch(grand_left, right);
-                    // (*right.as_ptr()).right_child = true;
-                    (*right.as_ptr()).parent = Some(right);
-
-                    (*left.as_ptr()).depth =
-                        grand_left.as_ref().depth.max(right.as_ref().depth) + 1;
-                    (*left.as_ptr()).bounds =
-                        grand_left.as_ref().bounds.join(right.as_ref().bounds);
-
-                    self.depth = left.as_ref().depth.max(grand_right.as_ref().depth) + 1;
+                    // (*left_raw.right.as_ptr()).right_child = true;
+                    (*left_raw.right.as_ptr()).parent = Some(left_content);
                 } else {
                     // swap right with grand_left
+                    mem::swap(&mut branch_raw.right, &mut left_raw.left);
 
                     // replace smaller child with larger grandchild
-                    self.content = NodeContent::Branch(left, grand_left);
-                    (*grand_left.as_ptr()).right_child = true;
-                    (*grand_left.as_ptr()).parent = Some(self_node);
+                    (*branch_raw.right.as_ptr()).right_child = true;
+                    (*branch_raw.right.as_ptr()).parent = Some(branch_content);
 
                     // replace larger grandchild with smaller child
-                    (*left.as_ptr()).content = NodeContent::Branch(right, grand_right);
-                    (*right.as_ptr()).right_child = false;
-                    (*right.as_ptr()).parent = Some(left);
-
-                    (*left.as_ptr()).depth =
-                        grand_right.as_ref().depth.max(right.as_ref().depth) + 1;
-                    (*left.as_ptr()).bounds =
-                        grand_right.as_ref().bounds.join(right.as_ref().bounds);
-
-                    self.depth = left.as_ref().depth.max(grand_left.as_ref().depth) + 1;
+                    (*left_raw.left.as_ptr()).right_child = false;
+                    (*left_raw.left.as_ptr()).parent = Some(left_content);
                 }
+
+                (*branch_raw.left.as_ptr()).depth = left_raw
+                    .right
+                    .as_ref()
+                    .depth
+                    .max(left_raw.left.as_ref().depth)
+                    + 1;
+                (*branch_raw.left.as_ptr()).bounds = left_raw
+                    .right
+                    .as_ref()
+                    .bounds
+                    .join(left_raw.left.as_ref().bounds);
+
+                self.depth = branch_raw
+                    .right
+                    .as_ref()
+                    .depth
+                    .max(branch_raw.left.as_ref().depth)
+                    + 1;
             }
         }
+    }
+}
+
+impl BranchContent {
+    fn new(node: NonNull<Node>, left: NonNull<Node>, right: NonNull<Node>) -> NonNull<Self> {
+        unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(Self { node, left, right }))) }
     }
 }
 
 impl Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.content {
-            NodeContent::Branch(left, right) => unsafe {
+            NodeContent::Branch(branch) => unsafe {
                 f.debug_struct("Branch")
                     .field("parent", &self.parent)
                     .field("right_child", &self.right_child)
                     .field("depth", &self.depth)
-                    .field("left", left.as_ref())
-                    .field("right", right.as_ref())
+                    .field("left", branch.as_ref().left.as_ref())
+                    .field("right", branch.as_ref().right.as_ref())
                     .finish()
             },
             NodeContent::Leaf(collider) => f
@@ -453,6 +481,7 @@ impl Debug for Node {
                 .field("depth", &self.depth)
                 .field("collider", &collider)
                 .finish(),
+            NodeContent::None => f.debug_struct("None").finish(),
         }
     }
 }
@@ -512,19 +541,26 @@ impl Drop for LeafOutsideHierachy {
 
 #[cfg(test)]
 mod tree_tests {
-    use std::{ptr, sync::Arc};
+    use std::{
+        ptr::{self, addr_of, NonNull},
+        sync::Arc,
+    };
 
     use crate::{game_objects::transform::TransformSystem, physics::collider::CuboidCollider};
 
-    use super::{Node, NodeContent, BVH};
+    use super::{BranchContent, Node, NodeContent, BVH};
 
-    fn validate_tree(child: &Node, parent: Option<&Node>, right_child: bool) -> Result<(), String> {
+    fn validate_tree(
+        child: &Node,
+        parent: Option<&NonNull<BranchContent>>,
+        right_child: bool,
+    ) -> Result<(), String> {
         // error format is {expected} vs {actual}
 
         // parent check
         if let Some(actual_parent) = child.parent {
             if let Some(expected_parent) = parent {
-                if !ptr::eq(expected_parent, actual_parent.as_ptr()) {
+                if !ptr::eq(expected_parent.as_ptr(), actual_parent.as_ptr()) {
                     return Err(format!("Mismatching parent"));
                 }
             } else {
@@ -543,9 +579,18 @@ mod tree_tests {
         }
 
         match &child.content {
-            NodeContent::Branch(left, right) => unsafe {
-                let left_raw = left.as_ref();
-                let right_raw = right.as_ref();
+            NodeContent::Branch(branch) => unsafe {
+                // check node
+                if !ptr::eq(child, branch.as_ref().node.as_ptr()) {
+                    return Err(format!(
+                        "Incorrect Node in BranchContent: {:?} vs {:?}",
+                        addr_of!(child),
+                        branch.as_ref().node.as_ptr()
+                    ));
+                }
+
+                let left_raw = branch.as_ref().left.as_ref();
+                let right_raw = branch.as_ref().right.as_ref();
 
                 // bounds check
                 if child.bounds != left_raw.bounds.join(right_raw.bounds) {
@@ -571,8 +616,8 @@ mod tree_tests {
                 //     return Err(format!("Unbalanced tree"));
                 // }
 
-                validate_tree(left_raw, Some(child), false)?;
-                validate_tree(right_raw, Some(child), true)?;
+                validate_tree(left_raw, Some(branch), false)?;
+                validate_tree(right_raw, Some(branch), true)?;
             },
             NodeContent::Leaf(collider) => {
                 // bounds check
@@ -587,6 +632,9 @@ mod tree_tests {
                 if child.depth != 0 {
                     return Err(format!("Incorrect depth: 0 vs {:?}", child.depth).to_string());
                 }
+            }
+            NodeContent::None => {
+                return Err(format!("Found unitialised node"));
             }
         }
 
