@@ -2,7 +2,7 @@ mod collider;
 mod geo_alg;
 // mod geo_alg_com;
 
-pub use collider::{ColliderRef, ColliderSystem, CuboidCollider};
+pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy};
 
 use cgmath::Vector3;
 

@@ -99,7 +99,7 @@ pub struct App {
     game_state: GameState,
     last_frame_time: Instant,
     current_level: i32,
-    bounds_debug_depth: Option<u32>,
+    bounds_debug_depth: Option<usize>,
 }
 
 const FIXED_DELTA_TIME: f32 = 0.02;

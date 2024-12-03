@@ -1,21 +1,18 @@
-mod bounds_tree;
+// mod bounds_tree;
 mod bvh;
 
-use std::{
-    fmt::Debug,
-    sync::{Arc, Mutex},
-};
+use std::fmt::Debug;
 
 use cgmath::{InnerSpace, Zero};
 
-use bounds_tree::{BoundsTree, TreeIter};
+use bvh::{DepthIter, LeafOutsideHierachy, BVH};
 
 use crate::game_objects::transform::{TransformID, TransformSystem};
 
 use super::Vector;
 
-pub use self::bounds_tree::Leaf;
-pub type ColliderRef = Arc<Mutex<Leaf>>;
+pub use self::bvh::LeafInHierachy;
+// pub type ColliderRef = Arc<Mutex<Leaf>>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct BoundingBox {
@@ -27,7 +24,7 @@ pub struct CuboidCollider {
     bounding_box: BoundingBox,
 }
 pub struct ColliderSystem {
-    bounds_tree: BoundsTree,
+    bounds_tree: BVH,
 }
 
 impl BoundingBox {
@@ -183,38 +180,46 @@ impl Debug for CuboidCollider {
 impl ColliderSystem {
     pub fn new() -> Self {
         Self {
-            bounds_tree: BoundsTree::new(),
+            bounds_tree: BVH::new(),
         }
     }
 
-    pub fn tree_depth(&self) -> u32 {
+    pub fn tree_depth(&self) -> usize {
         self.bounds_tree.depth()
     }
 
     // removed update and reinsert given collider
-    pub fn update(&mut self, target: &ColliderRef, transforms: &mut TransformSystem) {
-        // println!("[Updating bounds]");
-        self.bounds_tree.remove(target);
-        // println!("\t[Removed]");
-        let bounds = {
-            let mut lock = target.lock().unwrap();
-            lock.collider.update_bounding(transforms);
-            lock.collider.bounding_box
-        };
-        // println!("\t[Updated]");
-        self.bounds_tree.insert_leaf(target, bounds);
-        // println!("\t[Inserted]");
+    pub fn update(&mut self, target: &mut LeafInHierachy, transforms: &mut TransformSystem) {
+        self.bounds_tree
+            .modify_leaf(target, |collider| collider.update_bounding(transforms))
+            .unwrap();
+
+        // // println!("[Updating bounds]");
+        // let mut outside_hierachy = self.bounds_tree.remove(target).unwrap();
+        // // println!("\t[Removed]");
+        // let collider = outside_hierachy
+        //     .get_collider_mut(&mut self.bounds_tree)
+        //     .unwrap();
+        // collider.update_bounding(transforms);
+        // // println!("\t[Updated]");
+        // self.bounds_tree.insert(outside_hierachy).unwrap()
+        // // println!("\t[Inserted]");
     }
 
     /// adds collider to bounds tree, returns a reference to its leaf node
-    pub fn add(&mut self, collider: CuboidCollider) -> ColliderRef {
-        self.bounds_tree.insert_new(collider)
+    pub fn add(&mut self, collider: CuboidCollider) -> LeafInHierachy {
+        self.bounds_tree
+            .insert(self.bounds_tree.register_collider(collider))
+            .unwrap()
     }
-    pub fn remove(&mut self, target: &Arc<Mutex<Leaf>>) {
-        self.bounds_tree.remove(target);
+    pub fn remove(
+        &mut self,
+        target: LeafInHierachy,
+    ) -> Result<LeafOutsideHierachy, LeafInHierachy> {
+        self.bounds_tree.remove(target)
     }
 
-    pub fn bounds_iter(&self) -> TreeIter {
+    pub fn bounds_iter(&self) -> DepthIter {
         self.bounds_tree.iter()
     }
 }

@@ -1,7 +1,7 @@
 use cgmath::{InnerSpace, Quaternion, Rotation, Rotation3, Vector3, Zero};
 
 use crate::{
-    physics::{ColliderRef, ColliderSystem, RigidBody},
+    physics::{ColliderSystem, LeafInHierachy, RigidBody},
     LOGIC_PROFILER,
 };
 
@@ -95,8 +95,8 @@ impl GameWorld {
         let logic_start = std::time::Instant::now();
 
         // update bounds
-        let mut query = <(&TransformID, &ColliderRef)>::query();
-        for (_, collider) in query.iter(&self.world) {
+        let mut query = <(&TransformID, &mut LeafInHierachy)>::query();
+        for (_, collider) in query.iter_mut(&mut self.world) {
             self.colliders.update(collider, &mut self.transforms);
         }
 
