@@ -7,6 +7,7 @@ use crate::{
         light::PointLightComponent, transform::TransformCreateInfo, MaterialSwapper, Rotate,
         WorldLoader,
     },
+    load_object,
     physics::{CuboidCollider, RigidBody},
     render::resource_manager::{MaterialID::*, MeshID::*, TextureID},
 };
@@ -155,7 +156,8 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         velocity: (1.0, 10.0, 0.0).into(),
         bivelocity: (0.0, 0.0, -5.0).into(),
     };
-    loader.add_2_comp([0., 1., 0.], ro, rb);
+    // loader.add_2_comp([0., 1., 0.], ro, rb);
+    load_object!(loader, [0., 1., 0.], ro, rb);
 
     // moving collider
     let (pivot, _) = loader.add_1_comp([0., 0., 0.], Rotate([0., 1., 0.].into(), Rad(0.5)));

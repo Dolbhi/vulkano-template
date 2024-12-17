@@ -269,7 +269,7 @@ impl BVH {
             Err(())
         } else {
             unsafe {
-                // clone leaf (LEAF CLONE IS DANGEROUS DONT LET CLONE AND OG BOTH ESCAPE)
+                // clone leaf (LEAF CLONE IS DANGEROUS DONT LET CLONE AND OG ESCAPE TOGETHER)
                 let leaf_clone = leaf_ref.clone();
                 // use clone for removal
                 let mut res = self.remove(leaf_clone).unwrap();
