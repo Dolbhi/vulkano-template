@@ -46,27 +46,28 @@ impl BoundingBox {
         BoundingBox { max, min }
     }
 
-    #[allow(unused)]
-    fn check_overlap(&self, other: Self) -> bool {
+    pub fn check_overlap(&self, other: Self) -> bool {
         let diff = self.centre() - other.centre();
         let extents = self.extents() + other.extents();
 
         diff.x.abs() < extents.x && diff.y.abs() < extents.y && diff.z.abs() < extents.z
-
-        // let d1 = other.min - self.min;
-        // let d2 = other.max - self.max;
-
-        // d1.x < 0.0 && d1.y < 0.0 && d1.z < 0.0 && d2.x < 0.0 && d2.y < 0.0 && d2.z < 0.0
     }
 
-    #[allow(unused)]
-    fn translate(&mut self, translation: Vector) {
+    pub fn translate(&mut self, translation: Vector) {
         self.max += translation;
         self.min += translation;
     }
 
+    pub fn scale(&mut self, scale: f32) {
+        let centre = self.centre();
+        let extents = self.extents();
+
+        self.max = centre + scale * extents;
+        self.min = centre - scale * extents;
+    }
+
     /// returns new bounds which encapsulates both input bounds
-    fn join(self, rhs: Self) -> Self {
+    pub fn join(self, rhs: Self) -> Self {
         let max_x = rhs.max.x.max(self.max.x);
         let max_y = rhs.max.y.max(self.max.y);
         let max_z = rhs.max.z.max(self.max.z);
@@ -80,7 +81,7 @@ impl BoundingBox {
         }
     }
 
-    fn volume(&self) -> f32 {
+    pub fn volume(&self) -> f32 {
         let extends = self.max - self.min;
         extends.x * extends.y * extends.z
     }
