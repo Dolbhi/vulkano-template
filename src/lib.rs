@@ -26,8 +26,8 @@ pub static mut RENDER_PROFILER: Option<Profiler<7, 128>> = Some(Profiler::new([
 ]));
 pub static mut LOGIC_PROFILER: Mutex<Profiler<5, 128>> = Mutex::new(Profiler::new([
     "Lock wait",
-    "Colliders",
     "Physics",
+    "Colliders",
     "Interpolate",
     "Others",
 ]));

@@ -341,10 +341,10 @@ impl App {
                 if self.inputs.o_triggered {
                     let mut rng = rand::thread_rng();
 
-                    let pos = Vector3::new(
-                        rng.gen_range(-4.0..4.0),
-                        rng.gen_range(-4.0..4.0),
-                        rng.gen_range(-4.0..4.0),
+                    let pos: Vector3<f32> = Vector3::new(
+                        rng.gen_range(-8.0..8.0),
+                        rng.gen_range(-8.0..8.0),
+                        rng.gen_range(-8.0..8.0),
                     );
                     let scale = Vector3::new(
                         rng.gen_range(0.0..2.0),

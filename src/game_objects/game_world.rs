@@ -94,16 +94,6 @@ impl GameWorld {
         // let mut profiler = unsafe { LOGIC_PROFILER.lock().unwrap() };
         let logic_start = std::time::Instant::now();
 
-        // update bounds
-        let mut query = <(&TransformID, &mut LeafInHierachy)>::query();
-        for (_, collider) in query.iter_mut(&mut self.world) {
-            self.colliders.update(collider, &mut self.transforms);
-        }
-
-        // [Profiling] Colliders
-        let coll_time = logic_start.elapsed().as_micros() as u32;
-        let physics_start = std::time::Instant::now();
-
         // physics update
         let mut query = <(&TransformID, &mut RigidBody)>::query();
         for (transfrom, rigid_body) in query.iter_mut(&mut self.world) {
@@ -114,7 +104,22 @@ impl GameWorld {
         }
 
         // [Profiling] Physics
-        let phys_time = physics_start.elapsed().as_micros() as u32;
+        let phys_time = logic_start.elapsed().as_micros() as u32;
+        let coll_start = std::time::Instant::now();
+
+        // update bounds
+        let mut query = <(&TransformID, &mut LeafInHierachy)>::query();
+        for (_, collider) in query.iter_mut(&mut self.world) {
+            if collider
+                .get_collider(&self.colliders.bounds_tree)
+                .is_some_and(|coll| coll.is_dirty())
+            {
+                self.colliders.update(collider, &mut self.transforms);
+            }
+        }
+
+        // [Profiling] Colliders
+        let coll_time = coll_start.elapsed().as_micros() as u32;
         let lerp_start = std::time::Instant::now();
 
         // update interpolation models
@@ -152,8 +157,8 @@ impl GameWorld {
 
         unsafe {
             let mut profiler = LOGIC_PROFILER.lock().unwrap();
-            profiler.add_sample(coll_time, 1);
-            profiler.add_sample(phys_time, 2);
+            profiler.add_sample(phys_time, 1);
+            profiler.add_sample(coll_time, 2);
             profiler.add_sample(lerp_time, 3);
             profiler.add_sample(others_start.elapsed().as_micros() as u32, 4);
         }
