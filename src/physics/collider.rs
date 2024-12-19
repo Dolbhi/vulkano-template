@@ -48,10 +48,15 @@ impl BoundingBox {
 
     #[allow(unused)]
     fn check_overlap(&self, other: Self) -> bool {
-        let d1 = other.min - self.min;
-        let d2 = other.max - self.max;
+        let diff = self.centre() - other.centre();
+        let extents = self.extents() + other.extents();
 
-        d1.x < 0.0 && d1.y < 0.0 && d1.z < 0.0 && d2.x < 0.0 && d2.y < 0.0 && d2.z < 0.0
+        diff.x.abs() < extents.x && diff.y.abs() < extents.y && diff.z.abs() < extents.z
+
+        // let d1 = other.min - self.min;
+        // let d2 = other.max - self.max;
+
+        // d1.x < 0.0 && d1.y < 0.0 && d1.z < 0.0 && d2.x < 0.0 && d2.y < 0.0 && d2.z < 0.0
     }
 
     #[allow(unused)]
@@ -78,6 +83,13 @@ impl BoundingBox {
     fn volume(&self) -> f32 {
         let extends = self.max - self.min;
         extends.x * extends.y * extends.z
+    }
+
+    pub fn centre(&self) -> Vector {
+        (self.min + self.max) / 2.
+    }
+    pub fn extents(&self) -> Vector {
+        (self.max - self.min) / 2.
     }
 }
 impl PartialEq for BoundingBox {
@@ -170,6 +182,10 @@ impl CuboidCollider {
         self.bounding_box = BoundingBox::from_vertices(&vertices);
         // self.bounding_box.translate(*view.translation);
     }
+
+    pub fn get_bounds(&self) -> &BoundingBox {
+        &self.bounding_box
+    }
 }
 impl Debug for CuboidCollider {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -219,5 +235,9 @@ impl ColliderSystem {
 
     pub fn bounds_iter(&self) -> DepthIter {
         self.bounds_tree.iter()
+    }
+
+    pub fn get_potential_overlaps(&self) -> Vec<(&CuboidCollider, &CuboidCollider)> {
+        self.bounds_tree.get_overlaps()
     }
 }

@@ -284,7 +284,25 @@ impl BVH {
         }
     }
 
-    pub fn get_overlaps(&self) {}
+    pub fn get_overlaps(&self) -> Vec<(&CuboidCollider, &CuboidCollider)> {
+        match self.root {
+            Some(root) => unsafe {
+                if let NodeContent::Branch(branch) = (*root.as_ptr()).content {
+                    let mut results = Vec::with_capacity(self.size);
+                    (*branch.as_ptr())
+                        .left
+                        .as_ref()
+                        .check_overlap((*branch.as_ptr()).right.as_ref(), &mut results);
+                    results
+                } else {
+                    vec![]
+                }
+            },
+            None => {
+                vec![]
+            }
+        }
+    }
 
     pub unsafe fn get_root(&self) -> Option<NonNull<Node>> {
         self.root
@@ -435,6 +453,84 @@ impl Node {
 
             // update self depth (asumming an initial imbalance of 2)
             self.depth = (left_depth as usize + right_depth as usize) / 2 + 1;
+        }
+    }
+
+    fn check_overlap<'a>(
+        &'a self,
+        other: &'a Node,
+        results: &mut Vec<(&'a CuboidCollider, &'a CuboidCollider)>,
+    ) {
+        unsafe {
+            // recurse to children if any
+            if let NodeContent::Branch(branch) = self.content {
+                (*branch.as_ptr())
+                    .left
+                    .as_ref()
+                    .check_overlap((*branch.as_ptr()).right.as_ref(), results);
+            }
+            if let NodeContent::Branch(other_branch) = other.content {
+                (*other_branch.as_ptr())
+                    .left
+                    .as_ref()
+                    .check_overlap((*other_branch.as_ptr()).right.as_ref(), results);
+            }
+
+            if self.bounds.check_overlap(other.bounds) {
+                match (&self.content, &other.content) {
+                    (NodeContent::Branch(branch), NodeContent::Branch(other_branch)) => {
+                        // both are branches
+                        if self.bounds.volume() > other.bounds.volume() {
+                            (*branch.as_ptr())
+                                .left
+                                .as_ref()
+                                .check_overlap(other, results);
+                            (*branch.as_ptr())
+                                .right
+                                .as_ref()
+                                .check_overlap(other, results);
+                        } else {
+                            (*other_branch.as_ptr())
+                                .left
+                                .as_ref()
+                                .check_overlap(self, results);
+                            (*other_branch.as_ptr())
+                                .right
+                                .as_ref()
+                                .check_overlap(self, results);
+                        }
+                    }
+                    (NodeContent::Branch(branch), _) => {
+                        // self is branch, other is leaf
+                        (*branch.as_ptr())
+                            .left
+                            .as_ref()
+                            .check_overlap(other, results);
+                        (*branch.as_ptr())
+                            .right
+                            .as_ref()
+                            .check_overlap(other, results);
+                    }
+                    (_, NodeContent::Branch(other_branch)) => {
+                        // self is leaf, other is branch
+                        (*other_branch.as_ptr())
+                            .left
+                            .as_ref()
+                            .check_overlap(self, results);
+                        (*other_branch.as_ptr())
+                            .right
+                            .as_ref()
+                            .check_overlap(self, results);
+                    }
+                    (NodeContent::Leaf(coll), NodeContent::Leaf(other_coll)) => {
+                        // both are leaves
+                        results.push((coll, other_coll))
+                    }
+                    (_, _) => {
+                        println!("NONE NODE IN TREE???");
+                    }
+                }
+            }
         }
     }
 }

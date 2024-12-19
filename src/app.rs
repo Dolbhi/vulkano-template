@@ -410,7 +410,7 @@ impl App {
                 }
 
                 if let Some(debug_depth) = self.bounds_debug_depth {
-                    let bounding_boxes = colliders
+                    let mut bounding_boxes: Vec<GPUAABB> = colliders
                         .bounds_iter()
                         .filter(|(_, depth)| *depth == debug_depth)
                         .map(|(bounds, depth)| {
@@ -422,20 +422,74 @@ impl App {
                                 max: max_cast.into(),
                                 color: [1., mag, mag, 1.],
                             }
-                        });
-                    frame.upload_box_data(bounding_boxes);
-                } else {
-                    let bounding_boxes = colliders.bounds_iter().map(|(bounds, depth)| {
-                        let mag = 1. / (depth as f32 + 1.);
-                        let min_cast: [f32; 3] = bounds.min.into();
-                        let max_cast: [f32; 3] = bounds.max.into();
-                        GPUAABB {
+                        })
+                        .collect();
+
+                    // show overlaps
+                    for (coll_1, coll_2) in colliders.get_potential_overlaps() {
+                        let bounds_1 = coll_1.get_bounds();
+                        let bounds_2 = coll_2.get_bounds();
+
+                        let centre = bounds_1.centre();
+                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
                             min: min_cast.into(),
                             max: max_cast.into(),
-                            color: [1., mag, mag, 1.],
-                        }
-                    });
-                    frame.upload_box_data(bounding_boxes);
+                            color: [0., 1., 0., 1.],
+                        });
+
+                        let centre = bounds_2.centre();
+                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [0., 1., 0., 1.],
+                        });
+                    }
+
+                    frame.upload_box_data(bounding_boxes.into_iter());
+                } else {
+                    let mut bounding_boxes: Vec<GPUAABB> = colliders
+                        .bounds_iter()
+                        .map(|(bounds, depth)| {
+                            let mag = 1. / (depth as f32 + 1.);
+                            let min_cast: [f32; 3] = bounds.min.into();
+                            let max_cast: [f32; 3] = bounds.max.into();
+                            GPUAABB {
+                                min: min_cast.into(),
+                                max: max_cast.into(),
+                                color: [1., mag, mag, 1.],
+                            }
+                        })
+                        .collect();
+
+                    // show overlaps
+                    for (coll_1, coll_2) in colliders.get_potential_overlaps() {
+                        let bounds_1 = coll_1.get_bounds();
+                        let bounds_2 = coll_2.get_bounds();
+
+                        let centre = bounds_1.centre();
+                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [0., 1., 0., 1.],
+                        });
+
+                        let centre = bounds_2.centre();
+                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [0., 1., 0., 1.],
+                        });
+                    }
+
+                    frame.upload_box_data(bounding_boxes.into_iter());
                 }
 
                 // point lights
