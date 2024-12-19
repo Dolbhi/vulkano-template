@@ -7,7 +7,7 @@ use crate::{
 
 use super::{
     transform::{Transform, TransformID, TransformSystem},
-    Camera, Rotate,
+    Camera, PhysicsAwake, Rotate,
 };
 use legion::*;
 
@@ -110,12 +110,12 @@ impl GameWorld {
         // update bounds
         let mut query = <(&TransformID, &mut LeafInHierachy)>::query();
         for (_, collider) in query.iter_mut(&mut self.world) {
-            if collider
-                .get_collider(&self.colliders.bounds_tree)
-                .is_some_and(|coll| coll.is_dirty())
-            {
-                self.colliders.update(collider, &mut self.transforms);
-            }
+            // if collider
+            //     .get_collider(&self.colliders.bounds_tree)
+            //     .is_some_and(|coll| coll.is_dirty())
+            // {
+            self.colliders.update(collider, &mut self.transforms);
+            // }
         }
 
         // [Profiling] Colliders
