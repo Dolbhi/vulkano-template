@@ -304,6 +304,7 @@ impl App {
         // do render loop
         let extends = self.render_loop.context.window.inner_size();
         self.render_loop
+            // render update starts here
             .update(&mut self.renderer, |renderer, image_i| {
                 let GameWorld {
                     world,

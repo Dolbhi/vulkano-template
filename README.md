@@ -7,6 +7,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 
 ## To Do
 - [ ] Custom pointer for modifying colliders that updates bvh on drop
+- [ ] Unsafe system for storing transforms
 
 ### Misc.
 - [ ] Add camera light toggle (bound to 'f')

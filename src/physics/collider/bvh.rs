@@ -13,22 +13,22 @@ pub struct BVH {
     size: usize,
 }
 
-#[allow(dead_code)]
 pub struct Node {
-    parent: Option<NonNull<BranchContent>>,
+    parent: Option<NonNull<BranchLinks>>,
     right_child: bool,
     bounds: BoundingBox,
     depth: usize,
     content: NodeContent,
 }
 
-#[allow(dead_code)]
 enum NodeContent {
-    Branch(NonNull<BranchContent>),
+    Branch(NonNull<BranchLinks>),
     Leaf(CuboidCollider),
+    /// only used for empty root
     None,
 }
-struct BranchContent {
+/// pointers to a set of children and their parent, which in turn have pointers back to the `BranchLink`
+struct BranchLinks {
     node: NonNull<Node>,
     left: NonNull<Node>,
     right: NonNull<Node>,
@@ -36,24 +36,21 @@ struct BranchContent {
 
 /// unique external reference, return to bvh to remove the corresponding leaf node
 /// the NonNull node should only be dereferenced when provided with a &mut BVH matching the second element
-#[allow(dead_code)]
 pub struct LeafInHierachy {
     leaf: NonNull<Node>,
     hierachy: *const BVH,
 }
-#[allow(dead_code)]
 pub struct LeafOutsideHierachy {
     leaf: NonNull<Node>,
 }
 
-/// Depth first iterator for `BoundsTree`
+/// Depth first iterator for `BoundsTree`, iterates over every node, returning its bounds and depth
 pub struct DepthIter<'a> {
     current: Vec<NonNull<Node>>,
     next: Vec<NonNull<Node>>,
     lifetime: PhantomData<&'a BVH>,
 }
 
-#[allow(unused)]
 impl BVH {
     pub fn new() -> Self {
         BVH {
@@ -74,8 +71,9 @@ impl BVH {
     //     }
     // }
 
+    /// traverse down tree to insert leaf before traversing back up tree to update depth and do balancing
     pub fn insert(&mut self, leaf_ref: LeafOutsideHierachy) -> LeafInHierachy {
-        if let Some(mut root) = self.root {
+        if let Some(root) = self.root {
             unsafe {
                 let leaf_bounds = leaf_ref.leaf.as_ref().bounds;
 
@@ -114,7 +112,7 @@ impl BVH {
                     depth: 1,
                     content: NodeContent::None,
                 })));
-                let branch_content = BranchContent::new(new_branch, current, leaf_ref.leaf);
+                let branch_content = BranchLinks::new(new_branch, current, leaf_ref.leaf);
                 (*new_branch.as_ptr()).content = NodeContent::Branch(branch_content);
 
                 (*current.as_ptr()).parent = Some(branch_content);
@@ -559,7 +557,7 @@ impl Debug for Node {
     }
 }
 
-impl BranchContent {
+impl BranchLinks {
     fn new(node: NonNull<Node>, left: NonNull<Node>, right: NonNull<Node>) -> NonNull<Self> {
         unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(Self { node, left, right }))) }
     }
@@ -600,6 +598,7 @@ impl LeafInHierachy {
         LeafOutsideHierachy { leaf: self.leaf }
     }
 
+    // probably nothing wrong with leaving this in
     // pub fn get_collider(&self, hierachy: &BVH) -> Option<&CuboidCollider> {
     //     if ptr::eq(self.hierachy, hierachy) {
     //         unsafe {
@@ -616,6 +615,7 @@ impl LeafInHierachy {
 
     /// Having 2 copies of a leaf reference and using one for removal leaves a LeafInHierachy that references a leaf outside hierachy
     /// Not to mention dropping the newly converted LeafOutsideHierachy leaves dangling pointers
+    /// Note: This is used for quick removal and reinsertion without dropping the original LeafInHierachy, if we used a wrapper for the ECS this would not be needed
     unsafe fn clone(&self) -> Self {
         Self {
             leaf: self.leaf,
@@ -724,11 +724,11 @@ mod tree_tests {
 
     use crate::{game_objects::transform::TransformSystem, physics::collider::CuboidCollider};
 
-    use super::{BranchContent, Node, NodeContent, BVH};
+    use super::{BranchLinks, Node, NodeContent, BVH};
 
     fn validate_tree(
         child: &Node,
-        parent: Option<&NonNull<BranchContent>>,
+        parent: Option<&NonNull<BranchLinks>>,
         right_child: bool,
     ) -> Result<(), String> {
         // error format is {expected} vs {actual}

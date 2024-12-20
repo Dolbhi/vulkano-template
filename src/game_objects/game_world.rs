@@ -55,6 +55,7 @@ impl Inputs {
     }
 }
 
+/// stores game data and handles logic updates
 pub struct GameWorld {
     pub transforms: TransformSystem,
     pub colliders: ColliderSystem,

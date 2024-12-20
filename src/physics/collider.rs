@@ -194,6 +194,7 @@ impl Debug for CuboidCollider {
     }
 }
 
+/// Note: Probably a useless wrapper around the bvh
 impl ColliderSystem {
     pub fn new() -> Self {
         Self {
