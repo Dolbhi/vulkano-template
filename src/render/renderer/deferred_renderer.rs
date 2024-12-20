@@ -322,6 +322,11 @@ impl Renderer for DeferredRenderer {
         self.lit_draw_system.recreate_pipelines(context);
         self.lighting_system.recreate_pipeline(context);
         self.unlit_draw_system.recreate_pipelines(context);
+
+        self.lit_colored_system.recreate_pipelines(context);
+        self.unlit_colored_system.recreate_pipelines(context);
+
+        self.bounding_box_system.recreate_pipelines(context);
     }
     fn recreate_framebuffers(&mut self, context: &Context) {
         (self.attachments, self.framebuffers) =
