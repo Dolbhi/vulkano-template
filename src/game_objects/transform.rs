@@ -15,6 +15,7 @@ pub struct Transform {
     rotation: Quaternion<f32>,
     scale: Vector3<f32>,
     last_model: Option<Matrix4<f32>>,
+    pub phys_modified: bool,
 }
 
 pub struct TransformCreateInfo {
@@ -64,6 +65,7 @@ impl Transform {
             rotation: val.rotation,
             scale: val.scale,
             last_model: None,
+            phys_modified: true,
         }
     }
 
@@ -296,6 +298,7 @@ impl TransformSystem {
             .get_mut(id)
             .ok_or(TransformError::IDNotFound)?;
         transform.global_model = None;
+        transform.phys_modified = true;
 
         for child in transform.children.clone() {
             self.dirty(&child)?;
@@ -376,6 +379,10 @@ impl TransformSystem {
     pub fn get_transform_mut(&mut self, id: &TransformID) -> Option<&mut Transform> {
         self.dirty(id).ok()?;
         self.transforms.get_mut(id)
+    }
+
+    pub fn reset_phys_modified(&mut self, id: &TransformID) {
+        self.get_transform_mut(id).map(|t| t.phys_modified = false);
     }
 }
 impl Iterator for TransformSystem {
