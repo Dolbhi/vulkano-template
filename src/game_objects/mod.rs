@@ -111,3 +111,10 @@ macro_rules! load_object {
         (id, $loader.world.world.push((id, $($comp),+)))
     };
 }
+
+#[macro_export]
+macro_rules! load_object_with_transform {
+    ($loader:expr, $transform:expr, $($comp:expr),+) => {
+        $loader.world.world.push(($transform, $($comp),+))
+    };
+}

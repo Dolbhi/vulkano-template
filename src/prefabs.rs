@@ -7,7 +7,7 @@ use crate::{
         light::PointLightComponent, transform::TransformCreateInfo, MaterialSwapper, Rotate,
         WorldLoader,
     },
-    load_object,
+    load_object, load_object_with_transform,
     physics::{CuboidCollider, RigidBody},
     render::resource_manager::{MaterialID::*, MeshID::*, TextureID},
 };
@@ -65,7 +65,12 @@ pub fn init_world(mut loader: WorldLoader) {
     let rotate = Rotate([0., 1., 0.].into(), Rad(0.5));
     let (ina_transform, _) = loader.add_1_comp([0.0, 15.0, -3.0], rotate);
     for (mesh, mat) in zip(ina_meshes, ina_mats.clone()) {
-        loader.quick_ro(ina_transform, mesh, mat, true);
+        loader.quick_ro(
+            TransformCreateInfo::from_parent(ina_transform),
+            mesh,
+            mat,
+            true,
+        );
     }
 
     //      lost empires
@@ -87,7 +92,11 @@ pub fn init_world(mut loader: WorldLoader) {
             .map(|(id, lit)| loader.resources.get_material(id, lit)),
         );
 
-        loader.add_2_comp(le_transform, le_obj, mat_swapper);
+        loader.add_2_comp(
+            TransformCreateInfo::from_parent(le_transform),
+            le_obj,
+            mat_swapper,
+        );
     }
 
     // lights
@@ -151,13 +160,19 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     };
     loader.quick_ro(plane_trans, Square, yellow_mat, true);
 
+    // rigidbody test
+    let t = loader.world.transforms.add_transform([0., 1., 0.]);
     let ro = loader.resources.load_ro(Cube, green_mat, true);
     let rb = RigidBody {
         velocity: (1.0, 10.0, 0.0).into(),
         bivelocity: (0.0, 0.0, -5.0).into(),
     };
-    // loader.add_2_comp([0., 1., 0.], ro, rb);
-    load_object!(loader, [0., 1., 0.], ro, rb);
+    let collider = loader
+        .world
+        .colliders
+        .add(CuboidCollider::new(&mut loader.world.transforms, t));
+    // println!("[DEBUG] rb id: {:?}", t);
+    load_object_with_transform!(loader, t, ro, rb, collider);
 
     // moving collider
     let (pivot, _) = loader.add_1_comp([0., 0., 0.], Rotate([0., 1., 0.].into(), Rad(0.5)));
@@ -171,5 +186,5 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         .colliders
         .add(CuboidCollider::new(&mut loader.world.transforms, mover));
     let ro = loader.resources.load_ro(Cube, green_mat, true);
-    loader.add_2_comp(mover, collider, ro);
+    load_object_with_transform!(loader, mover, collider, ro);
 }

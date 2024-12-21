@@ -102,6 +102,11 @@ impl GameWorld {
                 self.transforms.get_transform_mut(transfrom).unwrap(),
                 seconds_passed,
             );
+            // println!(
+            //     "[RB] id: {:?}, model: {:?}",
+            //     transfrom,
+            //     self.transforms.get_global_model(transfrom)
+            // );
         }
 
         // [Profiling] Physics
@@ -110,6 +115,7 @@ impl GameWorld {
 
         // update bounds
         let mut query = <(&TransformID, &mut LeafInHierachy)>::query();
+        // println!("frame start");
         for (id, collider) in query.iter_mut(&mut self.world) {
             if let Some(transform) = self.transforms.get_transform(id) {
                 if transform.phys_modified {

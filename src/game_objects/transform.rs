@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Debug,
     time::Instant,
 };
 
@@ -69,7 +70,7 @@ impl Transform {
         }
     }
 
-    fn get_local_model(&mut self) -> Matrix4<f32> {
+    pub fn get_local_model(&mut self) -> Matrix4<f32> {
         match self.local_model {
             Some(matrix) => matrix,
             None => {
@@ -154,6 +155,13 @@ impl TransformCreateInfo {
         self.scale = scale.into();
         self
     }
+
+    pub fn from_parent(parent: TransformID) -> Self {
+        TransformCreateInfo {
+            parent: Some(parent),
+            ..Self::default()
+        }
+    }
 }
 impl<T> From<T> for TransformCreateInfo
 where
@@ -163,11 +171,11 @@ where
         Self::default().set_translation(value)
     }
 }
-impl From<TransformID> for TransformCreateInfo {
-    fn from(value: TransformID) -> Self {
-        Self::default().set_parent(Some(value))
-    }
-}
+// impl From<TransformID> for TransformCreateInfo {
+//     fn from(value: TransformID) -> Self {
+//         Self::default().set_parent(Some(value))
+//     }
+// }
 impl Default for TransformCreateInfo {
     fn default() -> Self {
         Self {

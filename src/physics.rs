@@ -27,6 +27,6 @@ impl RigidBody {
         transform.mutate(|t, r, _| {
             *t += self.velocity * delta_secs;
             *r = geo_alg::bivec_exp(delta_secs * self.bivelocity).into_quaternion() * *r;
-        })
+        });
     }
 }
