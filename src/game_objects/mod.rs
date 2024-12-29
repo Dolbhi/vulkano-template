@@ -106,15 +106,15 @@ impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
 
 #[macro_export]
 macro_rules! load_object {
-    ($loader:expr, $transform:expr, $($comp:expr),+) => {
-        let id = $loader.world.transforms.add_transform($transform);
-        (id, $loader.world.world.push((id, $($comp),+)))
+    ($game_world:expr, $transform:expr, $($comp:expr),+) => {
+        let id = $game_world.transforms.add_transform($transform);
+        (id, $game_world.push((id, $($comp),+)))
     };
 }
 
 #[macro_export]
 macro_rules! load_object_with_transform {
-    ($loader:expr, $transform:expr, $($comp:expr),+) => {
-        $loader.world.world.push(($transform, $($comp),+))
+    ($world:expr, $transform:expr, $($comp:expr),+) => {
+        $world.push(($transform, $($comp),+))
     };
 }

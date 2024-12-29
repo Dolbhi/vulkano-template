@@ -20,9 +20,10 @@ use winit::{
 use crate::{
     game_objects::{
         light::PointLightComponent,
-        transform::{TransformCreateInfo, TransformID},
+        transform::{self, TransformCreateInfo, TransformID},
         Camera, GameWorld, MaterialSwapper, WorldLoader,
     },
+    load_object_with_transform,
     physics::CuboidCollider,
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
@@ -305,7 +306,7 @@ impl App {
         let extends = self.render_loop.context.window.inner_size();
         self.render_loop
             // render update starts here
-            .update(&mut self.renderer, |renderer, image_i| {
+            .update(&mut self.renderer, |renderer, image_i, context| {
                 let GameWorld {
                     world,
                     transforms,
@@ -340,24 +341,45 @@ impl App {
 
                 // add random bounds
                 if self.inputs.o_triggered {
-                    let mut rng = rand::thread_rng();
+                    // let mut rng = rand::thread_rng();
 
-                    let pos: Vector3<f32> = Vector3::new(
-                        rng.gen_range(-8.0..8.0),
-                        rng.gen_range(-8.0..8.0),
-                        rng.gen_range(-8.0..8.0),
-                    );
-                    let scale = Vector3::new(
-                        rng.gen_range(0.0..2.0),
-                        rng.gen_range(0.0..2.0),
-                        rng.gen_range(0.0..2.0),
-                    );
+                    // let pos: Vector3<f32> = Vector3::new(
+                    //     rng.gen_range(-8.0..8.0),
+                    //     rng.gen_range(-8.0..8.0),
+                    //     rng.gen_range(-8.0..8.0),
+                    // );
+                    // let scale = Vector3::new(
+                    //     rng.gen_range(0.0..2.0),
+                    //     rng.gen_range(0.0..2.0),
+                    //     rng.gen_range(0.0..2.0),
+                    // );
+
+                    // let transform =
+                    //     transforms.add_transform(TransformCreateInfo::from(pos).set_scale(scale));
+
+                    // create unit cube at cam position and rotation
+                    let cam_transform = transforms
+                        .get_transform(&camera.transform)
+                        .unwrap()
+                        .get_local_transform();
+                    let pos = *cam_transform.translation;
+                    let rot = *cam_transform.rotation;
 
                     let transform =
-                        transforms.add_transform(TransformCreateInfo::from(pos).set_scale(scale));
+                        transforms.add_transform(TransformCreateInfo::from(pos).set_rotation(rot));
                     let collider = CuboidCollider::new(transforms, transform);
 
-                    colliders.add(collider);
+                    let collider = colliders.add(collider);
+
+                    let mut resource_loader = self.resources.begin_retrieving(context, renderer);
+                    let red_material = resource_loader.load_solid_material([1., 0., 0., 1.], true);
+                    let ro = resource_loader.load_ro(
+                        crate::render::resource_manager::MeshID::Cube,
+                        red_material.0,
+                        true,
+                    );
+
+                    load_object_with_transform!(world, transform, collider, ro);
 
                     self.inputs.o_triggered = false;
                 }
@@ -446,7 +468,18 @@ impl App {
                         bounding_boxes.push(GPUAABB {
                             min: min_cast.into(),
                             max: max_cast.into(),
-                            color: [0., 1., 0., 1.],
+                            color: [1., 1., 0., 1.],
+                        });
+                    }
+                    // show contacts
+                    for (pos, _) in colliders.get_contacts(transforms) {
+                        // println!("Pos: {:?}", pos);
+                        let min_cast: [f32; 3] = (pos - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (pos + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [0., 0., 1., 1.],
                         });
                     }
 
@@ -486,7 +519,18 @@ impl App {
                         bounding_boxes.push(GPUAABB {
                             min: min_cast.into(),
                             max: max_cast.into(),
-                            color: [0., 1., 0., 1.],
+                            color: [1., 1., 0., 1.],
+                        });
+                    }
+                    // show contacts
+                    for (pos, _) in colliders.get_contacts(transforms) {
+                        // println!("Pos: {:?}", pos);
+                        let min_cast: [f32; 3] = (pos - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (pos + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [0., 0., 1., 1.],
                         });
                     }
 

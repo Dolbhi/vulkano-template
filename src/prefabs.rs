@@ -172,7 +172,7 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         .colliders
         .add(CuboidCollider::new(&mut loader.world.transforms, t));
     // println!("[DEBUG] rb id: {:?}", t);
-    load_object_with_transform!(loader, t, ro, rb, collider);
+    load_object_with_transform!(loader.world.world, t, ro, rb, collider);
 
     // moving collider
     let (pivot, _) = loader.add_1_comp([0., 0., 0.], Rotate([0., 1., 0.].into(), Rad(0.5)));
@@ -186,5 +186,5 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         .colliders
         .add(CuboidCollider::new(&mut loader.world.transforms, mover));
     let ro = loader.resources.load_ro(Cube, green_mat, true);
-    load_object_with_transform!(loader, mover, collider, ro);
+    load_object_with_transform!(loader.world.world, mover, collider, ro);
 }

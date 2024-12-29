@@ -1,9 +1,10 @@
 // mod bounds_tree;
 mod bvh;
 
+use core::f32;
 use std::fmt::Debug;
 
-use cgmath::{InnerSpace, Zero};
+use cgmath::{InnerSpace, SquareMatrix, Zero};
 
 use bvh::{DepthIter, LeafOutsideHierachy, BVH};
 
@@ -19,6 +20,7 @@ pub struct BoundingBox {
     pub max: Vector,
     pub min: Vector,
 }
+/// cube with radius 1
 pub struct CuboidCollider {
     transform: TransformID,
     bounding_box: BoundingBox,
@@ -110,7 +112,13 @@ impl Default for BoundingBox {
     }
 }
 
-const CUBE_BOUNDING: [Vector; 8] = [
+/// First point is the minimal point followed by the 3 points adjacent to it
+const CUBE_VERTICES: [Vector; 8] = [
+    Vector {
+        x: -1.0,
+        y: -1.0,
+        z: -1.0,
+    },
     Vector {
         x: 1.0,
         y: -1.0,
@@ -145,11 +153,6 @@ const CUBE_BOUNDING: [Vector; 8] = [
         x: 1.0,
         y: 1.0,
         z: 1.0,
-    },
-    Vector {
-        x: -1.0,
-        y: -1.0,
-        z: -1.0,
     },
 ];
 
@@ -175,7 +178,7 @@ impl CuboidCollider {
         // self.bounding_box.min = pos.truncate() / pos.w;
         // self.bounding_box.max = self.bounding_box.min + view.scale;
 
-        let vertices = CUBE_BOUNDING.map(|v| {
+        let vertices = CUBE_VERTICES.map(|v| {
             let v = global_model * v.extend(1.0);
             v.truncate() / v.w
         });
@@ -241,5 +244,223 @@ impl ColliderSystem {
 
     pub fn get_potential_overlaps(&self) -> Vec<(&CuboidCollider, &CuboidCollider)> {
         self.bounds_tree.get_overlaps()
+    }
+
+    pub fn get_contacts(&self, transforms: &mut TransformSystem) -> Vec<(Vector, Vector)> {
+        let possible_overlaps = self.bounds_tree.get_overlaps();
+
+        let mut result = Vec::with_capacity(possible_overlaps.len());
+
+        for (coll_1, coll_2) in possible_overlaps {
+            let model_1 = transforms.get_global_model(&coll_1.transform).unwrap(); // impl func to try get model without mut
+            let model_2 = transforms.get_global_model(&coll_2.transform).unwrap();
+
+            if model_1.w.w != 1.0 || model_2.w.w != 1.0 {
+                println!("w1: {}, w2: {}", model_1.w.w, model_2.w.w);
+            }
+
+            // let view_1 = transforms
+            //     .get_transform(&coll_1.transform)
+            //     .unwrap()
+            //     .get_local_transform(); // impl way to clone this info
+            // let view_2 = transforms
+            //     .get_transform(&coll_2.transform)
+            //     .unwrap()
+            //     .get_local_transform();
+
+            // seperating axis
+            let dist = (model_1.w - model_2.w).truncate(); // might need to normalise
+
+            let axes = [
+                model_1.x, model_1.y, model_1.z, model_2.x, model_2.y, model_2.z,
+            ]
+            .map(|v| v.truncate());
+            let cross_axes = (0..3).flat_map(|i1| (3..6).map(move |i2| axes[i1].cross(axes[i2])));
+
+            let mut sep_axis_found = false;
+            for axis in axes.into_iter().chain(cross_axes) {
+                let proj_1 =
+                    axes[0].dot(axis).abs() + axes[1].dot(axis).abs() + axes[2].dot(axis).abs();
+                let proj_2 =
+                    axes[3].dot(axis).abs() + axes[4].dot(axis).abs() + axes[5].dot(axis).abs();
+
+                if dist.dot(axis).abs() > proj_1 + proj_2 {
+                    sep_axis_found = true;
+                    break;
+                }
+            }
+
+            if !sep_axis_found {
+                let inv_model_1 = model_1.invert().unwrap();
+                let space_2_to_space_1 = inv_model_1 * model_2;
+
+                let x_1_sqr = model_1.x.magnitude2();
+                let y_1_sqr = model_1.y.magnitude2();
+                let z_1_sqr = model_1.z.magnitude2();
+
+                // p-f contacts
+                let points_2 =
+                    CUBE_VERTICES.map(|v| (space_2_to_space_1 * v.extend(1.)).truncate());
+                let mut max_pen_pf_sqr = 0.;
+                let mut contact_point_pf = [0., 0., 0.].into();
+                let mut pen_axis = 0;
+                for point in points_2 {
+                    let x_depth = 1. - point.x.abs();
+                    let y_depth = 1. - point.y.abs();
+                    let z_depth = 1. - point.z.abs();
+
+                    if x_depth < 0. || y_depth < 0. || z_depth < 0. {
+                        continue;
+                    }
+
+                    // convert to world dist squared
+                    let x_depth = x_depth * x_depth * x_1_sqr;
+                    let y_depth = y_depth * y_depth * y_1_sqr;
+                    let z_depth = z_depth * z_depth * z_1_sqr;
+
+                    if x_depth > max_pen_pf_sqr {
+                        max_pen_pf_sqr = x_depth;
+                        contact_point_pf = point;
+                        pen_axis = point.x.signum() as i32;
+                    }
+                    if y_depth > max_pen_pf_sqr {
+                        max_pen_pf_sqr = y_depth;
+                        contact_point_pf = point;
+                        pen_axis = 2 * point.y.signum() as i32;
+                    }
+                    if z_depth > max_pen_pf_sqr {
+                        max_pen_pf_sqr = z_depth;
+                        contact_point_pf = point;
+                        pen_axis = 3 * point.z.signum() as i32;
+                    }
+                }
+
+                // f-p contacts
+                let axes_2 = [
+                    space_2_to_space_1.x,
+                    space_2_to_space_1.y,
+                    space_2_to_space_1.z,
+                ]
+                .map(|v| v.truncate());
+                let axes_2_inv = axes_2.map(|v| v / v.magnitude2());
+
+                let x_2_sqr = model_2.x.magnitude2();
+                let y_2_sqr = model_2.y.magnitude2();
+                let z_2_sqr = model_2.z.magnitude2();
+
+                let pos_2_in_1 = space_2_to_space_1.w.truncate();
+                let points_1 = CUBE_VERTICES.map(|v| v - pos_2_in_1);
+
+                for (i, point) in points_1.into_iter().enumerate() {
+                    let a2_proj = axes_2_inv.map(|a| point.dot(a));
+
+                    let x_depth = 1. - a2_proj[0].abs();
+                    let y_depth = 1. - a2_proj[1].abs();
+                    let z_depth = 1. - a2_proj[2].abs();
+
+                    if x_depth < 0. || y_depth < 0. || z_depth < 0. {
+                        continue;
+                    }
+
+                    // convert to world dist squared
+                    let x_depth = x_depth * x_depth * x_2_sqr;
+                    let y_depth = y_depth * y_depth * y_2_sqr;
+                    let z_depth = z_depth * z_depth * z_2_sqr;
+
+                    if x_depth > max_pen_pf_sqr {
+                        max_pen_pf_sqr = x_depth;
+                        contact_point_pf = CUBE_VERTICES[i];
+                        pen_axis = 4 * a2_proj[0].signum() as i32;
+                    }
+                    if y_depth > max_pen_pf_sqr {
+                        max_pen_pf_sqr = y_depth;
+                        contact_point_pf = CUBE_VERTICES[i];
+                        pen_axis = 5 * a2_proj[1].signum() as i32;
+                    }
+                    if z_depth > max_pen_pf_sqr {
+                        max_pen_pf_sqr = z_depth;
+                        contact_point_pf = CUBE_VERTICES[i];
+                        pen_axis = 6 * a2_proj[2].signum() as i32;
+                    }
+                }
+
+                // e-e contacts
+                let mut max_pen_ee_sqr = 0.;
+                let mut contact_point_ee = [0., 0., 0.].into();
+                let mut pen_axis_1 = 0;
+                let mut pen_axis_2 = 0;
+                for point in [1, 2, 3, 7].map(|i| points_2[i]) {
+                    for (i, a) in axes_2.iter().enumerate() {
+                        let d = point - a.dot(point) * axes_2_inv[i];
+
+                        let p1: Vector = [d.x.signum(), d.y.signum(), d.z.signum()].into();
+                        let d = point - a.dot(point - p1) * axes_2_inv[i];
+
+                        // check if point is in 2
+                        let d_from_2 = d - space_2_to_space_1.w.truncate();
+                        if d_from_2.dot(axes_2_inv[i]).abs() > 1. {
+                            continue;
+                        }
+
+                        let x_depth = 1. - d.x.abs();
+                        let y_depth = 1. - d.y.abs();
+                        let z_depth = 1. - d.z.abs();
+
+                        // check if point is in 1
+                        if x_depth < 0. || y_depth < 0. || z_depth < 0. {
+                            continue;
+                        }
+
+                        // convert to world dist squared
+                        let x_depth = x_depth * x_depth * x_1_sqr;
+                        let y_depth = y_depth * y_depth * y_1_sqr;
+                        let z_depth = z_depth * z_depth * z_1_sqr;
+
+                        let (potential_pen, axis_1) = if x_depth < y_depth {
+                            if y_depth < z_depth {
+                                (x_depth + y_depth, 3usize)
+                            } else {
+                                (x_depth + z_depth, 2usize)
+                            }
+                        } else {
+                            if x_depth < z_depth {
+                                (x_depth + y_depth, 3usize)
+                            } else {
+                                (y_depth + z_depth, 1usize)
+                            }
+                        };
+
+                        if potential_pen > max_pen_ee_sqr {
+                            max_pen_ee_sqr = potential_pen;
+                            contact_point_ee = d;
+                            pen_axis_1 = axis_1;
+                            pen_axis_2 = i + 1;
+                        }
+                    }
+                }
+
+                // compare p-f and e-e contacts
+                // returned normal points outward from coll_1
+                // should return max pen as well
+                if max_pen_pf_sqr == 0. && max_pen_ee_sqr == 0.0 {
+                    println!("CANT FIND CONTACT >:(");
+                    continue;
+                }
+                if max_pen_pf_sqr >= max_pen_ee_sqr {
+                    // max_pen_pf_sqr.sqrt()
+                    let normal = pen_axis.signum() as f32 * axes[pen_axis.abs() as usize - 1];
+                    // println!("before: {:?}", contact_point_pf);
+                    let point = model_1 * contact_point_pf.extend(1.);
+                    result.push((point.truncate(), normal));
+                } else {
+                    // max_pen_ee_sqr.sqrt()
+                    let normal = axes[pen_axis_1 - 1].cross(axes[pen_axis_2 - 1]);
+                    // println!("before: {:?}", contact_point_ee);
+                    let point = model_1 * contact_point_ee.extend(1.);
+                    result.push((point.truncate(), normal));
+                }
+            }
+        }
+        result
     }
 }

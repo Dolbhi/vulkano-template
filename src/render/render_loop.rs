@@ -39,7 +39,7 @@ impl RenderLoop {
     pub fn update<R, F>(&mut self, renderer: &mut R, upload_render_data: F)
     where
         R: Renderer,
-        F: FnOnce(&mut R, usize),
+        F: FnOnce(&mut R, usize, &Context),
     {
         let now = std::time::Instant::now();
 
@@ -90,7 +90,7 @@ impl RenderLoop {
         profiler.add_sample(now.elapsed().as_micros() as u32, 2);
         let now = std::time::Instant::now();
 
-        upload_render_data(renderer, index);
+        upload_render_data(renderer, index, &self.context);
 
         // [Profiling] Render upload
         profiler.add_sample(now.elapsed().as_micros() as u32, 3);
