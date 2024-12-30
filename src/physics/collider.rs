@@ -4,7 +4,7 @@ mod bvh;
 use core::f32;
 use std::fmt::Debug;
 
-use cgmath::{InnerSpace, SquareMatrix, Zero};
+use cgmath::{ElementWise, InnerSpace, SquareMatrix, Zero};
 
 use bvh::{DepthIter, LeafOutsideHierachy, BVH};
 
@@ -294,9 +294,15 @@ impl ColliderSystem {
                 let inv_model_1 = model_1.invert().unwrap();
                 let space_2_to_space_1 = inv_model_1 * model_2;
 
-                let x_1_sqr = model_1.x.magnitude2();
-                let y_1_sqr = model_1.y.magnitude2();
-                let z_1_sqr = model_1.z.magnitude2();
+                // let x_1_sqr = model_1.x.magnitude2();
+                // let y_1_sqr = model_1.y.magnitude2();
+                // let z_1_sqr = model_1.z.magnitude2();
+
+                let model_1_sqr = [
+                    model_1.x.magnitude2(),
+                    model_1.y.magnitude2(),
+                    model_1.z.magnitude2(),
+                ];
 
                 // p-f contacts
                 let points_2 =
@@ -314,9 +320,9 @@ impl ColliderSystem {
                     }
 
                     // convert to world dist squared
-                    let x_depth = x_depth * x_depth * x_1_sqr;
-                    let y_depth = y_depth * y_depth * y_1_sqr;
-                    let z_depth = z_depth * z_depth * z_1_sqr;
+                    let x_depth = x_depth * x_depth * model_1_sqr[0];
+                    let y_depth = y_depth * y_depth * model_1_sqr[1];
+                    let z_depth = z_depth * z_depth * model_1_sqr[2];
 
                     if x_depth > max_pen_pf_sqr {
                         max_pen_pf_sqr = x_depth;
@@ -385,57 +391,113 @@ impl ColliderSystem {
                 }
 
                 // e-e contacts
+                let cross_indices = [[1, 2], [2, 0], [0, 1]];
+
                 let mut max_pen_ee_sqr = 0.;
                 let mut contact_point_ee = [0., 0., 0.].into();
                 let mut pen_axis_1 = 0;
                 let mut pen_axis_2 = 0;
                 for point in [1, 2, 3, 7].map(|i| points_2[i]) {
-                    for (i, a) in axes_2.iter().enumerate() {
-                        let d = point - a.dot(point) * axes_2_inv[i];
+                    for (i, a2) in axes_2.iter().enumerate() {
+                        let d = point - a2.dot(point) * axes_2_inv[i];
 
                         let p1: Vector = [d.x.signum(), d.y.signum(), d.z.signum()].into();
-                        let d = point - a.dot(point - p1) * axes_2_inv[i];
+                        let p1_p2 = point - p1;
+                        // let test = p1_p2.mul_element_wise(*a);
+                        let a_projs: [Vector; 3] = [
+                            [0., a2.y, a2.z].into(),
+                            [a2.x, 0., a2.z].into(),
+                            [a2.x, a2.y, 0.].into(),
+                        ];
+                        // get closest point to 3 axes of 1
+                        let ds = a_projs
+                            .map(|a_proj| point - a_proj.dot(p1_p2) * a2 / a_proj.magnitude2());
 
-                        // check if point is in 2
-                        let d_from_2 = d - space_2_to_space_1.w.truncate();
-                        if d_from_2.dot(axes_2_inv[i]).abs() > 1. {
-                            continue;
-                        }
-
-                        let x_depth = 1. - d.x.abs();
-                        let y_depth = 1. - d.y.abs();
-                        let z_depth = 1. - d.z.abs();
-
-                        // check if point is in 1
-                        if x_depth < 0. || y_depth < 0. || z_depth < 0. {
-                            continue;
-                        }
-
-                        // convert to world dist squared
-                        let x_depth = x_depth * x_depth * x_1_sqr;
-                        let y_depth = y_depth * y_depth * y_1_sqr;
-                        let z_depth = z_depth * z_depth * z_1_sqr;
-
-                        let (potential_pen, axis_1) = if x_depth < y_depth {
-                            if y_depth < z_depth {
-                                (x_depth + y_depth, 3usize)
-                            } else {
-                                (x_depth + z_depth, 2usize)
+                        let mut potential_pen = f32::INFINITY;
+                        let mut potential_contact: Vector = [0., 0., 0.].into();
+                        let mut potential_axis = 0;
+                        for a1_i in 0..3 {
+                            // check if point is in 2
+                            let d_from_2 = ds[a1_i] - space_2_to_space_1.w.truncate();
+                            if d_from_2.dot(axes_2_inv[i]).abs() > 1. {
+                                continue;
                             }
-                        } else {
-                            if x_depth < z_depth {
-                                (x_depth + y_depth, 3usize)
-                            } else {
-                                (y_depth + z_depth, 1usize)
-                            }
-                        };
 
-                        if potential_pen > max_pen_ee_sqr {
-                            max_pen_ee_sqr = potential_pen;
-                            contact_point_ee = d;
-                            pen_axis_1 = axis_1;
-                            pen_axis_2 = i + 1;
+                            let d_abs = [ds[a1_i].x.abs(), ds[a1_i].y.abs(), ds[a1_i].z.abs()];
+                            // check if point is in 1
+                            if d_abs[0] > 1. || d_abs[1] > 1. || d_abs[2] > 1. {
+                                continue;
+                            }
+
+                            let [ci_1, ci_2] = cross_indices[a1_i];
+                            let depth_1 = 1. - d_abs[ci_1];
+                            let depth_2 = 1. - d_abs[ci_2];
+
+                            let depth = depth_1 * depth_1 * model_1_sqr[ci_1]
+                                + depth_2 * depth_2 * model_1_sqr[ci_2];
+                            // if depth < potential_pen {
+                            //     potential_pen = depth;
+                            //     potential_contact = ds[a1_i];
+                            //     potential_axis = a1_i + 1;
+                            // }
+
+                            if depth > max_pen_ee_sqr {
+                                max_pen_ee_sqr = depth;
+                                contact_point_ee = ds[a1_i];
+                                pen_axis_1 = a1_i + 1;
+                                pen_axis_2 = i + 1;
+                            }
                         }
+
+                        // if potential_pen.is_finite() && potential_pen > max_pen_ee_sqr {
+                        //     max_pen_ee_sqr = potential_pen;
+                        //     contact_point_ee = potential_contact;
+                        //     pen_axis_1 = potential_axis;
+                        //     pen_axis_2 = i + 1;
+                        // }
+
+                        // let d = point - a2.dot(point - p1) * axes_2_inv[i];
+
+                        // // check if point is in 2
+                        // let d_from_2 = d - space_2_to_space_1.w.truncate();
+                        // if d_from_2.dot(axes_2_inv[i]).abs() > 1. {
+                        //     continue;
+                        // }
+
+                        // let x_depth = 1. - d.x.abs();
+                        // let y_depth = 1. - d.y.abs();
+                        // let z_depth = 1. - d.z.abs();
+
+                        // // check if point is in 1
+                        // if x_depth < 0. || y_depth < 0. || z_depth < 0. {
+                        //     continue;
+                        // }
+
+                        // // convert to world dist squared
+                        // let x_depth = x_depth * x_depth * x_1_sqr;
+                        // let y_depth = y_depth * y_depth * y_1_sqr;
+                        // let z_depth = z_depth * z_depth * z_1_sqr;
+
+                        // let (potential_pen, axis_1) = if x_depth < y_depth {
+                        //     if y_depth < z_depth {
+                        //         (x_depth + y_depth, 3usize)
+                        //     } else {
+                        //         (x_depth + z_depth, 2usize)
+                        //     }
+                        // } else {
+                        //     if x_depth < z_depth {
+                        //         (x_depth + y_depth, 3usize)
+                        //     } else {
+                        //         (y_depth + z_depth, 1usize)
+                        //     }
+                        // };
+
+                        // if potential_pen > max_pen_ee_sqr {
+                        //     max_pen_ee_sqr = potential_pen;
+                        //     contact_point_ee = d;
+                        //     pen_axis_1 = axis_1;
+                        //     pen_axis_2 = i + 1;
+                        // }
                     }
                 }
 

@@ -152,6 +152,10 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         .resources
         .load_solid_material([0., 1., 0., 1.], true)
         .0;
+    let red_mat = loader
+        .resources
+        .load_solid_material([1., 0., 0., 1.], true)
+        .0;
 
     let plane_trans = TransformCreateInfo {
         rotation: Quaternion::from_axis_angle([1., 0., 0.].into(), Rad(-PI / 2.)),
@@ -187,4 +191,26 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         .add(CuboidCollider::new(&mut loader.world.transforms, mover));
     let ro = loader.resources.load_ro(Cube, green_mat, true);
     load_object_with_transform!(loader.world.world, mover, collider, ro);
+
+    // collider test
+    let transform = loader.world.transforms.add_transform([0., 5., 0.]);
+    let collider = loader
+        .world
+        .colliders
+        .add(CuboidCollider::new(&mut loader.world.transforms, transform));
+    let ro = loader.resources.load_ro(Cube, red_mat, true);
+    load_object_with_transform!(loader.world.world, transform, collider, ro);
+
+    let transform = loader.world.transforms.add_transform(
+        TransformCreateInfo::from([1.9, 5., 1.9]).set_rotation(Quaternion::from_axis_angle(
+            [(0.5f32).sqrt(), 0., (0.5f32).sqrt()].into(),
+            Rad(PI / 3.),
+        )),
+    );
+    let collider = loader
+        .world
+        .colliders
+        .add(CuboidCollider::new(&mut loader.world.transforms, transform));
+    let ro = loader.resources.load_ro(Cube, red_mat, true);
+    load_object_with_transform!(loader.world.world, transform, collider, ro);
 }
