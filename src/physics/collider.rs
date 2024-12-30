@@ -413,9 +413,9 @@ impl ColliderSystem {
                         let ds = a_projs
                             .map(|a_proj| point - a_proj.dot(p1_p2) * a2 / a_proj.magnitude2());
 
-                        let mut potential_pen = f32::INFINITY;
-                        let mut potential_contact: Vector = [0., 0., 0.].into();
-                        let mut potential_axis = 0;
+                        // let mut potential_pen = f32::INFINITY;
+                        // let mut potential_contact: Vector = [0., 0., 0.].into();
+                        // let mut potential_axis = 0;
                         for a1_i in 0..3 {
                             // check if point is in 2
                             let d_from_2 = ds[a1_i] - space_2_to_space_1.w.truncate();
