@@ -6,6 +6,10 @@ pub mod profiler;
 pub mod render;
 pub mod shaders;
 pub mod ui;
+pub mod utilities {
+    mod max_heap;
+    pub use max_heap::MaxHeap;
+}
 mod vertex_data;
 pub mod vulkano_objects;
 

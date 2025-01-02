@@ -1,4 +1,8 @@
-use std::{f32::consts::PI, iter::zip};
+use std::{
+    f32::consts::PI,
+    iter::zip,
+    sync::{Arc, RwLock},
+};
 
 use cgmath::{InnerSpace, Quaternion, Rad, Rotation3, Vector3};
 
@@ -167,10 +171,10 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     // rigidbody test
     let t = loader.world.transforms.add_transform([0., 1., 0.]);
     let ro = loader.resources.load_ro(Cube, green_mat, true);
-    let rb = RigidBody {
+    let rb = Arc::new(RwLock::new(RigidBody {
         velocity: (1.0, 10.0, 0.0).into(),
         bivelocity: (0.0, 0.0, -5.0).into(),
-    };
+    }));
     let collider = loader
         .world
         .colliders

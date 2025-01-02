@@ -1,3 +1,5 @@
+use std::sync::{Arc, RwLock};
+
 use cgmath::{InnerSpace, Quaternion, Rotation, Rotation3, Vector3, Zero};
 
 use crate::{
@@ -96,9 +98,9 @@ impl GameWorld {
         let logic_start = std::time::Instant::now();
 
         // physics update
-        let mut query = <(&TransformID, &mut RigidBody)>::query();
+        let mut query = <(&TransformID, &mut Arc<RwLock<RigidBody>>)>::query();
         for (transfrom, rigid_body) in query.iter_mut(&mut self.world) {
-            rigid_body.update(
+            rigid_body.write().unwrap().update(
                 self.transforms.get_transform_mut(transfrom).unwrap(),
                 seconds_passed,
             );
