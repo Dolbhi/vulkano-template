@@ -2,15 +2,21 @@
 mod bvh;
 
 use core::f32;
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    sync::{Arc, RwLock},
+};
 
-use cgmath::{ElementWise, InnerSpace, SquareMatrix, Zero};
+use cgmath::{InnerSpace, SquareMatrix, Zero};
 
 use bvh::{DepthIter, LeafOutsideHierachy, BVH};
 
 use crate::game_objects::transform::{TransformID, TransformSystem};
 
-use super::Vector;
+use super::{
+    contact::{Contact, ContactResolver},
+    RigidBody, Vector,
+};
 
 pub use self::bvh::LeafInHierachy;
 // pub type ColliderRef = Arc<Mutex<Leaf>>;
@@ -23,6 +29,7 @@ pub struct BoundingBox {
 /// cube with radius 1
 pub struct CuboidCollider {
     transform: TransformID,
+    rigidbody: Option<Arc<RwLock<RigidBody>>>,
     bounding_box: BoundingBox,
 }
 pub struct ColliderSystem {
@@ -157,9 +164,14 @@ const CUBE_VERTICES: [Vector; 8] = [
 ];
 
 impl CuboidCollider {
-    pub fn new(transforms: &mut TransformSystem, transform: TransformID) -> Self {
+    pub fn new(
+        transforms: &mut TransformSystem,
+        transform: TransformID,
+        rigidbody: Option<Arc<RwLock<RigidBody>>>,
+    ) -> Self {
         let mut collider = CuboidCollider {
             transform,
+            rigidbody,
             bounding_box: BoundingBox::default(),
         };
         collider.update_bounding(transforms);
@@ -246,27 +258,25 @@ impl ColliderSystem {
         self.bounds_tree.get_overlaps()
     }
 
-    pub fn get_contacts(&self, transforms: &mut TransformSystem) -> Vec<(Vector, Vector)> {
-        let possible_overlaps = self.bounds_tree.get_overlaps();
+    pub fn get_contacts(&self, transforms: &mut TransformSystem) -> ContactResolver {
+        let mut result = ContactResolver::new();
 
-        let mut result = Vec::with_capacity(possible_overlaps.len());
+        for (mut coll_1, mut coll_2) in self.bounds_tree.get_overlaps() {
+            if coll_1.rigidbody.is_none() {
+                if coll_2.rigidbody.is_some() {
+                    std::mem::swap(&mut coll_1, &mut coll_2);
+                } else {
+                    // ignore contacts not involving rigidbodies
+                    continue;
+                }
+            }
 
-        for (coll_1, coll_2) in possible_overlaps {
             let model_1 = transforms.get_global_model(&coll_1.transform).unwrap(); // impl func to try get model without mut
             let model_2 = transforms.get_global_model(&coll_2.transform).unwrap();
 
             if model_1.w.w != 1.0 || model_2.w.w != 1.0 {
                 println!("w1: {}, w2: {}", model_1.w.w, model_2.w.w);
             }
-
-            // let view_1 = transforms
-            //     .get_transform(&coll_1.transform)
-            //     .unwrap()
-            //     .get_local_transform(); // impl way to clone this info
-            // let view_2 = transforms
-            //     .get_transform(&coll_2.transform)
-            //     .unwrap()
-            //     .get_local_transform();
 
             // seperating axis
             let dist = (model_1.w - model_2.w).truncate(); // might need to normalise
@@ -293,10 +303,6 @@ impl ColliderSystem {
             if !sep_axis_found {
                 let inv_model_1 = model_1.invert().unwrap();
                 let space_2_to_space_1 = inv_model_1 * model_2;
-
-                // let x_1_sqr = model_1.x.magnitude2();
-                // let y_1_sqr = model_1.y.magnitude2();
-                // let z_1_sqr = model_1.z.magnitude2();
 
                 let model_1_sqr = [
                     model_1.x.magnitude2(),
@@ -435,11 +441,6 @@ impl ColliderSystem {
 
                             let depth = depth_1 * depth_1 * model_1_sqr[ci_1]
                                 + depth_2 * depth_2 * model_1_sqr[ci_2];
-                            // if depth < potential_pen {
-                            //     potential_pen = depth;
-                            //     potential_contact = ds[a1_i];
-                            //     potential_axis = a1_i + 1;
-                            // }
 
                             if depth > max_pen_ee_sqr {
                                 max_pen_ee_sqr = depth;
@@ -448,56 +449,6 @@ impl ColliderSystem {
                                 pen_axis_2 = i + 1;
                             }
                         }
-
-                        // if potential_pen.is_finite() && potential_pen > max_pen_ee_sqr {
-                        //     max_pen_ee_sqr = potential_pen;
-                        //     contact_point_ee = potential_contact;
-                        //     pen_axis_1 = potential_axis;
-                        //     pen_axis_2 = i + 1;
-                        // }
-
-                        // let d = point - a2.dot(point - p1) * axes_2_inv[i];
-
-                        // // check if point is in 2
-                        // let d_from_2 = d - space_2_to_space_1.w.truncate();
-                        // if d_from_2.dot(axes_2_inv[i]).abs() > 1. {
-                        //     continue;
-                        // }
-
-                        // let x_depth = 1. - d.x.abs();
-                        // let y_depth = 1. - d.y.abs();
-                        // let z_depth = 1. - d.z.abs();
-
-                        // // check if point is in 1
-                        // if x_depth < 0. || y_depth < 0. || z_depth < 0. {
-                        //     continue;
-                        // }
-
-                        // // convert to world dist squared
-                        // let x_depth = x_depth * x_depth * x_1_sqr;
-                        // let y_depth = y_depth * y_depth * y_1_sqr;
-                        // let z_depth = z_depth * z_depth * z_1_sqr;
-
-                        // let (potential_pen, axis_1) = if x_depth < y_depth {
-                        //     if y_depth < z_depth {
-                        //         (x_depth + y_depth, 3usize)
-                        //     } else {
-                        //         (x_depth + z_depth, 2usize)
-                        //     }
-                        // } else {
-                        //     if x_depth < z_depth {
-                        //         (x_depth + y_depth, 3usize)
-                        //     } else {
-                        //         (y_depth + z_depth, 1usize)
-                        //     }
-                        // };
-
-                        // if potential_pen > max_pen_ee_sqr {
-                        //     max_pen_ee_sqr = potential_pen;
-                        //     contact_point_ee = d;
-                        //     pen_axis_1 = axis_1;
-                        //     pen_axis_2 = i + 1;
-                        // }
                     }
                 }
 
@@ -509,17 +460,33 @@ impl ColliderSystem {
                     continue;
                 }
                 if max_pen_pf_sqr >= max_pen_ee_sqr {
-                    // max_pen_pf_sqr.sqrt()
-                    let normal = pen_axis.signum() as f32 * axes[pen_axis.abs() as usize - 1];
                     // println!("before: {:?}", contact_point_pf);
+                    let normal = pen_axis.signum() as f32 * axes[pen_axis.abs() as usize - 1];
                     let point = model_1 * contact_point_pf.extend(1.);
-                    result.push((point.truncate(), normal));
+
+                    let (index, contact) = Contact::new(
+                        &transforms,
+                        point.truncate(),
+                        normal.normalize(),
+                        max_pen_pf_sqr.sqrt(),
+                        coll_1.rigidbody.clone().unwrap(),
+                        coll_2.rigidbody.clone(),
+                    );
+                    result.add_contact(index, contact);
                 } else {
-                    // max_pen_ee_sqr.sqrt()
-                    let normal = axes[pen_axis_1 - 1].cross(axes[pen_axis_2 - 1]);
                     // println!("before: {:?}", contact_point_ee);
+                    let normal = axes[pen_axis_1 - 1].cross(axes[pen_axis_2 - 1]);
                     let point = model_1 * contact_point_ee.extend(1.);
-                    result.push((point.truncate(), normal));
+
+                    let (index, contact) = Contact::new(
+                        &transforms,
+                        point.truncate(),
+                        normal.normalize(),
+                        max_pen_ee_sqr.sqrt(),
+                        coll_1.rigidbody.clone().unwrap(),
+                        coll_2.rigidbody.clone(),
+                    );
+                    result.add_contact(index, contact);
                 }
             }
         }

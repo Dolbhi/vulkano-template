@@ -71,6 +71,14 @@ pub struct FullMultiVector {
 }
 
 impl FullMultiVector {
+    pub fn bivector(bivector: Vector) -> Self {
+        FullMultiVector {
+            s: 0.,
+            v: Vector::zero(),
+            b: bivector,
+            p: 0.,
+        }
+    }
     pub fn zero() -> Self {
         FullMultiVector {
             s: 0.,
@@ -202,3 +210,13 @@ impl Mul for FullMultiVector {
         }
     }
 }
+
+// impl Mul<FullMultiVector> for Vector {
+//     type Output = FullMultiVector;
+
+//     fn mul(self, rhs: FullMultiVector) -> Self::Output {
+//         Self {
+
+//         }
+//     }
+// }

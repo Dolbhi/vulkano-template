@@ -846,14 +846,17 @@ mod tree_tests {
         let a = BVH::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
+            rigidbody: None,
         });
         let b = BVH::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
+            rigidbody: None,
         });
         let c = BVH::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
+            rigidbody: None,
         });
 
         let _a = tree.insert(a);
@@ -881,14 +884,17 @@ mod tree_tests {
         let a = BVH::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
+            rigidbody: None,
         });
         let b = BVH::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
+            rigidbody: None,
         });
         let c = BVH::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
+            rigidbody: None,
         });
 
         let _a = tree.insert(a);
@@ -937,6 +943,7 @@ mod tree_tests {
             let leaf = BVH::register_collider(CuboidCollider {
                 transform: trans.next().unwrap(),
                 bounding_box,
+                rigidbody: None,
             });
             tree.insert(leaf);
         }
@@ -980,6 +987,7 @@ mod tree_tests {
         let leaf = BVH::register_collider(CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_6,
+            rigidbody: None,
         });
         let a = tree.insert(leaf);
 
@@ -989,6 +997,7 @@ mod tree_tests {
             let leaf = BVH::register_collider(CuboidCollider {
                 transform: trans.next().unwrap(),
                 bounding_box,
+                rigidbody: None,
             });
             tree.insert(leaf);
             // unsafe {
@@ -999,6 +1008,7 @@ mod tree_tests {
         let leaf = BVH::register_collider(CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
+            rigidbody: None,
         });
         let b = tree.insert(leaf);
 
@@ -1026,11 +1036,13 @@ mod tree_tests {
         let a = BVH::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
+            rigidbody: None,
         });
         tree.insert(a);
         let b = BVH::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
+            rigidbody: None,
         });
         let b = tree.insert(b);
 
@@ -1051,6 +1063,7 @@ mod tree_tests {
         let remove = BVH::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
+            rigidbody: None,
         });
         let remove = tree.insert(remove);
 

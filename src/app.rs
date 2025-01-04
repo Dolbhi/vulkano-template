@@ -367,7 +367,7 @@ impl App {
 
                     let transform =
                         transforms.add_transform(TransformCreateInfo::from(pos).set_rotation(rot));
-                    let collider = CuboidCollider::new(transforms, transform);
+                    let collider = CuboidCollider::new(transforms, transform, None);
 
                     let collider = colliders.add(collider);
 
@@ -472,16 +472,16 @@ impl App {
                         });
                     }
                     // show contacts
-                    for (pos, _) in colliders.get_contacts(transforms) {
-                        // println!("Pos: {:?}", pos);
-                        let min_cast: [f32; 3] = (pos - Vector3::new(0.1, 0.1, 0.1)).into();
-                        let max_cast: [f32; 3] = (pos + Vector3::new(0.1, 0.1, 0.1)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [0., 0., 1., 1.],
-                        });
-                    }
+                    // for (pos, _) in colliders.get_contacts(transforms) {
+                    //     // println!("Pos: {:?}", pos);
+                    //     let min_cast: [f32; 3] = (pos - Vector3::new(0.1, 0.1, 0.1)).into();
+                    //     let max_cast: [f32; 3] = (pos + Vector3::new(0.1, 0.1, 0.1)).into();
+                    //     bounding_boxes.push(GPUAABB {
+                    //         min: min_cast.into(),
+                    //         max: max_cast.into(),
+                    //         color: [0., 0., 1., 1.],
+                    //     });
+                    // }
 
                     frame.upload_box_data(bounding_boxes.into_iter());
                 } else {
@@ -523,16 +523,16 @@ impl App {
                         });
                     }
                     // show contacts
-                    for (pos, _) in colliders.get_contacts(transforms) {
-                        // println!("Pos: {:?}", pos);
-                        let min_cast: [f32; 3] = (pos - Vector3::new(0.1, 0.1, 0.1)).into();
-                        let max_cast: [f32; 3] = (pos + Vector3::new(0.1, 0.1, 0.1)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [0., 0., 1., 1.],
-                        });
-                    }
+                    // for (pos, _) in colliders.get_contacts(transforms) {
+                    //     // println!("Pos: {:?}", pos);
+                    //     let min_cast: [f32; 3] = (pos - Vector3::new(0.1, 0.1, 0.1)).into();
+                    //     let max_cast: [f32; 3] = (pos + Vector3::new(0.1, 0.1, 0.1)).into();
+                    //     bounding_boxes.push(GPUAABB {
+                    //         min: min_cast.into(),
+                    //         max: max_cast.into(),
+                    //         color: [0., 0., 1., 1.],
+                    //     });
+                    // }
 
                     frame.upload_box_data(bounding_boxes.into_iter());
                 }

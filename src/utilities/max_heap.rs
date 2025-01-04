@@ -15,6 +15,16 @@ struct HeapItem<T: Ord> {
 }
 
 impl<T: Ord> MaxHeap<T> {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+        }
+    }
+
     pub fn extract_min(&mut self) -> Option<(Arc<AtomicUsize>, T)> {
         let item_count = self.len();
 
