@@ -667,44 +667,45 @@ impl GameWorldThread {
             let mut next_time = Instant::now() + update_period;
             // let mut last_update = Instant::now();
             loop {
-                if !thread_paused.load(std::sync::atomic::Ordering::Relaxed) {
-                    {
-                        let update_start = std::time::Instant::now();
-
-                        let new_micros = thread_micros.load(std::sync::atomic::Ordering::Relaxed);
-                        let mut world = game_world.lock().unwrap();
-                        // let lock_wait = update_start.elapsed().as_millis();
-
-                        // [Profiling] Lock Wait
-                        unsafe {
-                            let mut profiler = LOGIC_PROFILER.lock().unwrap();
-                            profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
-                        }
-
-                        world.update(update_period.as_secs_f32());
-                        update_period = Duration::from_micros(new_micros);
-
-                        // skip frames if update took too long
-                        let now = Instant::now();
-                        let mut frames_skipped = 0u32;
-                        while next_time < now {
-                            next_time += update_period;
-                            frames_skipped += 1;
-                        }
-                        if frames_skipped > 0 {
-                            println!("[Warning] Skipped {frames_skipped} frames");
-                        }
-                        // println!(
-                        //     "[Debug] Wait since last update: {:>4} ms, Set wait till next: {:>4} ms",
-                        //     time_since_update, (next_time - now).as_millis()
-                        // );
-                    };
-                    thread::sleep(next_time - Instant::now());
-                    next_time += update_period;
-                } else {
+                if thread_paused.load(std::sync::atomic::Ordering::Relaxed) {
                     thread::park();
-                    next_time = Instant::now();
-                };
+                    next_time = Instant::now() + update_period;
+                }
+
+                {
+                    let update_start = std::time::Instant::now();
+
+                    let new_micros = thread_micros.load(std::sync::atomic::Ordering::Relaxed);
+                    let mut world = game_world.lock().unwrap();
+                    // let lock_wait = update_start.elapsed().as_millis();
+
+                    // [Profiling] Lock Wait
+                    unsafe {
+                        let mut profiler = LOGIC_PROFILER.lock().unwrap();
+                        profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
+                    }
+
+                    world.update(update_period.as_secs_f32());
+                    update_period = Duration::from_micros(new_micros);
+
+                    // skip frames if update took too long
+                    let now = Instant::now();
+                    let mut frames_skipped = 0u32;
+                    while next_time < now {
+                        next_time += update_period;
+                        frames_skipped += 1;
+                    }
+                    if frames_skipped > 0 {
+                        println!("[Warning] Skipped {frames_skipped} frames");
+                    }
+                    // println!(
+                    //     "[Debug] Wait since last update: {:>4} ms, Set wait till next: {:>4} ms",
+                    //     time_since_update, (next_time - now).as_millis()
+                    // );
+                }
+
+                thread::sleep(next_time - Instant::now());
+                next_time += update_period;
             }
         });
 
