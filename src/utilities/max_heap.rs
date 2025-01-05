@@ -5,16 +5,17 @@ use std::sync::{
 
 /// # Panics
 /// All functions taking indices panic when given an out of bounds index
-pub struct MaxHeap<T: Ord> {
-    items: Vec<HeapItem<T>>,
+pub struct MaxHeap<K: Ord + Copy, T> {
+    items: Vec<HeapItem<K, T>>,
 }
 
-struct HeapItem<T: Ord> {
+struct HeapItem<K: Ord + Copy, T> {
     index: Arc<AtomicUsize>,
+    key: K,
     item: T,
 }
 
-impl<T: Ord> MaxHeap<T> {
+impl<K: Ord + Copy, T> MaxHeap<K, T> {
     pub fn new() -> Self {
         Self { items: Vec::new() }
     }
@@ -55,14 +56,15 @@ impl<T: Ord> MaxHeap<T> {
         &self.items[index].item
     }
 
-    pub fn insert(&mut self, item: T) -> Arc<AtomicUsize> {
+    pub fn insert(&mut self, key: K, item: T) -> Arc<AtomicUsize> {
         let new_ref = Arc::new(AtomicUsize::new(0));
-        self.insert_with_ref(item, new_ref.clone());
+        self.insert_with_ref(key, item, new_ref.clone());
         new_ref
     }
-    pub fn insert_with_ref(&mut self, item: T, ref_index: Arc<AtomicUsize>) {
+    pub fn insert_with_ref(&mut self, key: K, item: T, ref_index: Arc<AtomicUsize>) {
         let new_heap_item = HeapItem {
             index: ref_index,
+            key,
             item,
         };
 
@@ -85,7 +87,7 @@ impl<T: Ord> MaxHeap<T> {
         let item = self.items.pop().unwrap();
 
         // up_heap or down_heap as nescessary
-        if item.item > self.items[index].item {
+        if item.key > self.items[index].key {
             // swapped item is smaller, try down_heap
             self.down_heap(index);
         } else {
@@ -96,14 +98,19 @@ impl<T: Ord> MaxHeap<T> {
         (item.index, item.item)
     }
 
-    /// modification closure should return true if ordering of item increased (or stays the same) and false if it decreased
+    /// modification closure should calculate and return the new key
     pub fn modify_key<F>(&mut self, index: usize, modification: F)
     where
-        F: FnOnce(&mut T) -> bool,
+        F: FnOnce(&mut T) -> K,
     {
-        if modification(&mut self.items[index].item) {
+        let item = &mut self.items[index];
+        let new_key = modification(&mut item.item);
+
+        if new_key > item.key {
+            item.key = new_key;
             self.up_heap(index);
         } else {
+            item.key = new_key;
             self.down_heap(index);
         }
     }
@@ -124,7 +131,7 @@ impl<T: Ord> MaxHeap<T> {
         let item = &self.items[index];
         let parent = &self.items[parent_index];
 
-        if item.item > parent.item {
+        if item.key > parent.key {
             // swap with parent
             self.items.swap(index, parent_index);
             self.items[index].index.store(index, Ordering::Release);
@@ -148,7 +155,7 @@ impl<T: Ord> MaxHeap<T> {
             item.index.store(index, Ordering::Release);
         } else if left_child_index == self.items.len() - 1 {
             // one child
-            if item.item < self.items[left_child_index].item {
+            if item.key < self.items[left_child_index].key {
                 // swap with left child
                 self.items.swap(index, left_child_index);
                 self.items[left_child_index]
@@ -160,13 +167,13 @@ impl<T: Ord> MaxHeap<T> {
         } else {
             // two children
             let larger_child_index =
-                if self.items[left_child_index].item > self.items[left_child_index + 1].item {
+                if self.items[left_child_index].key > self.items[left_child_index + 1].key {
                     left_child_index
                 } else {
                     left_child_index + 1
                 };
 
-            if item.item < self.items[larger_child_index].item {
+            if item.key < self.items[larger_child_index].key {
                 // swap with larger child
                 self.items.swap(index, larger_child_index);
                 self.items[index].index.store(index, Ordering::Release);

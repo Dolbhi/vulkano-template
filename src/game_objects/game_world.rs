@@ -127,6 +127,9 @@ impl GameWorld {
             }
         }
 
+        let mut contact_resolver = self.colliders.get_contacts(&mut self.transforms);
+        // contact_resolver.resolve(&self.transforms);
+
         // [Profiling] Colliders
         let coll_time = coll_start.elapsed().as_micros() as u32;
         let lerp_start = std::time::Instant::now();

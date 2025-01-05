@@ -9,9 +9,12 @@ use crate::{
 
 use super::{RigidBody, Vector};
 
+#[derive(PartialEq, Clone, Copy)]
+struct OrdF32(pub f32);
+
 pub struct ContactResolver {
-    pending_contacts: MaxHeap<CmpContact>,
-    settled_contacts: Vec<(Arc<AtomicUsize>, CmpContact)>,
+    pending_contacts: MaxHeap<OrdF32, Contact>,
+    settled_contacts: Vec<(Arc<AtomicUsize>, Contact)>,
 }
 
 pub struct Contact {
@@ -24,11 +27,6 @@ pub struct Contact {
 
     closing_velocity: Vector,
     target_delta_velocity: f32,
-}
-
-struct CmpContact {
-    value: f32,
-    contact: Contact,
 }
 
 struct RigidBodyRef {
@@ -47,20 +45,20 @@ impl ContactResolver {
     }
 
     pub fn add_contact(&mut self, index: Arc<AtomicUsize>, contact: Contact) {
-        let cmp_contact = CmpContact {
-            value: contact.penetration,
-            contact,
-        };
-        self.pending_contacts.insert_with_ref(cmp_contact, index);
+        self.pending_contacts
+            .insert_with_ref(contact.penetration.into(), contact, index);
     }
 
     pub fn resolve(&mut self, transform_system: &TransformSystem) {
         self.resolve_penetration(transform_system);
 
         // re-insert contacts with velocity as value
-        for (index, mut contact) in self.settled_contacts.drain(0..self.settled_contacts.len()) {
-            contact.value = contact.contact.target_delta_velocity.abs();
-            self.pending_contacts.insert_with_ref(contact, index);
+        for (index, contact) in self.settled_contacts.drain(0..self.settled_contacts.len()) {
+            self.pending_contacts.insert_with_ref(
+                contact.target_delta_velocity.into(),
+                contact,
+                index,
+            );
         }
 
         self.resolve_velocity(transform_system);
@@ -164,19 +162,24 @@ impl Contact {
     }
 }
 
-impl PartialEq for CmpContact {
-    fn eq(&self, other: &Self) -> bool {
-        self.value.eq(&other.value)
-    }
-}
-impl Eq for CmpContact {}
-impl PartialOrd for CmpContact {
+impl Eq for OrdF32 {}
+impl PartialOrd for OrdF32 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.value.partial_cmp(&other.value)
+        Some(self.cmp(other))
     }
 }
-impl Ord for CmpContact {
+impl Ord for OrdF32 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.value.total_cmp(&other.value)
+        self.0.total_cmp(&other.0)
+    }
+}
+impl From<f32> for OrdF32 {
+    fn from(value: f32) -> Self {
+        OrdF32(value)
+    }
+}
+impl From<OrdF32> for f32 {
+    fn from(value: OrdF32) -> Self {
+        value.0
     }
 }
