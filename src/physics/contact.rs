@@ -31,9 +31,14 @@ pub struct Contact {
 
 struct RigidBodyRef {
     rigidbody: Arc<RwLock<RigidBody>>,
-    relative_pos: Vector,
     /// location of this contact in rigidbody.contact_refs
     index: usize,
+
+    relative_pos: Vector,
+    torque_per_impulse: Vector,
+
+    inv_mass: f32,
+    angular_inertia: f32,
 }
 
 impl ContactResolver {
@@ -62,6 +67,17 @@ impl ContactResolver {
         }
 
         self.resolve_velocity(transform_system);
+
+        // drop all lingering references to contacts in rigidbodies
+        for (index, contact) in self.settled_contacts.drain(0..self.settled_contacts.len()) {
+            if Arc::strong_count(&index) > 1 {
+                contact.rb_1.rigidbody.write().unwrap().contact_refs.clear();
+
+                if let Some(rb_2) = contact.rb_2 {
+                    rb_2.rigidbody.write().unwrap().contact_refs.clear();
+                }
+            }
+        }
     }
 
     fn resolve_penetration(&mut self, transform_system: &TransformSystem) {
@@ -87,43 +103,65 @@ impl Contact {
         let heap_index = Arc::new(AtomicUsize::new(0));
 
         // aquire rb 1 data
-        let mut rb_lock_1 = rb_1.write().unwrap();
+        let mut rb_guard_1 = rb_1.write().unwrap();
         let transform_1 = transform_sys
-            .get_transform(&rb_lock_1.transform)
+            .get_transform(&rb_guard_1.transform)
             .unwrap()
             .get_local_transform();
-        let relative_pos_1 = position - transform_1.translation;
-        let point_vel_1 = rb_lock_1.point_velocity(relative_pos_1);
+
+        let relative_pos = position - transform_1.translation;
+        let point_vel_1 = rb_guard_1.point_velocity(relative_pos);
+
+        // normal points away from contact point 1
+        let normal = point_vel_1.dot(normal).signum() * normal;
+
+        let inv_mass = rb_guard_1.inv_mass;
+        // n x r
+        let torque_per_impulse = normal.cross(relative_pos);
+        let angular_inertia =
+            rb_guard_1.angular_vel_per_impulse(torque_per_impulse, *transform_1.rotation);
 
         // link to rb
-        let index = rb_lock_1.contact_refs.len();
-        rb_lock_1.contact_refs.push(heap_index.clone());
-        drop(rb_lock_1);
+        let index = rb_guard_1.contact_refs.len();
+        rb_guard_1.contact_refs.push(heap_index.clone());
+        drop(rb_guard_1);
         let rb_1 = RigidBodyRef {
             rigidbody: rb_1,
-            relative_pos: relative_pos_1,
             index,
+            relative_pos,
+            torque_per_impulse,
+            inv_mass,
+            angular_inertia,
         };
 
         // rb_lock_1
         if let Some(rb_2) = rb_2 {
             // aquire rb 1 data
-            let mut rb_lock_2 = rb_2.write().unwrap();
+            let mut rb_guard_2 = rb_2.write().unwrap();
             let transform_2 = transform_sys
-                .get_transform(&rb_lock_2.transform)
+                .get_transform(&rb_guard_2.transform)
                 .unwrap()
                 .get_local_transform();
-            let relative_pos_2 = position - transform_2.translation;
-            let point_vel_2 = rb_lock_2.point_velocity(relative_pos_2);
+            let relative_pos = position - transform_2.translation;
+            let point_vel_2 = rb_guard_2.point_velocity(relative_pos);
+
+            let inv_mass = rb_guard_2.inv_mass;
+            // n x r
+            let torque_per_impulse = -normal.cross(relative_pos);
+            let angular_inertia =
+                rb_guard_2.angular_vel_per_impulse(torque_per_impulse, *transform_2.rotation);
 
             // link to rb
-            let index = rb_lock_2.contact_refs.len();
-            rb_lock_2.contact_refs.push(heap_index.clone());
-            drop(rb_lock_2);
+            let index = rb_guard_2.contact_refs.len();
+            rb_guard_2.contact_refs.push(heap_index.clone());
+            drop(rb_guard_2);
             let rb_2 = RigidBodyRef {
                 rigidbody: rb_2,
-                relative_pos: relative_pos_2,
                 index,
+                relative_pos,
+                torque_per_impulse,
+                inv_mass,
+                angular_inertia,
             };
 
             let closing_velocity = point_vel_1 - point_vel_2;
