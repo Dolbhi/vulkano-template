@@ -124,9 +124,7 @@ impl App {
     pub fn start(event_loop: &EventLoop<()>) -> Self {
         println!("Welcome to THE RUSTY RENDERER!");
         println!("Press WASD, SPACE and LSHIFT to move and Q to swap materials");
-        println!(
-            "Press O to add a random bounding box to the BVH, press I to filter the depth shown"
-        );
+        println!("Press O to spawn a cube at the camera, press I to filter the depth shown");
         println!("Press P to pause the logic loop and = to advance it by 1 frame");
         println!("[TODO] Press F to toggle camera light");
 
