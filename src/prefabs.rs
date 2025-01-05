@@ -200,13 +200,17 @@ pub fn init_phys_test(mut loader: WorldLoader) {
 
     // collider test
     let transform = loader.world.transforms.add_transform([0., 5., 0.]);
+    let mut rigidbody = RigidBody::new(transform);
+    rigidbody.gravity_multiplier = 0.0;
+    rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
+    let rigidbody = Arc::new(RwLock::new(rigidbody));
     let collider = loader.world.colliders.add(CuboidCollider::new(
         &mut loader.world.transforms,
         transform,
-        None,
+        Some(rigidbody.clone()),
     ));
     let ro = loader.resources.load_ro(Cube, red_mat, true);
-    load_object_with_transform!(loader.world.world, transform, collider, ro);
+    load_object_with_transform!(loader.world.world, transform, collider, ro, rigidbody);
 
     let transform = loader.world.transforms.add_transform(
         TransformCreateInfo::from([1.9, 5., 1.9]).set_rotation(Quaternion::from_axis_angle(
@@ -214,11 +218,15 @@ pub fn init_phys_test(mut loader: WorldLoader) {
             Rad(PI / 3.),
         )),
     );
+    let mut rigidbody = RigidBody::new(transform);
+    rigidbody.gravity_multiplier = 0.0;
+    rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
+    let rigidbody = Arc::new(RwLock::new(rigidbody));
     let collider = loader.world.colliders.add(CuboidCollider::new(
         &mut loader.world.transforms,
         transform,
-        None,
+        Some(rigidbody.clone()),
     ));
     let ro = loader.resources.load_ro(Cube, red_mat, true);
-    load_object_with_transform!(loader.world.world, transform, collider, ro);
+    load_object_with_transform!(loader.world.world, transform, collider, ro, rigidbody);
 }

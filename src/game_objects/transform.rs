@@ -101,6 +101,7 @@ impl Transform {
         self.global_model.is_none()
     }
 
+    /// modify translation, rotation and scale through a closure.
     pub fn mutate(
         &mut self,
         modification: impl FnOnce(&mut Vector3<f32>, &mut Quaternion<f32>, &mut Vector3<f32>),

@@ -262,7 +262,14 @@ impl ColliderSystem {
         let mut result = ContactResolver::new();
 
         for (mut coll_1, mut coll_2) in self.bounds_tree.get_overlaps() {
-            if coll_1.rigidbody.is_none() {
+            if let Some(rb_1) = &coll_1.rigidbody {
+                if let Some(rb_2) = &coll_2.rigidbody {
+                    if Arc::ptr_eq(rb_1, rb_2) {
+                        // ignore contacts within a rigidbody
+                        continue;
+                    }
+                }
+            } else {
                 if coll_2.rigidbody.is_some() {
                     std::mem::swap(&mut coll_1, &mut coll_2);
                 } else {

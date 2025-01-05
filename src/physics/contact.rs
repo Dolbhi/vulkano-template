@@ -7,7 +7,7 @@ use crate::{
     utilities::MaxHeap,
 };
 
-use super::{RigidBody, Vector};
+use super::{geo_alg::bivec_exp, RigidBody, Vector};
 
 #[derive(PartialEq, Clone, Copy)]
 struct OrdF32(pub f32);
@@ -19,6 +19,7 @@ pub struct ContactResolver {
 
 pub struct Contact {
     position: Vector,
+    /// points from rb_1 to rb_2
     normal: Vector,
     penetration: f32,
 
@@ -37,7 +38,7 @@ struct RigidBodyRef {
     relative_pos: Vector,
     torque_per_impulse: Vector,
 
-    inv_mass: f32,
+    linear_inertia: f32,
     angular_inertia: f32,
 }
 
@@ -54,7 +55,7 @@ impl ContactResolver {
             .insert_with_ref(contact.penetration.into(), contact, index);
     }
 
-    pub fn resolve(&mut self, transform_system: &TransformSystem) {
+    pub fn resolve(&mut self, transform_system: &mut TransformSystem) {
         self.resolve_penetration(transform_system);
 
         // re-insert contacts with velocity as value
@@ -80,10 +81,96 @@ impl ContactResolver {
         }
     }
 
-    fn resolve_penetration(&mut self, transform_system: &TransformSystem) {
+    fn resolve_penetration(&mut self, transform_system: &mut TransformSystem) {
         while let Some((index, contact)) = self.pending_contacts.extract_min() {
-            // resolve penetration
-            // update penetration of contacts on the same rb
+            if let Some(rb_2) = &contact.rb_2 {
+                // calculate move
+                let inv_total_inertia = 1.
+                    / (contact.rb_1.linear_inertia
+                        + contact.rb_1.angular_inertia
+                        + rb_2.linear_inertia
+                        + rb_2.angular_inertia);
+
+                contact.rb_1.resolve_penetration(
+                    -contact.normal,
+                    contact.penetration,
+                    inv_total_inertia,
+                    &mut self.pending_contacts,
+                    transform_system,
+                );
+                rb_2.resolve_penetration(
+                    contact.normal,
+                    contact.penetration,
+                    inv_total_inertia,
+                    &mut self.pending_contacts,
+                    transform_system,
+                );
+            } else {
+                // calculate move
+                let inv_total_inertia =
+                    1. / (contact.rb_1.linear_inertia + contact.rb_1.angular_inertia);
+
+                contact.rb_1.resolve_penetration(
+                    -contact.normal,
+                    contact.penetration,
+                    inv_total_inertia,
+                    &mut self.pending_contacts,
+                    transform_system,
+                );
+
+                // let linear_move_1 =
+                //     -contact.penetration * contact.rb_1.linear_inertia * inv_total_inertia;
+                // let angular_move_1 =
+                //     contact.penetration * contact.rb_1.angular_inertia * inv_total_inertia;
+
+                // let rotate_1 = angular_move_1 * contact.rb_1.torque_per_impulse
+                //     / contact.rb_1.relative_pos.magnitude2();
+
+                // // apply move
+                // let guard_1 = contact.rb_1.rigidbody.read().unwrap();
+                // transform_system
+                //     .get_transform_mut(&guard_1.transform)
+                //     .unwrap()
+                //     .mutate(|translation, rotation, scale| {
+                //         *translation += linear_move_1 * contact.normal;
+                //         *rotation = bivec_exp(rotate_1 * 0.5).into_quaternion() * *rotation;
+                //     });
+
+                // // update penetration of contacts on the same rb
+                // for (i, other_index) in guard_1.contact_refs.iter().enumerate() {
+                //     // if i == contact.rb_1.index {
+                //     //     // skip self
+                //     //     continue;
+                //     // }
+                //     if Arc::ptr_eq(&index, other_index) {
+                //         // skip self
+                //         continue;
+                //     }
+
+                //     self.pending_contacts.modify_key(
+                //         other_index.load(std::sync::atomic::Ordering::Acquire),
+                //         |other_contact| {
+                //             let norm_mult = if Arc::ptr_eq(
+                //                 &contact.rb_1.rigidbody,
+                //                 &other_contact.rb_1.rigidbody,
+                //             ) {
+                //                 1. // moving in normal dir increases pen
+                //             } else {
+                //                 -1.
+                //             };
+
+                //             other_contact.penetration += norm_mult
+                //                 * linear_move_1
+                //                 * contact.normal.dot(other_contact.normal);
+                //             other_contact.penetration +=
+                //                 norm_mult * rotate_1.dot(other_contact.rb_1.torque_per_impulse);
+
+                //             other_contact.penetration.into()
+                //         },
+                //     );
+                // }
+            }
+
             self.settled_contacts.push((index, contact));
         }
     }
@@ -115,9 +202,9 @@ impl Contact {
         // normal points away from contact point 1
         let normal = point_vel_1.dot(normal).signum() * normal;
 
-        let inv_mass = rb_guard_1.inv_mass;
+        let linear_inertia = rb_guard_1.inv_mass;
         // n x r
-        let torque_per_impulse = normal.cross(relative_pos);
+        let torque_per_impulse = -normal.cross(relative_pos);
         let angular_inertia =
             rb_guard_1.angular_vel_per_impulse(torque_per_impulse, *transform_1.rotation);
 
@@ -130,11 +217,10 @@ impl Contact {
             index,
             relative_pos,
             torque_per_impulse,
-            inv_mass,
+            linear_inertia,
             angular_inertia,
         };
 
-        // rb_lock_1
         if let Some(rb_2) = rb_2 {
             // aquire rb 1 data
             let mut rb_guard_2 = rb_2.write().unwrap();
@@ -147,7 +233,7 @@ impl Contact {
 
             let inv_mass = rb_guard_2.inv_mass;
             // n x r
-            let torque_per_impulse = -normal.cross(relative_pos);
+            let torque_per_impulse = normal.cross(relative_pos);
             let angular_inertia =
                 rb_guard_2.angular_vel_per_impulse(torque_per_impulse, *transform_2.rotation);
 
@@ -160,7 +246,7 @@ impl Contact {
                 index,
                 relative_pos,
                 torque_per_impulse,
-                inv_mass,
+                linear_inertia: inv_mass,
                 angular_inertia,
             };
 
@@ -196,6 +282,61 @@ impl Contact {
                     target_delta_velocity: -2. * point_vel_1.dot(normal),
                 },
             )
+        }
+    }
+}
+
+impl RigidBodyRef {
+    /// normal is in target move direction to resolve penetration
+    fn resolve_penetration(
+        &self,
+        normal: Vector,
+        penetration: f32,
+        inv_total_inertia: f32,
+        pending_contacts: &mut MaxHeap<OrdF32, Contact>,
+        transform_system: &mut TransformSystem,
+    ) {
+        // calculate move
+        let linear_move = penetration * self.linear_inertia * inv_total_inertia;
+        let angular_move = penetration * self.angular_inertia * inv_total_inertia;
+
+        let move_1 = linear_move * normal;
+        let rotate_1 = angular_move * self.torque_per_impulse / self.relative_pos.magnitude2();
+
+        // apply move
+        let guard_1 = self.rigidbody.read().unwrap();
+        transform_system
+            .get_transform_mut(&guard_1.transform)
+            .unwrap()
+            .mutate(|translation, rotation, scale| {
+                *translation += move_1;
+                *rotation = bivec_exp(rotate_1 * 0.5).into_quaternion() * *rotation;
+            });
+
+        // update penetration of contacts on the same rb
+        for (i, other_index) in guard_1.contact_refs.iter().enumerate() {
+            // could compare heap index Arc instead
+            if i == self.index {
+                // skip self
+                continue;
+            }
+
+            pending_contacts.modify_key(
+                other_index.load(std::sync::atomic::Ordering::Acquire),
+                |other_contact| {
+                    let norm_mult = if Arc::ptr_eq(&self.rigidbody, &self.rigidbody) {
+                        1. // moving in normal dir increases pen
+                    } else {
+                        -1.
+                    };
+
+                    other_contact.penetration += norm_mult * move_1.dot(other_contact.normal);
+                    other_contact.penetration +=
+                        norm_mult * rotate_1.dot(other_contact.rb_1.torque_per_impulse);
+
+                    other_contact.penetration.into()
+                },
+            );
         }
     }
 }

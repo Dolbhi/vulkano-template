@@ -1,7 +1,7 @@
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicU64},
-        Arc, Mutex,
+        Arc, Mutex, RwLock,
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -24,7 +24,7 @@ use crate::{
         Camera, GameWorld, MaterialSwapper, WorldLoader,
     },
     load_object_with_transform,
-    physics::CuboidCollider,
+    physics::{CuboidCollider, RigidBody},
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
     shaders::{DirectionLight, GPUGlobalData, GPUAABB},
@@ -383,8 +383,14 @@ impl App {
 
                     let transform =
                         transforms.add_transform(TransformCreateInfo::from(pos).set_rotation(rot));
-                    let collider = CuboidCollider::new(transforms, transform, None);
 
+                    let mut rigidbody = RigidBody::new(transform);
+                    rigidbody.gravity_multiplier = 0.0;
+                    rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
+                    let rigidbody = Arc::new(RwLock::new(rigidbody));
+
+                    let collider =
+                        CuboidCollider::new(transforms, transform, Some(rigidbody.clone()));
                     let collider = colliders.add(collider);
 
                     let mut resource_loader = self.resources.begin_retrieving(context, renderer);
@@ -395,7 +401,7 @@ impl App {
                         true,
                     );
 
-                    load_object_with_transform!(world, transform, collider, ro);
+                    load_object_with_transform!(world, transform, collider, ro, rigidbody);
 
                     self.inputs.o_triggered = false;
                 }

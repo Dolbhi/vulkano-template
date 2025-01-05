@@ -35,7 +35,7 @@ impl RigidBody {
             velocity: Vector::zero(),
             bivelocity: Vector::zero(),
 
-            inv_mass: 0.,
+            inv_mass: 1.,
             sqrt_angular_mass: (1., 1., 1.).into(),
             gravity_multiplier: 1.,
 
@@ -50,6 +50,8 @@ impl RigidBody {
             *t += self.velocity * delta_secs;
             *r = geo_alg::bivec_exp((delta_secs / 2.) * self.bivelocity).into_quaternion() * *r;
         });
+
+        // println!("MASSES: {:?}", self.sqrt_angular_mass);
     }
 
     pub fn point_velocity(&self, point: Vector) -> Vector {

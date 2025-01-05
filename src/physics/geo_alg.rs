@@ -49,11 +49,19 @@ pub fn vec_exp(vec: Vector) -> FullMultiVector {
 }
 pub fn bivec_exp(bivec: Vector) -> FullMultiVector {
     let l = bivec.magnitude();
-    let b = bivec / l;
-    FullMultiVector {
-        s: l.cos(),
-        b: b * l.sin(),
-        ..FullMultiVector::zero()
+
+    if l.is_zero() {
+        FullMultiVector {
+            s: 1.,
+            ..FullMultiVector::zero()
+        }
+    } else {
+        let b = bivec / l;
+        FullMultiVector {
+            s: l.cos(),
+            b: b * l.sin(),
+            ..FullMultiVector::zero()
+        }
     }
 }
 
