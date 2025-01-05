@@ -9,7 +9,7 @@ use cgmath::{InnerSpace, Quaternion, Rad, Rotation3, Vector3};
 use crate::{
     game_objects::{
         light::PointLightComponent, transform::TransformCreateInfo, MaterialSwapper, Rotate,
-        WorldLoader,
+        TransformTracker, WorldLoader,
     },
     load_object, load_object_with_transform,
     physics::{CuboidCollider, RigidBody},
@@ -210,7 +210,14 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         Some(rigidbody.clone()),
     ));
     let ro = loader.resources.load_ro(Cube, red_mat, true);
-    load_object_with_transform!(loader.world.world, transform, collider, ro, rigidbody);
+    load_object_with_transform!(
+        loader.world.world,
+        transform,
+        collider,
+        ro,
+        rigidbody,
+        TransformTracker("prefab")
+    );
 
     let transform = loader.world.transforms.add_transform(
         TransformCreateInfo::from([1.9, 5., 1.9]).set_rotation(Quaternion::from_axis_angle(

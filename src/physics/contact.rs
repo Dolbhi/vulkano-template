@@ -308,7 +308,7 @@ impl RigidBodyRef {
         transform_system
             .get_transform_mut(&guard_1.transform)
             .unwrap()
-            .mutate(|translation, rotation, scale| {
+            .mutate(|translation, rotation, _| {
                 *translation += move_1;
                 *rotation = bivec_exp(rotate_1 * 0.5).into_quaternion() * *rotation;
             });

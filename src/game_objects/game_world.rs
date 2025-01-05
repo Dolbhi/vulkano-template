@@ -9,7 +9,7 @@ use crate::{
 
 use super::{
     transform::{Transform, TransformID, TransformSystem},
-    Camera, Rotate,
+    Camera, Rotate, TransformTracker,
 };
 use legion::*;
 
@@ -128,7 +128,7 @@ impl GameWorld {
         }
 
         let mut contact_resolver = self.colliders.get_contacts(&mut self.transforms);
-        // contact_resolver.resolve(&mut self.transforms);
+        contact_resolver.resolve(&mut self.transforms);
 
         // [Profiling] Colliders
         let coll_time = coll_start.elapsed().as_micros() as u32;
@@ -165,6 +165,12 @@ impl GameWorld {
                 Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
                     * transform.get_local_transform().rotation,
             );
+        }
+
+        let mut query = <(&TransformID, &TransformTracker)>::query();
+        for (transform_id, TransformTracker(tag)) in query.iter(&self.world) {
+            let model = self.transforms.get_global_model(transform_id).unwrap();
+            println!("[Transform] {}: {:?}", tag, model);
         }
 
         unsafe {

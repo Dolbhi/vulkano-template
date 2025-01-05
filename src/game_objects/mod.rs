@@ -29,6 +29,8 @@ pub struct MaterialSwapper<T: Clone> {
     curent_index: usize,
 }
 
+pub struct TransformTracker<'a>(pub &'a str);
+
 pub struct WorldLoader<'a, 'b: 'a> {
     pub world: &'a mut GameWorld,
     pub resources: &'a mut ResourceRetriever<'b>,
