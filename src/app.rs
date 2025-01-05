@@ -10,7 +10,7 @@ use std::{
 use cgmath::{One, Quaternion, Vector3, Vector4};
 use legion::*;
 
-use rand::Rng;
+// use rand::Rng;
 use winit::{
     dpi::PhysicalPosition,
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -20,7 +20,7 @@ use winit::{
 use crate::{
     game_objects::{
         light::PointLightComponent,
-        transform::{self, TransformCreateInfo, TransformID},
+        transform::{TransformCreateInfo, TransformID},
         Camera, GameWorld, MaterialSwapper, WorldLoader,
     },
     load_object_with_transform,
@@ -49,11 +49,13 @@ struct InputState {
     d: KeyState,
     q: KeyState,
     r: KeyState,
+    i: KeyState,
     o: KeyState,
     p: KeyState,
     space: KeyState,
     shift: KeyState,
     escape: KeyState,
+    equals: KeyState,
     q_triggered: bool,
     o_triggered: bool,
 }
@@ -123,8 +125,9 @@ impl App {
         println!("Welcome to THE RUSTY RENDERER!");
         println!("Press WASD, SPACE and LSHIFT to move and Q to swap materials");
         println!(
-            "Press O to add a random bounding box to the BVH, press P to filter the depth shown"
+            "Press O to add a random bounding box to the BVH, press I to filter the depth shown"
         );
+        println!("Press P to pause the logic loop and = to advance it by 1 frame");
         println!("[TODO] Press F to toggle camera light");
 
         let init_start_time = Instant::now();
@@ -609,21 +612,41 @@ impl App {
                 };
                 self.inputs.escape = state;
             }
+            VirtualKeyCode::P => {
+                // pause logic loop
+                if state == Pressed && self.inputs.p == Released {
+                    if self.game_state == GameState::Playing {
+                        let paused = self
+                            .game_thread
+                            .paused
+                            .load(std::sync::atomic::Ordering::Acquire);
+                        self.game_thread.set_paused(!paused);
+                    }
+                }
+                self.inputs.p = state;
+            }
+            VirtualKeyCode::Equals => {
+                // step logic loop
+                if state == Pressed && self.inputs.equals == Released {
+                    self.game_thread.step();
+                }
+                self.inputs.equals = state;
+            }
             VirtualKeyCode::O => {
                 // add bounding box
                 self.inputs.o_triggered = state == Pressed && self.inputs.o == Released;
                 self.inputs.o = state;
             }
-            VirtualKeyCode::P => {
+            VirtualKeyCode::I => {
                 // scroll through depths
-                if state == Pressed && self.inputs.p == Released {
+                if state == Pressed && self.inputs.i == Released {
                     if let Some(depth) = self.bounds_debug_depth {
                         self.bounds_debug_depth = Some(depth + 1);
                     } else {
                         self.bounds_debug_depth = Some(0);
                     }
                 }
-                self.inputs.p = state;
+                self.inputs.i = state;
             }
             _ => {}
         }
@@ -720,6 +743,13 @@ impl GameWorldThread {
         self.paused
             .store(paused, std::sync::atomic::Ordering::Relaxed);
         if !paused {
+            self.thread.thread().unpark();
+        }
+    }
+
+    /// Steps the game world forward 1 frame if it is paused
+    fn step(&self) {
+        if self.paused.load(std::sync::atomic::Ordering::Acquire) {
             self.thread.thread().unpark();
         }
     }
