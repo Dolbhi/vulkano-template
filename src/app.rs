@@ -324,6 +324,21 @@ impl App {
                 if self.game_state == GameState::Playing {
                     inputs.movement = self.inputs.get_move();
                     camera.set_rotation(self.camera_rotation);
+
+                    // allow moving while frozen
+                    if self
+                        .game_thread
+                        .paused
+                        .load(std::sync::atomic::Ordering::Acquire)
+                    {
+                        // move cam
+                        inputs.move_transform(
+                            transforms.get_transform_mut(&camera.transform).unwrap(),
+                            Instant::now()
+                                .duration_since(self.last_frame_time)
+                                .as_secs_f32(),
+                        );
+                    }
                 }
                 camera.sync_transform(transforms);
 
