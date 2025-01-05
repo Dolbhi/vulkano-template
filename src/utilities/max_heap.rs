@@ -1,6 +1,9 @@
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    usize,
 };
 
 /// # Panics
@@ -13,6 +16,11 @@ struct HeapItem<K: Ord + Copy, T> {
     index: Arc<AtomicUsize>,
     key: K,
     item: T,
+}
+
+pub struct HeapIter<'a, K: Ord + Copy, T> {
+    next_index: usize,
+    heap: &'a MaxHeap<K, T>,
 }
 
 impl<K: Ord + Copy, T> MaxHeap<K, T> {
@@ -45,6 +53,7 @@ impl<K: Ord + Copy, T> MaxHeap<K, T> {
         let min_item = self.items.pop().unwrap();
         self.down_heap(0);
 
+        min_item.index.store(usize::MAX, Ordering::Release);
         Some((min_item.index, min_item.item))
     }
 
@@ -95,6 +104,7 @@ impl<K: Ord + Copy, T> MaxHeap<K, T> {
             self.up_heap(index);
         }
 
+        item.index.store(usize::MAX, Ordering::Release);
         (item.index, item.item)
     }
 
@@ -193,6 +203,13 @@ impl<K: Ord + Copy, T> MaxHeap<K, T> {
         index * 2 + 1
     }
 
+    pub fn iter(&self) -> HeapIter<K, T> {
+        HeapIter {
+            next_index: 0,
+            heap: self,
+        }
+    }
+
     /// # Panics
     /// Panics if given an index of 0
     ///
@@ -203,3 +220,26 @@ impl<K: Ord + Copy, T> MaxHeap<K, T> {
         (index - 1) / 2
     }
 }
+
+impl<K: Ord + Copy, T> Iterator for MaxHeap<K, T> {
+    type Item = (Arc<AtomicUsize>, T);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.extract_min()
+    }
+}
+
+impl<'a, K: Ord + Copy, T> Iterator for HeapIter<'a, K, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = self.heap.items.get(self.next_index);
+        self.next_index += 1;
+        next.map(|heap_item| &heap_item.item)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = self.heap.len() - self.next_index;
+        (size, Some(size))
+    }
+}
+impl<'a, K: Ord + Copy, T> ExactSizeIterator for HeapIter<'a, K, T> {}

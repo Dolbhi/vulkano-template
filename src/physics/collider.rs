@@ -333,24 +333,35 @@ impl ColliderSystem {
                     }
 
                     // convert to world dist squared
-                    let x_depth = x_depth * x_depth * model_1_sqr[0];
-                    let y_depth = y_depth * y_depth * model_1_sqr[1];
-                    let z_depth = z_depth * z_depth * model_1_sqr[2];
+                    let point_depth_sqr = [
+                        x_depth * x_depth * model_1_sqr[0],
+                        y_depth * y_depth * model_1_sqr[1],
+                        z_depth * z_depth * model_1_sqr[2],
+                    ];
 
-                    if x_depth > max_pen_pf_sqr {
-                        max_pen_pf_sqr = x_depth;
+                    // find min depth for this point
+                    let min_index = if point_depth_sqr[0] < point_depth_sqr[1] {
+                        if point_depth_sqr[0] < point_depth_sqr[2] {
+                            // x min
+                            0
+                        } else {
+                            // z min
+                            2
+                        }
+                    } else {
+                        if point_depth_sqr[1] < point_depth_sqr[2] {
+                            // y min
+                            1
+                        } else {
+                            // z min
+                            2
+                        }
+                    };
+
+                    if point_depth_sqr[min_index] > max_pen_pf_sqr {
+                        max_pen_pf_sqr = point_depth_sqr[min_index];
                         contact_point_pf = point;
-                        pen_axis = point.x.signum() as i32;
-                    }
-                    if y_depth > max_pen_pf_sqr {
-                        max_pen_pf_sqr = y_depth;
-                        contact_point_pf = point;
-                        pen_axis = 2 * point.y.signum() as i32;
-                    }
-                    if z_depth > max_pen_pf_sqr {
-                        max_pen_pf_sqr = z_depth;
-                        contact_point_pf = point;
-                        pen_axis = 3 * point.z.signum() as i32;
+                        pen_axis = (1 + min_index as i32) * point.x.signum() as i32;
                     }
                 }
 
@@ -381,25 +392,57 @@ impl ColliderSystem {
                         continue;
                     }
 
-                    // convert to world dist squared
-                    let x_depth = x_depth * x_depth * x_2_sqr;
-                    let y_depth = y_depth * y_depth * y_2_sqr;
-                    let z_depth = z_depth * z_depth * z_2_sqr;
+                    // // convert to world dist squared
+                    // let x_depth = x_depth * x_depth * x_2_sqr;
+                    // let y_depth = y_depth * y_depth * y_2_sqr;
+                    // let z_depth = z_depth * z_depth * z_2_sqr;
 
-                    if x_depth > max_pen_pf_sqr {
-                        max_pen_pf_sqr = x_depth;
+                    // if x_depth > max_pen_pf_sqr {
+                    //     max_pen_pf_sqr = x_depth;
+                    //     contact_point_pf = CUBE_VERTICES[i];
+                    //     pen_axis = 4 * a2_proj[0].signum() as i32;
+                    // }
+                    // if y_depth > max_pen_pf_sqr {
+                    //     max_pen_pf_sqr = y_depth;
+                    //     contact_point_pf = CUBE_VERTICES[i];
+                    //     pen_axis = 5 * a2_proj[1].signum() as i32;
+                    // }
+                    // if z_depth > max_pen_pf_sqr {
+                    //     max_pen_pf_sqr = z_depth;
+                    //     contact_point_pf = CUBE_VERTICES[i];
+                    //     pen_axis = 6 * a2_proj[2].signum() as i32;
+                    // }
+
+                    // convert to world dist squared
+                    let point_depth_sqr = [
+                        x_depth * x_depth * x_2_sqr,
+                        y_depth * y_depth * y_2_sqr,
+                        z_depth * z_depth * z_2_sqr,
+                    ];
+
+                    // find min depth for this point
+                    let min_index = if point_depth_sqr[0] < point_depth_sqr[1] {
+                        if point_depth_sqr[0] < point_depth_sqr[2] {
+                            // x min
+                            0
+                        } else {
+                            // z min
+                            2
+                        }
+                    } else {
+                        if point_depth_sqr[1] < point_depth_sqr[2] {
+                            // y min
+                            1
+                        } else {
+                            // z min
+                            2
+                        }
+                    };
+
+                    if point_depth_sqr[min_index] > max_pen_pf_sqr {
+                        max_pen_pf_sqr = point_depth_sqr[min_index];
                         contact_point_pf = CUBE_VERTICES[i];
-                        pen_axis = 4 * a2_proj[0].signum() as i32;
-                    }
-                    if y_depth > max_pen_pf_sqr {
-                        max_pen_pf_sqr = y_depth;
-                        contact_point_pf = CUBE_VERTICES[i];
-                        pen_axis = 5 * a2_proj[1].signum() as i32;
-                    }
-                    if z_depth > max_pen_pf_sqr {
-                        max_pen_pf_sqr = z_depth;
-                        contact_point_pf = CUBE_VERTICES[i];
-                        pen_axis = 6 * a2_proj[2].signum() as i32;
+                        pen_axis = (4 + min_index as i32) * a2_proj[min_index].signum() as i32;
                     }
                 }
 
@@ -453,7 +496,7 @@ impl ColliderSystem {
                                 max_pen_ee_sqr = depth;
                                 contact_point_ee = ds[a1_i];
                                 pen_axis_1 = a1_i + 1;
-                                pen_axis_2 = i + 1;
+                                pen_axis_2 = i + 4;
                             }
                         }
                     }
@@ -467,8 +510,8 @@ impl ColliderSystem {
                     continue;
                 }
                 if max_pen_pf_sqr >= max_pen_ee_sqr {
-                    // println!("before: {:?}", contact_point_pf);
                     let normal = pen_axis.signum() as f32 * axes[pen_axis.abs() as usize - 1];
+                    // println!("pf collision normal: {:?}", normal);
                     let point = model_1 * contact_point_pf.extend(1.);
 
                     let (index, contact) = Contact::new(
@@ -481,8 +524,8 @@ impl ColliderSystem {
                     );
                     result.add_contact(index, contact);
                 } else {
-                    // println!("before: {:?}", contact_point_ee);
                     let normal = axes[pen_axis_1 - 1].cross(axes[pen_axis_2 - 1]);
+                    // println!("ee collision normal: {:?}", normal);
                     let point = model_1 * contact_point_ee.extend(1.);
 
                     let (index, contact) = Contact::new(

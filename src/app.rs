@@ -494,16 +494,29 @@ impl App {
                         });
                     }
                     // show contacts
-                    // for (pos, _) in colliders.get_contacts(transforms) {
-                    //     // println!("Pos: {:?}", pos);
-                    //     let min_cast: [f32; 3] = (pos - Vector3::new(0.1, 0.1, 0.1)).into();
-                    //     let max_cast: [f32; 3] = (pos + Vector3::new(0.1, 0.1, 0.1)).into();
-                    //     bounding_boxes.push(GPUAABB {
-                    //         min: min_cast.into(),
-                    //         max: max_cast.into(),
-                    //         color: [0., 0., 1., 1.],
-                    //     });
-                    // }
+                    for contact in colliders.get_contacts(transforms).get_contacts() {
+                        let (position, normal, _) = contact.get_debug_info();
+
+                        // contact point
+                        let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [0., 0., 1., 1.],
+                        });
+
+                        // normal indicator
+                        let min_cast: [f32; 3] =
+                            (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
+                        let max_cast: [f32; 3] =
+                            (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [0., 0., 1., 1.],
+                        });
+                    }
 
                     frame.upload_box_data(bounding_boxes.into_iter());
                 } else {
@@ -545,16 +558,29 @@ impl App {
                         });
                     }
                     // show contacts
-                    // for (pos, _) in colliders.get_contacts(transforms) {
-                    //     // println!("Pos: {:?}", pos);
-                    //     let min_cast: [f32; 3] = (pos - Vector3::new(0.1, 0.1, 0.1)).into();
-                    //     let max_cast: [f32; 3] = (pos + Vector3::new(0.1, 0.1, 0.1)).into();
-                    //     bounding_boxes.push(GPUAABB {
-                    //         min: min_cast.into(),
-                    //         max: max_cast.into(),
-                    //         color: [0., 0., 1., 1.],
-                    //     });
-                    // }
+                    for contact in colliders.get_contacts(transforms).get_contacts() {
+                        let (position, normal, _) = contact.get_debug_info();
+
+                        // contact position
+                        let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [0., 0., 1., 1.],
+                        });
+
+                        // normal indicator
+                        let min_cast: [f32; 3] =
+                            (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
+                        let max_cast: [f32; 3] =
+                            (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [0., 0., 1., 1.],
+                        });
+                    }
 
                     frame.upload_box_data(bounding_boxes.into_iter());
                 }
