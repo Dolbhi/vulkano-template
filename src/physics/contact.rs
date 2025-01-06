@@ -69,16 +69,7 @@ impl ContactResolver {
 
         self.resolve_velocity(transform_system);
 
-        // drop all lingering references to contacts in rigidbodies
-        for (index, contact) in self.settled_contacts.drain(0..self.settled_contacts.len()) {
-            if Arc::strong_count(&index) > 1 {
-                contact.rb_1.rigidbody.write().unwrap().contact_refs.clear();
-
-                if let Some(rb_2) = contact.rb_2 {
-                    rb_2.rigidbody.write().unwrap().contact_refs.clear();
-                }
-            }
-        }
+        self.clear();
     }
 
     fn resolve_penetration(&mut self, transform_system: &mut TransformSystem) {
@@ -123,6 +114,24 @@ impl ContactResolver {
         }
     }
     fn resolve_velocity(&mut self, transform_system: &TransformSystem) {}
+
+    // drop all contacts from pending and settled and remove their reference from their rigidbodies
+    pub fn clear(&mut self) {
+        while let Some(contact) = self.pending_contacts.extract_min() {
+            self.settled_contacts.push(contact);
+        }
+
+        // drop all lingering references to contacts in rigidbodies
+        for (index, contact) in self.settled_contacts.drain(0..self.settled_contacts.len()) {
+            if Arc::strong_count(&index) > 1 {
+                contact.rb_1.rigidbody.write().unwrap().contact_refs.clear();
+
+                if let Some(rb_2) = contact.rb_2 {
+                    rb_2.rigidbody.write().unwrap().contact_refs.clear();
+                }
+            }
+        }
+    }
 }
 
 impl Contact {
@@ -283,9 +292,9 @@ impl RigidBodyRef {
             if other_index_loaded < pending_contacts.len() {
                 pending_contacts.modify_key(other_index_loaded, |other_contact| {
                     let norm_mult = if Arc::ptr_eq(&self.rigidbody, &self.rigidbody) {
-                        1. // moving in normal dir increases pen
-                    } else {
                         -1.
+                    } else {
+                        1.
                     };
 
                     other_contact.penetration += norm_mult * move_1.dot(other_contact.normal);

@@ -105,7 +105,7 @@ pub struct App {
     bounds_debug_depth: Option<usize>,
 }
 
-const FIXED_DELTA_TIME: f32 = 0.02;
+const FIXED_DELTA_TIME: f32 = 0.01;
 /// Struct for handling the logic thread of the game world
 struct GameWorldThread {
     thread: JoinHandle<()>,
@@ -494,7 +494,8 @@ impl App {
                         });
                     }
                     // show contacts
-                    for contact in colliders.get_contacts(transforms).get_contacts() {
+                    let mut contacts = colliders.get_contacts(transforms);
+                    for contact in contacts.get_contacts() {
                         let (position, normal, _) = contact.get_debug_info();
 
                         // contact point
@@ -517,6 +518,7 @@ impl App {
                             color: [0., 0., 1., 1.],
                         });
                     }
+                    contacts.clear();
 
                     frame.upload_box_data(bounding_boxes.into_iter());
                 } else {
@@ -558,10 +560,11 @@ impl App {
                         });
                     }
                     // show contacts
-                    for contact in colliders.get_contacts(transforms).get_contacts() {
+                    let mut contacts = colliders.get_contacts(transforms);
+                    for contact in contacts.get_contacts() {
                         let (position, normal, _) = contact.get_debug_info();
 
-                        // contact position
+                        // contact point
                         let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
                         let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
                         bounding_boxes.push(GPUAABB {
@@ -581,6 +584,7 @@ impl App {
                             color: [0., 0., 1., 1.],
                         });
                     }
+                    contacts.clear();
 
                     frame.upload_box_data(bounding_boxes.into_iter());
                 }
