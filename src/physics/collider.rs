@@ -281,9 +281,12 @@ impl ColliderSystem {
             let model_1 = transforms.get_global_model(&coll_1.transform).unwrap(); // impl func to try get model without mut
             let model_2 = transforms.get_global_model(&coll_2.transform).unwrap();
 
-            if model_1.w.w != 1.0 || model_2.w.w != 1.0 {
-                println!("w1: {}, w2: {}", model_1.w.w, model_2.w.w);
-            }
+            // if model_1.w.w != 1.0 || model_2.w.w != 1.0 {
+            //     println!(
+            //         "models not normalised, w1: {}, w2: {}",
+            //         model_1.w.w, model_2.w.w
+            //     );
+            // }
 
             // seperating axis
             let dist = (model_1.w - model_2.w).truncate(); // might need to normalise
@@ -517,7 +520,7 @@ impl ColliderSystem {
                 // returned normal points outward from coll_1
                 // should return max pen as well
                 if max_pen_pf_sqr == 0. && max_pen_ee_sqr == 0.0 {
-                    println!("CANT FIND CONTACT >:(");
+                    // println!("CANT FIND CONTACT >:(");
                     continue;
                 }
                 if max_pen_pf_sqr >= max_pen_ee_sqr {

@@ -65,7 +65,7 @@ impl RigidBody {
         if self.inv_mass.is_zero() {
             return;
         }
-        self.sqrt_angular_mass = (1. / self.inv_mass * 24.).sqrt() * scale;
+        self.sqrt_angular_mass = (1. / (self.inv_mass * 24.)).sqrt() * scale;
     }
 
     /// inverse moment of inertia about an axis (and other stuff), calculated via black magic
@@ -76,6 +76,32 @@ impl RigidBody {
     ) -> f32 {
         let world_sam = rotation * self.sqrt_angular_mass;
         let tpi_squared = torque_per_impulse.magnitude2();
+
+        if tpi_squared.is_zero() {
+            return 0.;
+        }
+
         (tpi_squared * tpi_squared) / torque_per_impulse.cross(world_sam).magnitude2()
+    }
+}
+
+#[cfg(test)]
+mod physics_tests {
+    use crate::game_objects::transform::TransformSystem;
+    use crate::physics::RigidBody;
+
+    #[test]
+    fn check_angular_vpi() {
+        let mut transform = TransformSystem::new();
+        let mut rb = RigidBody::new(transform.next().unwrap());
+
+        rb.set_moi_as_cuboid((1., 1., 1.).into());
+
+        println!("WHATS THE VECTOR {:?}", rb.sqrt_angular_mass);
+
+        assert_eq!(
+            rb.angular_vel_per_impulse((1., 0., 0.).into(), (1., 0., 0., 0.).into()),
+            2.
+        );
     }
 }
