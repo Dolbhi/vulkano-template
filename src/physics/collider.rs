@@ -392,27 +392,6 @@ impl ColliderSystem {
                         continue;
                     }
 
-                    // // convert to world dist squared
-                    // let x_depth = x_depth * x_depth * x_2_sqr;
-                    // let y_depth = y_depth * y_depth * y_2_sqr;
-                    // let z_depth = z_depth * z_depth * z_2_sqr;
-
-                    // if x_depth > max_pen_pf_sqr {
-                    //     max_pen_pf_sqr = x_depth;
-                    //     contact_point_pf = CUBE_VERTICES[i];
-                    //     pen_axis = 4 * a2_proj[0].signum() as i32;
-                    // }
-                    // if y_depth > max_pen_pf_sqr {
-                    //     max_pen_pf_sqr = y_depth;
-                    //     contact_point_pf = CUBE_VERTICES[i];
-                    //     pen_axis = 5 * a2_proj[1].signum() as i32;
-                    // }
-                    // if z_depth > max_pen_pf_sqr {
-                    //     max_pen_pf_sqr = z_depth;
-                    //     contact_point_pf = CUBE_VERTICES[i];
-                    //     pen_axis = 6 * a2_proj[2].signum() as i32;
-                    // }
-
                     // convert to world dist squared
                     let point_depth_sqr = [
                         x_depth * x_depth * x_2_sqr,
@@ -453,34 +432,52 @@ impl ColliderSystem {
                 let mut contact_point_ee = [0., 0., 0.].into();
                 let mut pen_axis_1 = 0;
                 let mut pen_axis_2 = 0;
+                // for each unique axis point on 2
                 for point in [1, 2, 3, 7].map(|i| points_2[i]) {
+                    // for each edge from that point
                     for (i, a2) in axes_2.iter().enumerate() {
+                        // closest point on edge to 1's centre
                         let d = point - a2.dot(point) * axes_2_inv[i];
 
+                        // closest vertex on 1 to d (closest vertex to edge)
                         let p1: Vector = [d.x.signum(), d.y.signum(), d.z.signum()].into();
                         let p1_p2 = point - p1;
                         // let test = p1_p2.mul_element_wise(*a);
+
+                        // project edge onto each x,y,z plane
                         let a_projs: [Vector; 3] = [
                             [0., a2.y, a2.z].into(),
                             [a2.x, 0., a2.z].into(),
                             [a2.x, a2.y, 0.].into(),
                         ];
-                        // get closest point to 3 axes of 1
-                        let ds = a_projs
+                        // get closest point of edge to 3 edges of p1
+                        let d2_per_edge = a_projs
                             .map(|a_proj| point - a_proj.dot(p1_p2) * a2 / a_proj.magnitude2());
 
-                        // let mut potential_pen = f32::INFINITY;
-                        // let mut potential_contact: Vector = [0., 0., 0.].into();
-                        // let mut potential_axis = 0;
+                        let mut potential_pen = None;
+                        let mut potential_index = None;
+
+                        // for each closest point
                         for a1_i in 0..3 {
                             // check if point is in 2
-                            let d_from_2 = ds[a1_i] - space_2_to_space_1.w.truncate();
-                            if d_from_2.dot(axes_2_inv[i]).abs() > 1. {
+                            let d2_from_2 = d2_per_edge[a1_i] - space_2_to_space_1.w.truncate();
+                            if d2_from_2.dot(axes_2_inv[i]).abs() > 1. {
                                 continue;
                             }
 
-                            let d_abs = [ds[a1_i].x.abs(), ds[a1_i].y.abs(), ds[a1_i].z.abs()];
+                            // check if closest point on edge is in 2
+                            let mut d1_from_2 = d2_from_2;
+                            d1_from_2[a1_i] += p1[a1_i] - d2_per_edge[a1_i][a1_i];
+                            if d1_from_2.dot(axes_2_inv[i]).abs() > 1. {
+                                continue;
+                            }
+
                             // check if point is in 1
+                            let d_abs = [
+                                d2_per_edge[a1_i].x.abs(),
+                                d2_per_edge[a1_i].y.abs(),
+                                d2_per_edge[a1_i].z.abs(),
+                            ];
                             if d_abs[0] > 1. || d_abs[1] > 1. || d_abs[2] > 1. {
                                 continue;
                             }
@@ -492,10 +489,24 @@ impl ColliderSystem {
                             let depth = depth_1 * depth_1 * model_1_sqr[ci_1]
                                 + depth_2 * depth_2 * model_1_sqr[ci_2];
 
+                            if let Some(min_depth) = potential_pen {
+                                if depth < min_depth {
+                                    potential_pen = Some(depth);
+                                    potential_index = Some(a1_i)
+                                }
+                            } else {
+                                potential_pen = Some(depth);
+                                potential_index = Some(a1_i);
+                            }
+                        }
+
+                        if let Some(depth) = potential_pen {
                             if depth > max_pen_ee_sqr {
+                                let index = potential_index.unwrap();
+
                                 max_pen_ee_sqr = depth;
-                                contact_point_ee = ds[a1_i];
-                                pen_axis_1 = a1_i + 1;
+                                contact_point_ee = d2_per_edge[index];
+                                pen_axis_1 = index + 1;
                                 pen_axis_2 = i + 4;
                             }
                         }
