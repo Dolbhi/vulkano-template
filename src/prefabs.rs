@@ -11,7 +11,7 @@ use crate::{
         light::PointLightComponent, transform::TransformCreateInfo, MaterialSwapper, Rotate,
         TransformTracker, WorldLoader,
     },
-    load_object, load_object_with_transform,
+    load_object_with_transform,
     physics::{CuboidCollider, RigidBody},
     render::resource_manager::{MaterialID::*, MeshID::*, TextureID},
 };
@@ -161,6 +161,10 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         .resources
         .load_solid_material([1., 0., 0., 1.], true)
         .0;
+    let blue_mat = loader
+        .resources
+        .load_solid_material([0., 0., 1., 1.], true)
+        .0;
 
     let plane_trans = TransformCreateInfo {
         rotation: Quaternion::from_axis_angle([1., 0., 0.].into(), Rad(-PI / 2.)),
@@ -180,6 +184,26 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         None,
     ));
     load_object_with_transform!(loader.world.world, transform, collider);
+
+    // axis
+    loader.quick_ro(
+        TransformCreateInfo::from((1., -10., 0.)).set_scale((0.1, 0.1, 0.1)),
+        Cube,
+        red_mat,
+        true,
+    );
+    loader.quick_ro(
+        TransformCreateInfo::from((0., -9., 0.)).set_scale((0.1, 0.1, 0.1)),
+        Cube,
+        green_mat,
+        true,
+    );
+    loader.quick_ro(
+        TransformCreateInfo::from((0., -10., 1.)).set_scale((0.1, 0.1, 0.1)),
+        Cube,
+        blue_mat,
+        true,
+    );
 
     // rigidbody test
     let t = loader.world.transforms.add_transform([0., 1., 0.]);

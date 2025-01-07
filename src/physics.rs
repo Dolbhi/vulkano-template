@@ -4,7 +4,7 @@ mod geo_alg;
 // mod geo_alg_com;
 
 use crate::game_objects::transform::{Transform, TransformID};
-use cgmath::{InnerSpace, Quaternion, Vector3, Zero};
+use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, Quaternion, Vector3, Zero};
 pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy};
 use std::sync::{atomic::AtomicUsize, Arc};
 
@@ -15,6 +15,30 @@ const GRAVITY: Vector = Vector {
     y: -9.81,
     z: 0.,
 };
+
+/// Invert a othonormal model matrix that has no skew
+///
+/// Assumes matrix is normalised (model.w.w == 1)
+#[allow(dead_code)]
+pub fn quick_inverse(model: &mut Matrix4<f32>) {
+    // reverse translation
+    model.w *= -1.;
+    model.w.w = 1.;
+
+    // reverse rotation and scale
+    for i in [0, 1, 2] {
+        let m_2 = model[i].magnitude2();
+        model[i] /= m_2;
+    }
+    model.swap_elements((0, 1), (1, 0));
+    model.swap_elements((1, 2), (2, 1));
+    model.swap_elements((2, 0), (0, 2));
+}
+
+#[allow(dead_code)]
+pub fn matrix_truncate(model: &Matrix4<f32>) -> Matrix3<f32> {
+    Matrix3::from_cols(model.x.truncate(), model.y.truncate(), model.z.truncate())
+}
 
 pub struct RigidBody {
     pub transform: TransformID,

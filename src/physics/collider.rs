@@ -11,6 +11,7 @@ use crate::game_objects::transform::{TransformID, TransformSystem};
 use bvh::{DepthIter, LeafOutsideHierachy, BVH};
 use cgmath::{InnerSpace, SquareMatrix, Zero};
 use core::f32;
+use ray::Ray;
 use std::{
     fmt::Debug,
     sync::{Arc, RwLock},
@@ -34,6 +35,13 @@ pub struct ColliderSystem {
 }
 
 impl BoundingBox {
+    pub fn new(min: impl Into<Vector>, max: impl Into<Vector>) -> Self {
+        Self {
+            min: min.into(),
+            max: max.into(),
+        }
+    }
+
     /// find upper and lower bounds of given verticies
     fn from_vertices<'a>(vertices: impl IntoIterator<Item = &'a Vector>) -> Self {
         let mut vertices = vertices.into_iter();
@@ -242,6 +250,18 @@ impl ColliderSystem {
 
     pub fn get_potential_overlaps(&self) -> Vec<(&CuboidCollider, &CuboidCollider)> {
         self.bounds_tree.get_overlaps()
+    }
+
+    pub fn raycast(
+        &self,
+        transforms: &mut TransformSystem,
+        start: Vector,
+        direction: Vector,
+        distance: f32,
+    ) -> Option<(Vector, &CuboidCollider)> {
+        let ray = Ray::new(start, direction, distance);
+        let result = self.bounds_tree.raycast(&ray, transforms);
+        result.map(|(d, c)| (ray.calc_point(d), c))
     }
 
     pub fn get_contacts(&self, transforms: &mut TransformSystem) -> ContactResolver {

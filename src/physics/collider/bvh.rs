@@ -1,11 +1,13 @@
+use cgmath::SquareMatrix;
+
+use super::{ray::Ray, BoundingBox, CuboidCollider};
+use crate::{game_objects::transform::TransformSystem, physics::quick_inverse};
 use std::{
     fmt::Debug,
     marker::PhantomData,
     mem::{self, ManuallyDrop},
     ptr::NonNull,
 };
-
-use super::{BoundingBox, CuboidCollider};
 
 pub struct BVH {
     root: Option<NonNull<Node>>,
@@ -302,6 +304,16 @@ impl BVH {
         }
     }
 
+    pub fn raycast(
+        &self,
+        ray: &Ray,
+        transforms: &mut TransformSystem,
+    ) -> Option<(f32, &CuboidCollider)> {
+        self.root
+            .map(|root_node| unsafe { root_node.as_ref().raycast(ray, transforms) })
+            .flatten()
+    }
+
     pub unsafe fn get_root(&self) -> Option<NonNull<Node>> {
         self.root
     }
@@ -528,6 +540,65 @@ impl Node {
                         println!("NONE NODE IN TREE???");
                     }
                 }
+            }
+        }
+    }
+
+    fn raycast(
+        &self,
+        ray: &Ray,
+        transforms: &mut TransformSystem,
+    ) -> Option<(f32, &CuboidCollider)> {
+        match &self.content {
+            NodeContent::Leaf(collider) => {
+                let mut model = transforms.get_global_model(&collider.transform).unwrap();
+                quick_inverse(&mut model);
+                ray.cuboid_intersection(&model)
+                    .map(|depth| (depth, collider))
+            }
+            NodeContent::Branch(branch) => unsafe {
+                let left_dist = ray.box_intersection(&branch.as_ref().left.as_ref().bounds);
+                let right_dist = ray.box_intersection(&branch.as_ref().right.as_ref().bounds);
+
+                match (left_dist, right_dist) {
+                    (Some(left), Some(right)) => {
+                        // check first intercepted child first
+                        let (close_child, far_child) = if left < right {
+                            ((*branch.as_ptr()).left, (*branch.as_ptr()).right)
+                        } else {
+                            ((*branch.as_ptr()).right, (*branch.as_ptr()).left)
+                        };
+                        let far_dist = left.max(right);
+
+                        let close_result = close_child.as_ref().raycast(ray, transforms);
+
+                        if let Some((close_dist, _)) = close_result {
+                            // check if far bounds is entered before close result
+                            if close_dist < far_dist {
+                                close_result
+                            } else {
+                                // try raycast far
+                                let far_result = far_child.as_ref().raycast(ray, transforms);
+                                far_result.map_or(close_result, |(far_dist, _)| {
+                                    if close_dist < far_dist {
+                                        close_result
+                                    } else {
+                                        far_result
+                                    }
+                                })
+                            }
+                        } else {
+                            far_child.as_ref().raycast(ray, transforms)
+                        }
+                    }
+                    (Some(_), None) => branch.as_ref().left.as_ref().raycast(ray, transforms),
+                    (None, Some(_)) => branch.as_ref().right.as_ref().raycast(ray, transforms),
+                    _ => None,
+                }
+            },
+            NodeContent::None => {
+                println!("NONE NODE IN TREE???");
+                None
             }
         }
     }

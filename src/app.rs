@@ -454,140 +454,210 @@ impl App {
                     self.bounds_debug_depth = None;
                 }
 
-                if let Some(debug_depth) = self.bounds_debug_depth {
-                    let mut bounding_boxes: Vec<GPUAABB> = colliders
-                        .bounds_iter()
-                        .filter(|(_, depth)| *depth == debug_depth)
-                        .map(|(bounds, depth)| {
-                            let mag = 1. / (depth as f32 + 1.);
-                            let min_cast: [f32; 3] = bounds.min.into();
-                            let max_cast: [f32; 3] = bounds.max.into();
-                            GPUAABB {
-                                min: min_cast.into(),
-                                max: max_cast.into(),
-                                color: [1., mag, mag, 1.],
-                            }
-                        })
-                        .collect();
+                let mut bounding_boxes: Vec<GPUAABB> =
+                    if let Some(debug_depth) = self.bounds_debug_depth {
+                        colliders
+                            .bounds_iter()
+                            .filter(|(_, depth)| *depth == debug_depth)
+                            .map(|(bounds, depth)| {
+                                let mag = 1. / (depth as f32 + 1.);
+                                let min_cast: [f32; 3] = bounds.min.into();
+                                let max_cast: [f32; 3] = bounds.max.into();
+                                GPUAABB {
+                                    min: min_cast.into(),
+                                    max: max_cast.into(),
+                                    color: [1., mag, mag, 1.],
+                                }
+                            })
+                            .collect()
 
-                    // show overlaps
-                    for (coll_1, coll_2) in colliders.get_potential_overlaps() {
-                        let bounds_1 = coll_1.get_bounds();
-                        let bounds_2 = coll_2.get_bounds();
+                        // // show overlaps
+                        // for (coll_1, coll_2) in colliders.get_potential_overlaps() {
+                        //     let bounds_1 = coll_1.get_bounds();
+                        //     let bounds_2 = coll_2.get_bounds();
 
-                        let centre = bounds_1.centre();
-                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [0., 1., 0., 1.],
-                        });
+                        //     let centre = bounds_1.centre();
+                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [0., 1., 0., 1.],
+                        //     });
 
-                        let centre = bounds_2.centre();
-                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [1., 1., 0., 1.],
-                        });
-                    }
-                    // show contacts
-                    let mut contacts = colliders.get_contacts(transforms);
-                    for contact in contacts.get_contacts() {
-                        let (position, normal, _) = contact.get_debug_info();
+                        //     let centre = bounds_2.centre();
+                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [1., 1., 0., 1.],
+                        //     });
+                        // }
+                        // // show contacts
+                        // let mut contacts = colliders.get_contacts(transforms);
+                        // for contact in contacts.get_contacts() {
+                        //     let (position, normal, _) = contact.get_debug_info();
 
-                        // contact point
-                        let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
-                        let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [0., 0., 1., 1.],
-                        });
+                        //     // contact point
+                        //     let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [0., 0., 1., 1.],
+                        //     });
 
-                        // normal indicator
-                        let min_cast: [f32; 3] =
-                            (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
-                        let max_cast: [f32; 3] =
-                            (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [0., 0., 1., 1.],
-                        });
-                    }
-                    contacts.clear();
+                        //     // normal indicator
+                        //     let min_cast: [f32; 3] =
+                        //         (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
+                        //     let max_cast: [f32; 3] =
+                        //         (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [0., 0., 1., 1.],
+                        //     });
+                        // }
+                        // contacts.clear();
 
-                    frame.upload_box_data(bounding_boxes.into_iter());
-                } else {
-                    let mut bounding_boxes: Vec<GPUAABB> = colliders
-                        .bounds_iter()
-                        .map(|(bounds, depth)| {
-                            let mag = 1. / (depth as f32 + 1.);
-                            let min_cast: [f32; 3] = bounds.min.into();
-                            let max_cast: [f32; 3] = bounds.max.into();
-                            GPUAABB {
-                                min: min_cast.into(),
-                                max: max_cast.into(),
-                                color: [1., mag, mag, 1.],
-                            }
-                        })
-                        .collect();
+                        // frame.upload_box_data(bounding_boxes.into_iter());
+                    } else {
+                        colliders
+                            .bounds_iter()
+                            .map(|(bounds, depth)| {
+                                let mag = 1. / (depth as f32 + 1.);
+                                let min_cast: [f32; 3] = bounds.min.into();
+                                let max_cast: [f32; 3] = bounds.max.into();
+                                GPUAABB {
+                                    min: min_cast.into(),
+                                    max: max_cast.into(),
+                                    color: [1., mag, mag, 1.],
+                                }
+                            })
+                            .collect()
 
-                    // show overlaps
-                    for (coll_1, coll_2) in colliders.get_potential_overlaps() {
-                        let bounds_1 = coll_1.get_bounds();
-                        let bounds_2 = coll_2.get_bounds();
+                        // // show overlaps
+                        // for (coll_1, coll_2) in colliders.get_potential_overlaps() {
+                        //     let bounds_1 = coll_1.get_bounds();
+                        //     let bounds_2 = coll_2.get_bounds();
 
-                        let centre = bounds_1.centre();
-                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [0., 1., 0., 1.],
-                        });
+                        //     let centre = bounds_1.centre();
+                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [0., 1., 0., 1.],
+                        //     });
 
-                        let centre = bounds_2.centre();
-                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [1., 1., 0., 1.],
-                        });
-                    }
-                    // show contacts
-                    let mut contacts = colliders.get_contacts(transforms);
-                    for contact in contacts.get_contacts() {
-                        let (position, normal, _) = contact.get_debug_info();
+                        //     let centre = bounds_2.centre();
+                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [1., 1., 0., 1.],
+                        //     });
+                        // }
+                        // // show contacts
+                        // let mut contacts = colliders.get_contacts(transforms);
+                        // for contact in contacts.get_contacts() {
+                        //     let (position, normal, _) = contact.get_debug_info();
 
-                        // contact point
-                        let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
-                        let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [0., 0., 1., 1.],
-                        });
+                        //     // contact point
+                        //     let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [0., 0., 1., 1.],
+                        //     });
 
-                        // normal indicator
-                        let min_cast: [f32; 3] =
-                            (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
-                        let max_cast: [f32; 3] =
-                            (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [0., 0., 1., 1.],
-                        });
-                    }
-                    contacts.clear();
+                        //     // normal indicator
+                        //     let min_cast: [f32; 3] =
+                        //         (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
+                        //     let max_cast: [f32; 3] =
+                        //         (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [0., 0., 1., 1.],
+                        //     });
+                        // }
+                        // contacts.clear();
 
-                    frame.upload_box_data(bounding_boxes.into_iter());
+                        // frame.upload_box_data(bounding_boxes.into_iter());
+                    };
+                // show overlaps
+                for (coll_1, coll_2) in colliders.get_potential_overlaps() {
+                    let bounds_1 = coll_1.get_bounds();
+                    let bounds_2 = coll_2.get_bounds();
+
+                    let centre = bounds_1.centre();
+                    let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                    let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                    bounding_boxes.push(GPUAABB {
+                        min: min_cast.into(),
+                        max: max_cast.into(),
+                        color: [0., 1., 0., 1.],
+                    });
+
+                    let centre = bounds_2.centre();
+                    let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                    let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                    bounding_boxes.push(GPUAABB {
+                        min: min_cast.into(),
+                        max: max_cast.into(),
+                        color: [1., 1., 0., 1.],
+                    });
                 }
+                // show contacts
+                let mut contacts = colliders.get_contacts(transforms);
+                for contact in contacts.get_contacts() {
+                    let (position, normal, _) = contact.get_debug_info();
+
+                    // contact point
+                    let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
+                    let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
+                    bounding_boxes.push(GPUAABB {
+                        min: min_cast.into(),
+                        max: max_cast.into(),
+                        color: [0., 0., 1., 1.],
+                    });
+
+                    // normal indicator
+                    let min_cast: [f32; 3] =
+                        (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
+                    let max_cast: [f32; 3] =
+                        (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
+                    bounding_boxes.push(GPUAABB {
+                        min: min_cast.into(),
+                        max: max_cast.into(),
+                        color: [0., 0., 1., 1.],
+                    });
+                }
+                contacts.clear();
+
+                // raycast
+                let cam_model = transforms.get_global_model(&camera.transform).unwrap();
+                let raycast_result = colliders.raycast(
+                    transforms,
+                    cam_model.w.truncate(),
+                    -cam_model.z.truncate(),
+                    20.,
+                );
+                if let Some((point, _)) = raycast_result {
+                    let min_cast: [f32; 3] = (point - Vector3::new(0.1, 0.1, 0.1)).into();
+                    let max_cast: [f32; 3] = (point + Vector3::new(0.1, 0.1, 0.1)).into();
+                    bounding_boxes.push(GPUAABB {
+                        min: min_cast.into(),
+                        max: max_cast.into(),
+                        color: [1., 0., 1., 1.],
+                    });
+                }
+
+                frame.upload_box_data(bounding_boxes.into_iter());
 
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();
