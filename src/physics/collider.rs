@@ -1,5 +1,7 @@
 // mod bounds_tree;
 mod bvh;
+mod ray;
+
 pub use self::bvh::LeafInHierachy;
 use super::{
     contact::{Contact, ContactResolver},

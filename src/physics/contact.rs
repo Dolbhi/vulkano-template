@@ -344,7 +344,8 @@ impl RigidBodyRef {
 
         // calculate move
         let linear_move = PEN_RESTITUTION * penetration * self.linear_inertia * inv_total_inertia;
-        let angular_move = PEN_RESTITUTION * penetration * self.angular_inertia * inv_total_inertia;
+        let angular_move =
+            -PEN_RESTITUTION * penetration * self.angular_inertia * inv_total_inertia;
 
         let linear_move = linear_move * normal;
         let rotate = angular_move * self.torque_per_impulse / self.relative_pos.magnitude2();
@@ -407,7 +408,7 @@ impl RigidBodyRef {
 
         // calculate move
         let linear_accel = target_delta_v * self.linear_inertia * inv_total_inertia;
-        let angular_accel = target_delta_v * self.angular_inertia * inv_total_inertia;
+        let angular_accel = -target_delta_v * self.angular_inertia * inv_total_inertia;
 
         let linear_accel = linear_accel * normal;
         let angular_accel =

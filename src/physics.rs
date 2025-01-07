@@ -55,7 +55,7 @@ impl RigidBody {
     }
 
     pub fn point_velocity(&self, point: Vector) -> Vector {
-        self.velocity + point.cross(self.bivelocity)
+        self.velocity + self.bivelocity.cross(point)
     }
 
     /// Set principle axis masses assuming object is a cuboid of constant density, taking object scale into account
