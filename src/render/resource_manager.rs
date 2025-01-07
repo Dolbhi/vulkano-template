@@ -24,7 +24,9 @@ use super::{
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum MeshID {
+    /// Unit square on the xy-plane, normal in positive z-direction
     Square,
+    /// Unit radius cube
     Cube,
     Suzanne,
     InaBody,

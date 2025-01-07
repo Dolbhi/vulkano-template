@@ -385,7 +385,7 @@ impl App {
                         transforms.add_transform(TransformCreateInfo::from(pos).set_rotation(rot));
 
                     let mut rigidbody = RigidBody::new(transform);
-                    rigidbody.gravity_multiplier = 0.0;
+                    // rigidbody.gravity_multiplier = 0.0;
                     rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
                     let rigidbody = Arc::new(RwLock::new(rigidbody));
 

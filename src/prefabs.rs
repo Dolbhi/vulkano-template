@@ -148,6 +148,7 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     // let plane_mesh = resources.get_mesh(Square);
     // let cube_mesh = resources.get_mesh(Cube);
 
+    // plane
     let yellow_mat = loader
         .resources
         .load_solid_material([1., 1., 0., 1.], true)
@@ -167,6 +168,18 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         ..Default::default()
     };
     loader.quick_ro(plane_trans, Square, yellow_mat, true);
+
+    // plane collider
+    let transform_info = TransformCreateInfo::default()
+        .set_translation([0., -0.5, 0.])
+        .set_scale([5., 0.5, 5.]);
+    let transform = loader.world.transforms.add_transform(transform_info);
+    let collider = loader.world.colliders.add(CuboidCollider::new(
+        &mut loader.world.transforms,
+        transform,
+        None,
+    ));
+    load_object_with_transform!(loader.world.world, transform, collider);
 
     // rigidbody test
     let t = loader.world.transforms.add_transform([0., 1., 0.]);

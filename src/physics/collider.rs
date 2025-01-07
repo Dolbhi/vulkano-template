@@ -1,25 +1,20 @@
 // mod bounds_tree;
 mod bvh;
-
+pub use self::bvh::LeafInHierachy;
+use super::{
+    contact::{Contact, ContactResolver},
+    RigidBody, Vector,
+};
+use crate::game_objects::transform::{TransformID, TransformSystem};
+use bvh::{DepthIter, LeafOutsideHierachy, BVH};
+use cgmath::{InnerSpace, SquareMatrix, Zero};
 use core::f32;
 use std::{
     fmt::Debug,
     sync::{Arc, RwLock},
 };
 
-use cgmath::{InnerSpace, SquareMatrix, Zero};
-
-use bvh::{DepthIter, LeafOutsideHierachy, BVH};
-
-use crate::game_objects::transform::{TransformID, TransformSystem};
-
-use super::{
-    contact::{Contact, ContactResolver},
-    RigidBody, Vector,
-};
-
-pub use self::bvh::LeafInHierachy;
-// pub type ColliderRef = Arc<Mutex<Leaf>>;
+const CROSS_INDICES: [[usize; 2]; 3] = [[1, 2], [2, 0], [0, 1]];
 
 #[derive(Clone, Copy, Debug)]
 pub struct BoundingBox {
@@ -226,17 +221,6 @@ impl ColliderSystem {
         self.bounds_tree
             .modify_collider(target, |collider| collider.update_bounding(transforms))
             .unwrap();
-
-        // // println!("[Updating bounds]");
-        // let mut outside_hierachy = self.bounds_tree.remove(target).unwrap();
-        // // println!("\t[Removed]");
-        // let collider = outside_hierachy
-        //     .get_collider_mut(&mut self.bounds_tree)
-        //     .unwrap();
-        // collider.update_bounding(transforms);
-        // // println!("\t[Updated]");
-        // self.bounds_tree.insert(outside_hierachy).unwrap()
-        // // println!("\t[Inserted]");
     }
 
     /// adds collider to bounds tree, returns a reference to its leaf node
@@ -312,13 +296,22 @@ impl ColliderSystem {
 
             if !sep_axis_found {
                 let inv_model_1 = model_1.invert().unwrap();
-                let space_2_to_space_1 = inv_model_1 * model_2;
-
                 let model_1_sqr = [
                     model_1.x.magnitude2(),
                     model_1.y.magnitude2(),
                     model_1.z.magnitude2(),
                 ];
+
+                let space_2_to_space_1 = inv_model_1 * model_2;
+                let axes_2 = [
+                    space_2_to_space_1.x,
+                    space_2_to_space_1.y,
+                    space_2_to_space_1.z,
+                ]
+                .map(|v| v.truncate());
+                let axes_2_inv = axes_2.map(|v| v / v.magnitude2());
+                let pos_2_in_1 = space_2_to_space_1.w.truncate();
+                let model_2_sqr = [0, 1, 2].map(|i| model_2[i].magnitude2());
 
                 // p-f contacts
                 let points_2 =
@@ -327,110 +320,97 @@ impl ColliderSystem {
                 let mut contact_point_pf = [0., 0., 0.].into();
                 let mut pen_axis = 0;
                 for point in points_2 {
-                    let x_depth = 1. - point.x.abs();
-                    let y_depth = 1. - point.y.abs();
-                    let z_depth = 1. - point.z.abs();
+                    let depths = point.map(|c| 1. - c.abs());
 
-                    if x_depth < 0. || y_depth < 0. || z_depth < 0. {
+                    if depths.x < 0. || depths.y < 0. || depths.z < 0. {
                         continue;
                     }
 
-                    // convert to world dist squared
-                    let point_depth_sqr = [
-                        x_depth * x_depth * model_1_sqr[0],
-                        y_depth * y_depth * model_1_sqr[1],
-                        z_depth * z_depth * model_1_sqr[2],
-                    ];
+                    let mut min_pen = None;
+                    let mut min_index = 0;
 
-                    // find min depth for this point
-                    let min_index = if point_depth_sqr[0] < point_depth_sqr[1] {
-                        if point_depth_sqr[0] < point_depth_sqr[2] {
-                            // x min
-                            0
-                        } else {
-                            // z min
-                            2
+                    // for each axis
+                    for i in 0..2 {
+                        // point projected onto closest face
+                        let mut face_point = point;
+                        face_point[i] = face_point[i].signum();
+                        // check if it is in 2
+                        let point_from_2 = face_point - pos_2_in_1;
+                        let a2_proj = axes_2_inv.map(|a| point_from_2.dot(a));
+                        let depth_2 = a2_proj.map(|c| 1. - c.abs());
+                        if depth_2[0] < 0. || depth_2[1] < 0. || depth_2[2] < 0. {
+                            continue;
                         }
-                    } else {
-                        if point_depth_sqr[1] < point_depth_sqr[2] {
-                            // y min
-                            1
-                        } else {
-                            // z min
-                            2
-                        }
-                    };
 
-                    if point_depth_sqr[min_index] > max_pen_pf_sqr {
-                        max_pen_pf_sqr = point_depth_sqr[min_index];
-                        contact_point_pf = point;
-                        pen_axis = (1 + min_index as i32) * point.x.signum() as i32;
+                        let depth_sqr = depths[i] * depths[i] * model_1_sqr[i];
+                        if let Some(old_pen) = min_pen {
+                            if depth_sqr < old_pen {
+                                min_pen = Some(depth_sqr);
+                                min_index = i;
+                            }
+                        } else {
+                            min_pen = Some(depth_sqr);
+                            min_index = i;
+                        }
                     }
+
+                    min_pen.map(|depth| {
+                        if depth > max_pen_pf_sqr {
+                            max_pen_pf_sqr = depth;
+                            contact_point_pf = point;
+                            pen_axis = (1 + min_index as i32) * point.x.signum() as i32;
+                        }
+                    });
                 }
 
                 // f-p contacts
-                let axes_2 = [
-                    space_2_to_space_1.x,
-                    space_2_to_space_1.y,
-                    space_2_to_space_1.z,
-                ]
-                .map(|v| v.truncate());
-                let axes_2_inv = axes_2.map(|v| v / v.magnitude2());
-
-                let x_2_sqr = model_2.x.magnitude2();
-                let y_2_sqr = model_2.y.magnitude2();
-                let z_2_sqr = model_2.z.magnitude2();
-
-                let pos_2_in_1 = space_2_to_space_1.w.truncate();
                 let points_1 = CUBE_VERTICES.map(|v| v - pos_2_in_1);
-
                 for (i, point) in points_1.into_iter().enumerate() {
                     let a2_proj = axes_2_inv.map(|a| point.dot(a));
 
-                    let x_depth = 1. - a2_proj[0].abs();
-                    let y_depth = 1. - a2_proj[1].abs();
-                    let z_depth = 1. - a2_proj[2].abs();
+                    let depths = a2_proj.map(|c| 1. - c.abs());
 
-                    if x_depth < 0. || y_depth < 0. || z_depth < 0. {
+                    if depths[0] < 0. || depths[1] < 0. || depths[2] < 0. {
                         continue;
                     }
 
-                    // convert to world dist squared
-                    let point_depth_sqr = [
-                        x_depth * x_depth * x_2_sqr,
-                        y_depth * y_depth * y_2_sqr,
-                        z_depth * z_depth * z_2_sqr,
-                    ];
+                    let mut min_pen = None;
+                    let mut min_index = 0;
+                    // for each axis
+                    for j in 0..2 {
+                        // // point projected onto closest face
+                        // let mut face_point = point;
+                        // face_point[i] = face_point[i].signum();
+                        // // check if it is in 2
+                        // let point_from_2 = face_point - pos_2_in_1;
+                        // let a2_proj = axes_2_inv.map(|a| point_from_2.dot(a));
+                        // let depth_2 = a2_proj.map(|c| 1. - c.abs());
+                        // if depth_2[0] < 0. || depth_2[1] < 0. || depth_2[2] < 0. {
+                        //     continue;
+                        // }
 
-                    // find min depth for this point
-                    let min_index = if point_depth_sqr[0] < point_depth_sqr[1] {
-                        if point_depth_sqr[0] < point_depth_sqr[2] {
-                            // x min
-                            0
+                        let depth_sqr = depths[j] * depths[j] * model_2_sqr[j];
+                        if let Some(old_pen) = min_pen {
+                            if depth_sqr < old_pen {
+                                min_pen = Some(depth_sqr);
+                                min_index = j;
+                            }
                         } else {
-                            // z min
-                            2
+                            min_pen = Some(depth_sqr);
+                            min_index = j;
                         }
-                    } else {
-                        if point_depth_sqr[1] < point_depth_sqr[2] {
-                            // y min
-                            1
-                        } else {
-                            // z min
-                            2
-                        }
-                    };
-
-                    if point_depth_sqr[min_index] > max_pen_pf_sqr {
-                        max_pen_pf_sqr = point_depth_sqr[min_index];
-                        contact_point_pf = CUBE_VERTICES[i];
-                        pen_axis = (4 + min_index as i32) * a2_proj[min_index].signum() as i32;
                     }
+
+                    min_pen.map(|depth| {
+                        if depth > max_pen_pf_sqr {
+                            max_pen_pf_sqr = depth;
+                            contact_point_pf = CUBE_VERTICES[i];
+                            pen_axis = (4 + min_index as i32) * a2_proj[min_index].signum() as i32;
+                        }
+                    });
                 }
 
                 // e-e contacts
-                let cross_indices = [[1, 2], [2, 0], [0, 1]];
-
                 let mut max_pen_ee_sqr = 0.;
                 let mut contact_point_ee = [0., 0., 0.].into();
                 let mut pen_axis_1 = 0;
@@ -485,7 +465,7 @@ impl ColliderSystem {
                                 continue;
                             }
 
-                            let [ci_1, ci_2] = cross_indices[a1_i];
+                            let [ci_1, ci_2] = CROSS_INDICES[a1_i];
                             let depth_1 = 1. - d_abs[ci_1];
                             let depth_2 = 1. - d_abs[ci_2];
 
