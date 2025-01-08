@@ -7,13 +7,13 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cgmath::{One, Quaternion, Vector3, Vector4};
+use cgmath::{InnerSpace, One, Quaternion, Vector3, Vector4};
 use legion::*;
 
 // use rand::Rng;
 use winit::{
     dpi::PhysicalPosition,
-    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::{ElementState, Event, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent},
     event_loop::EventLoop,
 };
 
@@ -24,7 +24,7 @@ use crate::{
         Camera, GameWorld, MaterialSwapper, WorldLoader,
     },
     load_object_with_transform,
-    physics::{CuboidCollider, RigidBody},
+    physics::{quick_inverse, CuboidCollider, RigidBody},
     prefabs::{init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
     shaders::{DirectionLight, GPUGlobalData, GPUAABB},
@@ -52,12 +52,14 @@ struct InputState {
     i: KeyState,
     o: KeyState,
     p: KeyState,
+    lmb: KeyState,
     space: KeyState,
     shift: KeyState,
     escape: KeyState,
     equals: KeyState,
     q_triggered: bool,
     o_triggered: bool,
+    lmb_triggered: bool,
 }
 
 impl InputState {
@@ -225,6 +227,17 @@ impl App {
                                 },
                             ..
                         } => self.handle_keyboard_input(code, state),
+                        WindowEvent::MouseInput { state, button, .. } => {
+                            let state = match state {
+                                ElementState::Pressed => Pressed,
+                                ElementState::Released => Released,
+                            };
+                            if button == MouseButton::Left {
+                                self.inputs.lmb_triggered =
+                                    state == Pressed && self.inputs.lmb == Released;
+                                self.inputs.lmb = state;
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -647,7 +660,7 @@ impl App {
                     -cam_model.z.truncate(),
                     20.,
                 );
-                if let Some((point, _)) = raycast_result {
+                if let Some((point, coll)) = raycast_result {
                     let min_cast: [f32; 3] = (point - Vector3::new(0.1, 0.1, 0.1)).into();
                     let max_cast: [f32; 3] = (point + Vector3::new(0.1, 0.1, 0.1)).into();
                     bounding_boxes.push(GPUAABB {
@@ -655,6 +668,29 @@ impl App {
                         max: max_cast.into(),
                         color: [1., 0., 1., 1.],
                     });
+
+                    if self.inputs.lmb_triggered {
+                        if let Some(rigidbody) = coll.get_rigidbody() {
+                            let mut model =
+                                transforms.get_global_model(coll.get_transform()).unwrap();
+                            quick_inverse(&mut model);
+                            // let normal = CuboidCollider::point_normal(point, &model).normalize();
+
+                            let rotation = transforms
+                                .get_transform(coll.get_transform())
+                                .unwrap()
+                                .get_local_transform()
+                                .rotation;
+                            let point = point + model.w.truncate();
+                            rigidbody.write().unwrap().apply_impulse(
+                                point,
+                                -0.5 * cam_model.z.truncate().normalize(),
+                                *rotation,
+                            );
+                        }
+
+                        self.inputs.lmb_triggered = false;
+                    }
                 }
 
                 frame.upload_box_data(bounding_boxes.into_iter());

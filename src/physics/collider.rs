@@ -5,11 +5,11 @@ mod ray;
 pub use self::bvh::LeafInHierachy;
 use super::{
     contact::{Contact, ContactResolver},
-    RigidBody, Vector,
+    matrix_truncate, RigidBody, Vector,
 };
 use crate::game_objects::transform::{TransformID, TransformSystem};
-use bvh::{DepthIter, LeafOutsideHierachy, BVH};
-use cgmath::{InnerSpace, SquareMatrix, Zero};
+use bvh::{Bvh, DepthIter, LeafOutsideHierachy};
+use cgmath::{InnerSpace, Matrix, Matrix4, SquareMatrix, Zero};
 use core::f32;
 use ray::Ray;
 use std::{
@@ -30,8 +30,9 @@ pub struct CuboidCollider {
     rigidbody: Option<Arc<RwLock<RigidBody>>>,
     bounding_box: BoundingBox,
 }
+#[derive(Default)]
 pub struct ColliderSystem {
-    bounds_tree: BVH,
+    bounds_tree: Bvh,
 }
 
 impl BoundingBox {
@@ -207,6 +208,37 @@ impl CuboidCollider {
     pub fn get_bounds(&self) -> &BoundingBox {
         &self.bounding_box
     }
+
+    pub fn get_transform(&self) -> &TransformID {
+        &self.transform
+    }
+
+    pub fn get_rigidbody(&self) -> &Option<Arc<RwLock<RigidBody>>> {
+        &self.rigidbody
+    }
+
+    /// assuming inv_model is normalised, returned normal is not normalised
+    #[allow(clippy::collapsible_else_if)]
+    pub fn point_normal(point: Vector, inv_model: &Matrix4<f32>) -> Vector {
+        let point_local = matrix_truncate(inv_model) * (point + inv_model.w.truncate());
+        let point_abs = point_local.map(|c| c.abs());
+
+        let axis_index = if point_abs.x >= point_abs.y {
+            if point_abs.x >= point_abs.z {
+                0
+            } else {
+                2
+            }
+        } else {
+            if point_abs.y >= point_abs.z {
+                1
+            } else {
+                2
+            }
+        };
+
+        point_local[axis_index].signum() * inv_model.row(axis_index).truncate()
+    }
 }
 impl Debug for CuboidCollider {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -218,7 +250,7 @@ impl Debug for CuboidCollider {
 impl ColliderSystem {
     pub fn new() -> Self {
         Self {
-            bounds_tree: BVH::new(),
+            bounds_tree: Bvh::new(),
         }
     }
 
@@ -235,7 +267,7 @@ impl ColliderSystem {
 
     /// adds collider to bounds tree, returns a reference to its leaf node
     pub fn add(&mut self, collider: CuboidCollider) -> LeafInHierachy {
-        self.bounds_tree.insert(BVH::register_collider(collider))
+        self.bounds_tree.insert(Bvh::register_collider(collider))
     }
     pub fn remove(
         &mut self,
@@ -264,6 +296,7 @@ impl ColliderSystem {
         result.map(|(d, c)| (ray.calc_point(d), c))
     }
 
+    #[allow(clippy::collapsible_else_if)]
     pub fn get_contacts(&self, transforms: &mut TransformSystem) -> ContactResolver {
         let mut result = ContactResolver::new();
 
@@ -376,13 +409,13 @@ impl ColliderSystem {
                         }
                     }
 
-                    min_pen.map(|depth| {
+                    if let Some(depth) = min_pen {
                         if depth > max_pen_pf_sqr {
                             max_pen_pf_sqr = depth;
                             contact_point_pf = point;
                             pen_axis = (1 + min_index as i32) * point.x.signum() as i32;
                         }
-                    });
+                    };
                 }
 
                 // f-p contacts
@@ -423,13 +456,13 @@ impl ColliderSystem {
                         }
                     }
 
-                    min_pen.map(|depth| {
+                    if let Some(depth) = min_pen {
                         if depth > max_pen_pf_sqr {
                             max_pen_pf_sqr = depth;
                             contact_point_pf = CUBE_VERTICES[i];
                             pen_axis = (4 + min_index as i32) * a2_proj[min_index].signum() as i32;
                         }
-                    });
+                    };
                 }
 
                 // e-e contacts
@@ -526,12 +559,13 @@ impl ColliderSystem {
                     continue;
                 }
                 if max_pen_pf_sqr >= max_pen_ee_sqr {
-                    let normal = pen_axis.signum() as f32 * axes[pen_axis.abs() as usize - 1];
+                    let normal =
+                        pen_axis.signum() as f32 * axes[pen_axis.unsigned_abs() as usize - 1];
                     // println!("pf collision normal: {:?}", normal);
                     let point = model_1 * contact_point_pf.extend(1.);
 
                     let (index, contact) = Contact::new(
-                        &transforms,
+                        transforms,
                         point.truncate(),
                         normal.normalize(),
                         max_pen_pf_sqr.sqrt(),
@@ -545,7 +579,7 @@ impl ColliderSystem {
                     let point = model_1 * contact_point_ee.extend(1.);
 
                     let (index, contact) = Contact::new(
-                        &transforms,
+                        transforms,
                         point.truncate(),
                         normal.normalize(),
                         max_pen_ee_sqr.sqrt(),

@@ -21,7 +21,7 @@ use crate::{
 pub fn init_world(mut loader: WorldLoader) {
     // meshes
     let ina_meshes = [InaBody, InaCloth, InaHair, InaHead];
-    let le_meshes = (0..45u8).map(|n| LostEmpire(n));
+    let le_meshes = (0..45u8).map(LostEmpire);
 
     // materials
     let ina_mats = [
@@ -30,7 +30,7 @@ pub fn init_world(mut loader: WorldLoader) {
         TextureID::InaHair,
         TextureID::InaHead,
     ]
-    .map(|id| Texture(id));
+    .map(Texture);
     // colored materials
     let red_mat = loader
         .resources
@@ -68,7 +68,7 @@ pub fn init_world(mut loader: WorldLoader) {
     //      Ina
     let rotate = Rotate([0., 1., 0.].into(), Rad(0.5));
     let (ina_transform, _) = loader.add_1_comp([0.0, 15.0, -3.0], rotate);
-    for (mesh, mat) in zip(ina_meshes, ina_mats.clone()) {
+    for (mesh, mat) in zip(ina_meshes, ina_mats) {
         loader.quick_ro(
             TransformCreateInfo::from_parent(ina_transform),
             mesh,

@@ -1,5 +1,6 @@
 pub mod draw;
 
+// #[derive(Default)]
 vulkano_shaders::shader! {
     shaders: {
         // draw

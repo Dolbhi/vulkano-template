@@ -78,6 +78,27 @@ impl RigidBody {
         // println!("MASSES: {:?}", self.sqrt_angular_mass);
     }
 
+    pub fn apply_impulse(&mut self, point: Vector, impulse: Vector, rotation: Quaternion<f32>) {
+        self.velocity += impulse * self.inv_mass;
+
+        // let impulse_mag = impulse.magnitude();
+        // let torque_per_impulse = impulse.cross(point) / impulse_mag;
+        // let angular_inertia = self.angular_vel_per_impulse(torque_per_impulse, rotation);
+        // self.bivelocity += impulse_mag * torque_per_impulse * angular_inertia;
+
+        let torque = -impulse.cross(point);
+        let angular_inertia = self.angular_vel_per_impulse(torque.normalize(), rotation);
+        self.bivelocity += torque * angular_inertia;
+
+        println!(
+            "[Point impulse] point: {:?}, impulse: {:?}, delta_v: {:?}, angular_inertia: {:?}",
+            point,
+            impulse,
+            impulse * self.inv_mass,
+            angular_inertia
+        );
+    }
+
     pub fn point_velocity(&self, point: Vector) -> Vector {
         self.velocity + self.bivelocity.cross(point)
     }

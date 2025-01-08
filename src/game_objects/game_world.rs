@@ -191,3 +191,8 @@ impl GameWorld {
         // self.world.push((self.camera.transform,));
     }
 }
+impl Default for GameWorld {
+    fn default() -> Self {
+        Self::new()
+    }
+}

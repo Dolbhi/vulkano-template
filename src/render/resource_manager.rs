@@ -354,7 +354,7 @@ impl<'a> ResourceRetriever<'a> {
             &mut self.renderer.unlit_draw_system
         };
 
-        if let None = system.find_shader(&ShaderID::Color) {
+        if system.find_shader(&ShaderID::Color).is_none() {
             system.add_shader(
                 self.context,
                 MaterialID::Color(0),

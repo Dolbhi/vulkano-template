@@ -1,5 +1,3 @@
-use cgmath::SquareMatrix;
-
 use super::{ray::Ray, BoundingBox, CuboidCollider};
 use crate::{game_objects::transform::TransformSystem, physics::quick_inverse};
 use std::{
@@ -9,7 +7,8 @@ use std::{
     ptr::NonNull,
 };
 
-pub struct BVH {
+#[derive(Default)]
+pub struct Bvh {
     root: Option<NonNull<Node>>,
     /// number of leafs (excluding those outside hierachy)
     size: usize,
@@ -40,7 +39,7 @@ struct BranchLinks {
 /// the NonNull node should only be dereferenced when provided with a &mut BVH matching the second element
 pub struct LeafInHierachy {
     leaf: NonNull<Node>,
-    hierachy: *const BVH,
+    hierachy: *const Bvh,
 }
 pub struct LeafOutsideHierachy {
     leaf: NonNull<Node>,
@@ -50,12 +49,12 @@ pub struct LeafOutsideHierachy {
 pub struct DepthIter<'a> {
     current: Vec<NonNull<Node>>,
     next: Vec<NonNull<Node>>,
-    lifetime: PhantomData<&'a BVH>,
+    lifetime: PhantomData<&'a Bvh>,
 }
 
-impl BVH {
+impl Bvh {
     pub fn new() -> Self {
-        BVH {
+        Bvh {
             root: None,
             size: 0,
         }
@@ -310,8 +309,7 @@ impl BVH {
         transforms: &mut TransformSystem,
     ) -> Option<(f32, &CuboidCollider)> {
         self.root
-            .map(|root_node| unsafe { root_node.as_ref().raycast(ray, transforms) })
-            .flatten()
+            .and_then(|root_node| unsafe { root_node.as_ref().raycast(ray, transforms) })
     }
 
     pub unsafe fn get_root(&self) -> Option<NonNull<Node>> {
@@ -341,10 +339,15 @@ impl BVH {
         }
     }
 }
-unsafe impl Send for BVH {}
-unsafe impl Sync for BVH {}
+// impl Default for BVH {
+//     fn default() -> Self {
 
-impl Drop for BVH {
+//     }
+// }
+unsafe impl Send for Bvh {}
+unsafe impl Sync for Bvh {}
+
+impl Drop for Bvh {
     fn drop(&mut self) {
         // manually drop each node
         if let Some(mut root) = self.root {
@@ -695,7 +698,7 @@ impl LeafInHierachy {
     }
 }
 impl LeafOutsideHierachy {
-    fn convert(self, hierachy: *const BVH) -> LeafInHierachy {
+    fn convert(self, hierachy: *const Bvh) -> LeafInHierachy {
         let x = ManuallyDrop::new(self);
         LeafInHierachy {
             leaf: x.leaf,
@@ -746,7 +749,7 @@ impl Drop for LeafOutsideHierachy {
     }
 }
 
-impl<'a> IntoIterator for &'a BVH {
+impl<'a> IntoIterator for &'a Bvh {
     type IntoIter = DepthIter<'a>;
     type Item = (BoundingBox, usize);
 
@@ -795,7 +798,7 @@ mod tree_tests {
 
     use crate::{game_objects::transform::TransformSystem, physics::collider::CuboidCollider};
 
-    use super::{BranchLinks, Node, NodeContent, BVH};
+    use super::{BranchLinks, Bvh, Node, NodeContent};
 
     fn validate_tree(
         child: &Node,
@@ -903,7 +906,7 @@ mod tree_tests {
     #[test]
     fn insert_test() {
         let mut trans = TransformSystem::new();
-        let mut tree = BVH::new();
+        let mut tree = Bvh::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -914,17 +917,17 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        let a = BVH::register_collider(super::CuboidCollider {
+        let a = Bvh::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
             rigidbody: None,
         });
-        let b = BVH::register_collider(super::CuboidCollider {
+        let b = Bvh::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
             rigidbody: None,
         });
-        let c = BVH::register_collider(super::CuboidCollider {
+        let c = Bvh::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
             rigidbody: None,
@@ -941,7 +944,7 @@ mod tree_tests {
     #[test]
     fn remove_test() {
         let mut trans = TransformSystem::new();
-        let mut tree = BVH::new();
+        let mut tree = Bvh::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -952,17 +955,17 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        let a = BVH::register_collider(super::CuboidCollider {
+        let a = Bvh::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
             rigidbody: None,
         });
-        let b = BVH::register_collider(super::CuboidCollider {
+        let b = Bvh::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
             rigidbody: None,
         });
-        let c = BVH::register_collider(super::CuboidCollider {
+        let c = Bvh::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
             rigidbody: None,
@@ -981,7 +984,7 @@ mod tree_tests {
     #[test]
     fn big_tree() {
         let mut trans = TransformSystem::new();
-        let mut tree = BVH::new();
+        let mut tree = Bvh::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -1011,7 +1014,7 @@ mod tree_tests {
         for bounding_box in [
             crap_box, box_2, box_3, box_4, crap_box, box_5, box_6, box_2, box_4, box_6,
         ] {
-            let leaf = BVH::register_collider(CuboidCollider {
+            let leaf = Bvh::register_collider(CuboidCollider {
                 transform: trans.next().unwrap(),
                 bounding_box,
                 rigidbody: None,
@@ -1028,7 +1031,7 @@ mod tree_tests {
     #[test]
     fn big_remove() {
         let mut trans = TransformSystem::new();
-        let mut tree = BVH::new();
+        let mut tree = Bvh::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -1055,7 +1058,7 @@ mod tree_tests {
             min: (2.0, -5.0, 5.0).into(),
         };
 
-        let leaf = BVH::register_collider(CuboidCollider {
+        let leaf = Bvh::register_collider(CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_6,
             rigidbody: None,
@@ -1065,7 +1068,7 @@ mod tree_tests {
         for bounding_box in [
             crap_box, box_2, box_3, box_4, crap_box, box_5, box_6, box_2, box_4, box_6,
         ] {
-            let leaf = BVH::register_collider(CuboidCollider {
+            let leaf = Bvh::register_collider(CuboidCollider {
                 transform: trans.next().unwrap(),
                 bounding_box,
                 rigidbody: None,
@@ -1076,7 +1079,7 @@ mod tree_tests {
             // }
         }
 
-        let leaf = BVH::register_collider(CuboidCollider {
+        let leaf = Bvh::register_collider(CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
             rigidbody: None,
@@ -1093,7 +1096,7 @@ mod tree_tests {
     #[test]
     fn remove_branch_root() {
         let mut trans = TransformSystem::new();
-        let mut tree = BVH::new();
+        let mut tree = Bvh::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -1104,13 +1107,13 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        let a = BVH::register_collider(super::CuboidCollider {
+        let a = Bvh::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
             rigidbody: None,
         });
         tree.insert(a);
-        let b = BVH::register_collider(super::CuboidCollider {
+        let b = Bvh::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: box_2,
             rigidbody: None,
@@ -1125,13 +1128,13 @@ mod tree_tests {
     #[test]
     fn remove_leaf_root() {
         let mut trans = TransformSystem::new();
-        let mut tree = BVH::new();
+        let mut tree = Bvh::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
             min: (0.0, 0.0, 0.0).into(),
         };
-        let remove = BVH::register_collider(super::CuboidCollider {
+        let remove = Bvh::register_collider(super::CuboidCollider {
             transform: trans.next().unwrap(),
             bounding_box: crap_box,
             rigidbody: None,

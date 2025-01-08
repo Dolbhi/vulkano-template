@@ -391,7 +391,9 @@ impl TransformSystem {
     }
 
     pub fn reset_phys_modified(&mut self, id: &TransformID) {
-        self.get_transform_mut(id).map(|t| t.phys_modified = false);
+        if let Some(t) = self.get_transform_mut(id) {
+            t.phys_modified = false;
+        }
     }
 }
 impl Iterator for TransformSystem {

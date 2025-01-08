@@ -212,6 +212,11 @@ impl ContactResolver {
         }
     }
 }
+impl Default for ContactResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl Contact {
     /// create new contact, automatically adding itself to the respective rigidbodies' contact_refs

@@ -8,6 +8,7 @@ use std::{
 
 /// # Panics
 /// All functions taking indices panic when given an out of bounds index
+#[derive(Default)]
 pub struct MaxHeap<K: Ord + Copy, T> {
     items: Vec<HeapItem<K, T>>,
 }
@@ -58,7 +59,7 @@ impl<K: Ord + Copy, T> MaxHeap<K, T> {
     }
 
     pub fn peek(&self) -> Option<&T> {
-        self.items.get(0).map(|item| &item.item)
+        self.items.first().map(|item| &item.item)
     }
 
     pub fn get_ref(&self, index: usize) -> &T {
@@ -197,6 +198,9 @@ impl<K: Ord + Copy, T> MaxHeap<K, T> {
 
     pub fn len(&self) -> usize {
         self.items.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
     }
 
     fn left_child_index(index: usize) -> usize {
