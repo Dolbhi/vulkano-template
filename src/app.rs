@@ -32,52 +32,47 @@ use crate::{
     LOGIC_PROFILER, RENDER_PROFILER,
 };
 
-#[derive(Default, PartialEq)]
-enum KeyState {
-    Pressed,
-    #[default]
-    Released,
+struct ButtonState {
+    last_state: ElementState,
+    /// true if last input update changed button state from released to pressed
+    button_down: bool,
 }
-
-use KeyState::{Pressed, Released};
 
 #[derive(Default)]
 struct InputState {
-    a: KeyState,
-    w: KeyState,
-    s: KeyState,
-    d: KeyState,
-    q: KeyState,
-    r: KeyState,
-    i: KeyState,
-    o: KeyState,
-    p: KeyState,
-    lmb: KeyState,
-    space: KeyState,
-    shift: KeyState,
-    escape: KeyState,
-    equals: KeyState,
-    q_triggered: bool,
-    o_triggered: bool,
-    lmb_triggered: bool,
+    a: bool,
+    w: bool,
+    s: bool,
+    d: bool,
+    space: bool,
+    shift: bool,
+
+    q: ButtonState,
+    r: ButtonState,
+    i: ButtonState,
+    o: ButtonState,
+    p: ButtonState,
+    lmb: ButtonState,
+    escape: ButtonState,
+    equals: ButtonState,
 }
 
 impl InputState {
     fn get_move(&self) -> Vector3<f32> {
         let mut movement = <Vector3<f32> as cgmath::Zero>::zero();
-        if self.w == Pressed {
+        if self.w {
             movement.z -= 1.; // forward
-        } else if self.s == Pressed {
+        } else if self.s {
             movement.z += 1.; // backwards
         }
-        if self.a == Pressed {
+        if self.a {
             movement.x -= 1.; // left
-        } else if self.d == Pressed {
+        } else if self.d {
             movement.x += 1.; // right
         }
-        if self.space == Pressed {
+        if self.space {
             movement.y += 1.;
-        } else if self.shift == Pressed {
+        } else if self.shift {
             movement.y -= 1.;
         }
 
@@ -228,14 +223,8 @@ impl App {
                             ..
                         } => self.handle_keyboard_input(code, state),
                         WindowEvent::MouseInput { state, button, .. } => {
-                            let state = match state {
-                                ElementState::Pressed => Pressed,
-                                ElementState::Released => Released,
-                            };
                             if button == MouseButton::Left {
-                                self.inputs.lmb_triggered =
-                                    state == Pressed && self.inputs.lmb == Released;
-                                self.inputs.lmb = state;
+                                self.inputs.lmb.update_state(state);
                             }
                         }
                         _ => {}
@@ -356,7 +345,7 @@ impl App {
                 camera.sync_transform(transforms);
 
                 // update basic mat swap
-                if self.inputs.q_triggered {
+                if self.inputs.q.consume_button_down() {
                     let mut query = <(&mut MaterialSwapper<()>, &mut RenderObject<()>)>::query();
 
                     query.for_each_mut(world, |(swapper, render_object)| {
@@ -364,12 +353,10 @@ impl App {
                         // println!("Swapped mat: {:?}", next_mat);
                         render_object.material = next_mat;
                     });
-
-                    self.inputs.q_triggered = false;
                 }
 
                 // add random bounds
-                if self.inputs.o_triggered {
+                if self.inputs.o.consume_button_down() {
                     // let mut rng = rand::thread_rng();
 
                     // let pos: Vector3<f32> = Vector3::new(
@@ -415,8 +402,6 @@ impl App {
                     );
 
                     load_object_with_transform!(world, transform, collider, ro, rigidbody);
-
-                    self.inputs.o_triggered = false;
                 }
 
                 // camera data
@@ -669,7 +654,7 @@ impl App {
                         color: [1., 0., 1., 1.],
                     });
 
-                    if self.inputs.lmb_triggered {
+                    if self.inputs.lmb.consume_button_down() {
                         if let Some(rigidbody) = coll.get_rigidbody() {
                             let mut model =
                                 transforms.get_global_model(coll.get_transform()).unwrap();
@@ -688,8 +673,6 @@ impl App {
                                 *rotation,
                             );
                         }
-
-                        self.inputs.lmb_triggered = false;
                     }
                 }
 
@@ -723,34 +706,29 @@ impl App {
 
     /// update key state
     fn handle_keyboard_input(&mut self, key_code: VirtualKeyCode, state: ElementState) {
-        let state = match state {
-            ElementState::Pressed => Pressed,
-            ElementState::Released => Released,
-        };
+        // let state = match state {
+        //     ElementState::Pressed => Pressed,
+        //     ElementState::Released => Released,
+        // };
 
         match key_code {
             VirtualKeyCode::Q => {
-                self.inputs.q_triggered = state == Pressed && self.inputs.q == Released;
-                self.inputs.q = state;
+                self.inputs.q.update_state(state);
             }
             VirtualKeyCode::R => {
-                if self.game_state == GameState::Playing
-                    && state == Pressed
-                    && self.inputs.r == Released
-                {
+                if self.game_state == GameState::Playing && self.inputs.r.update_state(state) {
                     let _ = self.load_level(self.current_level);
                 }
-                self.inputs.r = state;
             }
-            VirtualKeyCode::W => self.inputs.w = state,
-            VirtualKeyCode::A => self.inputs.a = state,
-            VirtualKeyCode::S => self.inputs.s = state,
-            VirtualKeyCode::D => self.inputs.d = state,
-            VirtualKeyCode::Space => self.inputs.space = state,
-            VirtualKeyCode::LShift => self.inputs.shift = state,
+            VirtualKeyCode::W => self.inputs.w = state == ElementState::Pressed,
+            VirtualKeyCode::A => self.inputs.a = state == ElementState::Pressed,
+            VirtualKeyCode::S => self.inputs.s = state == ElementState::Pressed,
+            VirtualKeyCode::D => self.inputs.d = state == ElementState::Pressed,
+            VirtualKeyCode::Space => self.inputs.space = state == ElementState::Pressed,
+            VirtualKeyCode::LShift => self.inputs.shift = state == ElementState::Pressed,
             VirtualKeyCode::Escape => {
                 // pause and unpause
-                if state == Pressed && self.inputs.escape == Released {
+                if self.inputs.escape.update_state(state) {
                     match self.game_state {
                         GameState::Playing => {
                             self.game_state = GameState::Paused;
@@ -765,11 +743,10 @@ impl App {
                         _ => {}
                     }
                 };
-                self.inputs.escape = state;
             }
             VirtualKeyCode::P => {
                 // pause logic loop
-                if state == Pressed && self.inputs.p == Released {
+                if self.inputs.p.update_state(state) {
                     if self.game_state == GameState::Playing {
                         let paused = self
                             .game_thread
@@ -778,30 +755,26 @@ impl App {
                         self.game_thread.set_paused(!paused);
                     }
                 }
-                self.inputs.p = state;
             }
             VirtualKeyCode::Equals => {
                 // step logic loop
-                if state == Pressed && self.inputs.equals == Released {
+                if self.inputs.equals.update_state(state) {
                     self.game_thread.step();
                 }
-                self.inputs.equals = state;
             }
             VirtualKeyCode::O => {
                 // add bounding box
-                self.inputs.o_triggered = state == Pressed && self.inputs.o == Released;
-                self.inputs.o = state;
+                self.inputs.o.update_state(state);
             }
             VirtualKeyCode::I => {
                 // scroll through depths
-                if state == Pressed && self.inputs.i == Released {
+                if self.inputs.i.update_state(state) {
                     if let Some(depth) = self.bounds_debug_depth {
                         self.bounds_debug_depth = Some(depth + 1);
                     } else {
                         self.bounds_debug_depth = Some(0);
                     }
                 }
-                self.inputs.i = state;
             }
             _ => {}
         }
@@ -913,5 +886,36 @@ impl GameWorldThread {
     fn set_delta_time(&self, micros: u64) {
         self.delta_micros
             .store(micros, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+impl ButtonState {
+    fn new() -> Self {
+        Self {
+            last_state: ElementState::Released,
+            button_down: false,
+        }
+    }
+
+    fn update_state(&mut self, state: ElementState) -> bool {
+        self.button_down =
+            state == ElementState::Pressed && self.last_state == ElementState::Released;
+        self.last_state = state;
+        self.button_down
+    }
+
+    /// get button_down and reset it (kinda like an Option::take() actually)
+    fn consume_button_down(&mut self) -> bool {
+        if self.button_down {
+            self.button_down = false;
+            true
+        } else {
+            false
+        }
+    }
+}
+impl Default for ButtonState {
+    fn default() -> Self {
+        Self::new()
     }
 }
