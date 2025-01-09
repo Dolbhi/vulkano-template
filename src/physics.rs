@@ -51,6 +51,8 @@ pub struct RigidBody {
     pub gravity_multiplier: f32,
 
     pub contact_refs: Vec<Arc<AtomicUsize>>,
+
+    pub old_velocity: Vector,
 }
 impl RigidBody {
     pub fn new(transform: TransformID) -> Self {
@@ -64,10 +66,15 @@ impl RigidBody {
             gravity_multiplier: 1.,
 
             contact_refs: Vec::new(),
+
+            old_velocity: Vector::zero(),
         }
     }
 
     pub fn update(&mut self, transform: &mut Transform, delta_secs: f32) {
+        // self.velocity *= 1. - 0.05 * delta_secs;
+        // self.bivelocity *= 1. - 0.05 * delta_secs;
+
         self.velocity += GRAVITY * delta_secs * self.gravity_multiplier;
 
         transform.mutate(|t, r, _| {
@@ -119,14 +126,30 @@ impl RigidBody {
         torque_per_impulse: Vector,
         rotation: Quaternion<f32>,
     ) -> f32 {
-        let world_sam = rotation * self.sqrt_angular_mass;
         let tpi_squared = torque_per_impulse.magnitude2();
-
         if tpi_squared.is_zero() {
             return 0.;
         }
 
-        (tpi_squared * tpi_squared) / torque_per_impulse.cross(world_sam).magnitude2()
+        // let world_sam = rotation * self.sqrt_angular_mass;
+        // (tpi_squared * tpi_squared) / torque_per_impulse.cross(world_sam).magnitude2()
+        let local_torque = rotation.conjugate() * torque_per_impulse;
+        let principle_moi = self.sqrt_angular_mass.map(|c| c * c);
+        let moi = 2.
+            * local_torque.dot(
+                (
+                    local_torque[0] * (principle_moi[1] + principle_moi[2]),
+                    local_torque[1] * (principle_moi[2] + principle_moi[0]),
+                    local_torque[2] * (principle_moi[0] + principle_moi[1]),
+                )
+                    .into(),
+            );
+        (tpi_squared * tpi_squared) / moi
+        // 6.
+    }
+
+    pub fn set_old_velocity(&mut self) {
+        self.old_velocity = self.velocity;
     }
 }
 
@@ -144,9 +167,25 @@ mod physics_tests {
 
         println!("WHATS THE VECTOR {:?}", rb.sqrt_angular_mass);
 
-        assert_eq!(
-            rb.angular_vel_per_impulse((1., 0., 0.).into(), (1., 0., 0., 0.).into()),
-            2.
+        println!(
+            "(1,0,0): {:?}",
+            rb.angular_vel_per_impulse((1., 0., 0.).into(), (1., 0., 0., 0.).into())
+        );
+        println!(
+            "(1,0,1): {:?}",
+            rb.angular_vel_per_impulse((1., 0., 1.).into(), (1., 0., 0., 0.).into())
+        );
+        println!(
+            "(1,0,-1): {:?}",
+            rb.angular_vel_per_impulse((1., 0., -1.).into(), (1., 0., 0., 0.).into())
+        );
+        println!(
+            "(-1,0,1): {:?}",
+            rb.angular_vel_per_impulse((-1., 0., 1.).into(), (1., 0., 0., 0.).into())
+        );
+        println!(
+            "(-1,0,-1): {:?}",
+            rb.angular_vel_per_impulse((-1., 0., -1.).into(), (1., 0., 0., 0.).into())
         );
     }
 }

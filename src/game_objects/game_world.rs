@@ -90,6 +90,11 @@ impl GameWorld {
     }
 
     /// update world logic with a time step
+    ///
+    /// # Order
+    /// 1. Rigidbody movement
+    /// 2. Collision resolution
+    /// 3. Other logic
     pub fn update(&mut self, seconds_passed: f32) {
         self.last_delta_time = seconds_passed;
         self.fixed_seconds += seconds_passed;
@@ -129,6 +134,11 @@ impl GameWorld {
 
         let mut contact_resolver = self.colliders.get_contacts(&mut self.transforms);
         contact_resolver.resolve(&mut self.transforms);
+        // store old velocity
+        let mut query = <&mut Arc<RwLock<RigidBody>>>::query();
+        for rigid_body in query.iter_mut(&mut self.world) {
+            rigid_body.write().unwrap().set_old_velocity();
+        }
 
         // [Profiling] Colliders
         let coll_time = coll_start.elapsed().as_micros() as u32;

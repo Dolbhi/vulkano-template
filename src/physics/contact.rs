@@ -3,7 +3,9 @@ use crate::{game_objects::transform::TransformSystem, utilities::MaxHeap};
 use cgmath::InnerSpace;
 use std::sync::{atomic::AtomicUsize, Arc, RwLock};
 
-const PEN_RESTITUTION: f32 = 1.000001;
+const PEN_RESTITUTION: f32 = 1.0;
+const SQR_VEL_RESTITUTION_LIMIT: f32 = 3.0;
+const ANGULAR_MOVE_LIMIT_RAD: f32 = 0.1;
 
 #[derive(PartialEq, Clone, Copy)]
 struct OrdF32(pub f32);
@@ -31,7 +33,7 @@ struct RigidBodyRef {
     index: usize,
 
     relative_pos: Vector,
-    relative_vel: Vector,
+    point_vel: Vector,
     torque_per_impulse: Vector,
 
     linear_inertia: f32,
@@ -142,8 +144,8 @@ impl ContactResolver {
             );
 
             println!(
-                "\t[rb1] rel_pos: {:?}, t_per_i: {:?}, l_inertia: {:?}, a_inertia: {:?}",
-                contact.rb_1.relative_pos,
+                "\t[rb1] point_vel: {:?}, t_per_i: {:?}, l_inertia: {:?}, a_inertia: {:?}",
+                contact.rb_1.point_vel,
                 contact.rb_1.torque_per_impulse,
                 contact.rb_1.linear_inertia,
                 contact.rb_1.angular_inertia,
@@ -151,8 +153,8 @@ impl ContactResolver {
 
             if let Some(rb_2) = &contact.rb_2 {
                 println!(
-                    "\t[rb2] rel_pos: {:?}, t_per_i: {:?}, l_inertia: {:?}, a_inertia: {:?}",
-                    rb_2.relative_pos,
+                    "\t[rb2] point_vel: {:?}, t_per_i: {:?}, l_inertia: {:?}, a_inertia: {:?}",
+                    rb_2.point_vel,
                     rb_2.torque_per_impulse,
                     rb_2.linear_inertia,
                     rb_2.angular_inertia,
@@ -184,7 +186,7 @@ impl ContactResolver {
 
                 contact.rb_1.resolve_velocity(
                     -contact.normal,
-                    contact.penetration,
+                    contact.target_delta_velocity,
                     inv_total_inertia,
                     &mut self.pending_contacts,
                 );
@@ -239,6 +241,7 @@ impl Contact {
 
         let relative_pos = position - transform_1.translation;
         let point_vel_1 = rb_guard_1.point_velocity(relative_pos);
+        let old_vel_1 = rb_guard_1.old_velocity;
 
         // normal points away from contact point 1 (assuming convex shape)
         let normal = relative_pos.dot(normal).signum() * normal;
@@ -257,7 +260,7 @@ impl Contact {
             rigidbody: rb_1,
             index,
             relative_pos,
-            relative_vel: point_vel_1,
+            point_vel: point_vel_1,
             torque_per_impulse,
             linear_inertia,
             angular_inertia,
@@ -272,6 +275,7 @@ impl Contact {
                 .get_local_transform();
             let relative_pos = position - transform_2.translation;
             let point_vel_2 = rb_guard_2.point_velocity(relative_pos);
+            let old_vel_2 = rb_guard_2.old_velocity;
 
             let inv_mass = rb_guard_2.inv_mass;
             // n x r
@@ -287,14 +291,23 @@ impl Contact {
                 rigidbody: rb_2,
                 index,
                 relative_pos,
-                relative_vel: point_vel_2,
+                point_vel: point_vel_2,
                 torque_per_impulse,
                 linear_inertia: inv_mass,
                 angular_inertia,
             };
 
             let closing_velocity = point_vel_1 - point_vel_2;
-            let target_delta_velocity = 2. * closing_velocity.dot(normal);
+            let old_closing_velocity = old_vel_1 - old_vel_2;
+            let restituition = if -closing_velocity.dot(normal) < SQR_VEL_RESTITUTION_LIMIT {
+                0.0
+            } else {
+                1.0
+            };
+            let target_delta_velocity =
+                (closing_velocity + restituition * old_closing_velocity).dot(normal);
+            //   ^cancels out the current velocity
+            //                      ^bounce using only old velocity
 
             (
                 heap_index,
@@ -310,6 +323,11 @@ impl Contact {
                 },
             )
         } else {
+            let restituition = if -point_vel_1.dot(normal) < SQR_VEL_RESTITUTION_LIMIT {
+                0.0
+            } else {
+                1.0
+            };
             (
                 heap_index,
                 Contact {
@@ -320,7 +338,7 @@ impl Contact {
                     rb_1,
                     rb_2: None,
 
-                    target_delta_velocity: 2. * point_vel_1.dot(normal),
+                    target_delta_velocity: (point_vel_1 + restituition * old_vel_1).dot(normal),
                 },
             )
         }
@@ -348,12 +366,24 @@ impl RigidBodyRef {
         }
 
         // calculate move
-        let linear_move = PEN_RESTITUTION * penetration * self.linear_inertia * inv_total_inertia;
-        let angular_move =
-            -PEN_RESTITUTION * penetration * self.angular_inertia * inv_total_inertia;
+        let mut linear_move =
+            PEN_RESTITUTION * penetration * self.linear_inertia * inv_total_inertia;
+        let mut angular_move =
+            PEN_RESTITUTION * penetration * self.angular_inertia * inv_total_inertia;
+
+        let angular_move_rad = angular_move / self.relative_pos.magnitude();
+        if angular_move_rad > ANGULAR_MOVE_LIMIT_RAD {
+            let excess = angular_move * (1.0 - (ANGULAR_MOVE_LIMIT_RAD / angular_move_rad));
+            println!(
+                "[Penetration resolution] rotation limit hit! Excess: {:?}",
+                excess
+            );
+            angular_move -= excess;
+            linear_move += excess;
+        }
 
         let linear_move = linear_move * normal;
-        let rotate = angular_move * self.torque_per_impulse / self.relative_pos.magnitude2();
+        let rotate = -angular_move * self.torque_per_impulse / self.relative_pos.magnitude2();
 
         println!(
             "[Penetration resolution] move: {:?}, rotate: {:?}",
@@ -429,6 +459,11 @@ impl RigidBodyRef {
         guard_1.velocity += linear_accel;
         guard_1.bivelocity += angular_accel;
 
+        println!(
+            "[Velocity results] linear: {:?}, angular: {:?}",
+            guard_1.velocity, guard_1.bivelocity
+        );
+
         // update penetration of contacts on the same rb
         for (i, other_index) in guard_1.contact_refs.iter().enumerate() {
             // could compare heap index Arc instead
@@ -448,9 +483,9 @@ impl RigidBodyRef {
                             (-1., other_contact.rb_2.as_mut().unwrap()) // please
                         };
 
-                    let old_rel_vel = other_rb.relative_vel;
+                    let old_rel_vel = other_rb.point_vel;
                     let new_rel_vel = guard_1.point_velocity(other_rb.relative_pos);
-                    other_rb.relative_vel = new_rel_vel;
+                    other_rb.point_vel = new_rel_vel;
 
                     other_contact.target_delta_velocity +=
                         2. * norm_mult * other_contact.normal.dot(new_rel_vel - old_rel_vel);
