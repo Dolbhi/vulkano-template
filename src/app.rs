@@ -389,9 +389,8 @@ impl App {
                     rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
                     let rigidbody = Arc::new(RwLock::new(rigidbody));
 
-                    let collider =
-                        CuboidCollider::new(transforms, transform, Some(rigidbody.clone()));
-                    let collider = colliders.add(collider);
+                    let collider = CuboidCollider::new(transform, Some(rigidbody.clone()));
+                    let collider = colliders.add(collider, transforms);
 
                     let mut resource_loader = self.resources.begin_retrieving(context, renderer);
                     let red_material = resource_loader.load_solid_material([1., 0., 0., 1.], true);
@@ -589,8 +588,8 @@ impl App {
                     };
                 // show overlaps
                 for (coll_1, coll_2) in colliders.get_potential_overlaps() {
-                    let bounds_1 = coll_1.get_bounds();
-                    let bounds_2 = coll_2.get_bounds();
+                    let bounds_1 = coll_1.calc_bounding(transforms);
+                    let bounds_2 = coll_2.calc_bounding(transforms);
 
                     let centre = bounds_1.centre();
                     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();

@@ -28,7 +28,7 @@ pub struct BoundingBox {
 pub struct CuboidCollider {
     transform: TransformID,
     rigidbody: Option<Arc<RwLock<RigidBody>>>,
-    bounding_box: BoundingBox,
+    // bounding_box: BoundingBox,
 }
 #[derive(Default)]
 pub struct ColliderSystem {
@@ -171,20 +171,20 @@ const CUBE_VERTICES: [Vector; 8] = [
 
 impl CuboidCollider {
     pub fn new(
-        transforms: &mut TransformSystem,
+        // transforms: &mut TransformSystem,
         transform: TransformID,
         rigidbody: Option<Arc<RwLock<RigidBody>>>,
     ) -> Self {
-        let mut collider = CuboidCollider {
+        let collider = CuboidCollider {
             transform,
             rigidbody,
-            bounding_box: BoundingBox::default(),
+            // bounding_box: BoundingBox::default(),
         };
-        collider.update_bounding(transforms);
+        // collider.update_bounding(transforms);
         collider
     }
 
-    fn update_bounding(&mut self, transforms: &mut TransformSystem) {
+    pub fn calc_bounding(&self, transforms: &mut TransformSystem) -> BoundingBox {
         let global_model = transforms.get_global_model(&self.transform).unwrap();
         // let view = transforms
         //     .get_transform(&self.transform)
@@ -201,13 +201,13 @@ impl CuboidCollider {
             v.truncate() / v.w
         });
 
-        self.bounding_box = BoundingBox::from_vertices(&vertices);
+        BoundingBox::from_vertices(&vertices)
         // self.bounding_box.translate(*view.translation);
     }
 
-    pub fn get_bounds(&self) -> &BoundingBox {
-        &self.bounding_box
-    }
+    // pub fn get_bounds(&self) -> &BoundingBox {
+    //     &self.bounding_box
+    // }
 
     pub fn get_transform(&self) -> &TransformID {
         &self.transform
@@ -261,13 +261,20 @@ impl ColliderSystem {
     // removed update and reinsert given collider
     pub fn update(&mut self, target: &mut LeafInHierachy, transforms: &mut TransformSystem) {
         self.bounds_tree
-            .modify_collider(target, |collider| collider.update_bounding(transforms))
+            .recalculate_bounds(target, |collider| collider.calc_bounding(transforms))
             .unwrap();
     }
 
     /// adds collider to bounds tree, returns a reference to its leaf node
-    pub fn add(&mut self, collider: CuboidCollider) -> LeafInHierachy {
-        self.bounds_tree.insert(Bvh::register_collider(collider))
+    pub fn add(
+        &mut self,
+        collider: CuboidCollider,
+        transforms: &mut TransformSystem,
+    ) -> LeafInHierachy {
+        self.bounds_tree.insert(Bvh::register_collider(
+            collider.calc_bounding(transforms),
+            collider,
+        ))
     }
     pub fn remove(
         &mut self,

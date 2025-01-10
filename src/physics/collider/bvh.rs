@@ -60,9 +60,9 @@ impl Bvh {
         }
     }
 
-    pub fn register_collider(collider: CuboidCollider) -> LeafOutsideHierachy {
+    pub fn register_collider(bounds: BoundingBox, collider: CuboidCollider) -> LeafOutsideHierachy {
         LeafOutsideHierachy {
-            leaf: Node::new(collider),
+            leaf: Node::new(bounds, collider),
         }
     }
     // pub fn deregister_collider(&self, leaf_ref: LeafReference<OutsideHierachy>) {
@@ -254,14 +254,14 @@ impl Bvh {
         Ok(leaf_ref.convert())
     }
 
-    /// remove and reinsert leaf with modification
-    pub fn modify_collider<F>(
+    /// remove and reinsert leaf with new bounds
+    pub fn recalculate_bounds<F>(
         &mut self,
         leaf_ref: &mut LeafInHierachy,
-        modification: F,
+        calc_bounds: F,
     ) -> Result<(), ()>
     where
-        F: FnOnce(&mut CuboidCollider),
+        F: FnOnce(&mut CuboidCollider) -> BoundingBox,
     {
         if leaf_ref.hierachy != self {
             // Leaf does not belong to this hierachy
@@ -273,9 +273,9 @@ impl Bvh {
                 // use clone for removal
                 let mut res = self.remove(leaf_clone).unwrap();
                 // modify collider safely
-                modification(res.get_collider_mut());
+
                 // update bounds
-                res.leaf.as_mut().bounds = res.get_collider().bounding_box;
+                res.leaf.as_mut().bounds = calc_bounds(res.get_collider_mut());
                 // re-insert leaf and reconcille clone and og (kill og)
                 *leaf_ref = self.insert(res);
             }
@@ -392,12 +392,12 @@ impl Drop for Bvh {
 }
 
 impl Node {
-    fn new(collider: CuboidCollider) -> NonNull<Self> {
+    fn new(bounds: BoundingBox, collider: CuboidCollider) -> NonNull<Self> {
         unsafe {
             NonNull::new_unchecked(Box::into_raw(Box::new(Node {
                 parent: None,
                 right_child: false,
-                bounds: collider.bounding_box,
+                bounds,
                 depth: 0,
                 content: NodeContent::Leaf(collider),
             })))
@@ -869,14 +869,14 @@ mod tree_tests {
                 validate_tree(left_raw, Some(branch), false)?;
                 validate_tree(right_raw, Some(branch), true)?;
             },
-            NodeContent::Leaf(collider) => {
-                // bounds check
-                if child.bounds != collider.bounding_box {
-                    return Err(format!(
-                        "Incorrect Bounds: {:?} vs {:?}",
-                        collider.bounding_box, child.bounds
-                    ));
-                }
+            NodeContent::Leaf(_) => {
+                // // bounds check
+                // if child.bounds != collider.bounding_box {
+                //     return Err(format!(
+                //         "Incorrect Bounds: {:?} vs {:?}",
+                //         collider.bounding_box, child.bounds
+                //     ));
+                // }
 
                 // depth check
                 if child.depth != 0 {
@@ -917,21 +917,27 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        let a = Bvh::register_collider(super::CuboidCollider {
-            transform: trans.next().unwrap(),
-            bounding_box: crap_box,
-            rigidbody: None,
-        });
-        let b = Bvh::register_collider(super::CuboidCollider {
-            transform: trans.next().unwrap(),
-            bounding_box: box_2,
-            rigidbody: None,
-        });
-        let c = Bvh::register_collider(super::CuboidCollider {
-            transform: trans.next().unwrap(),
-            bounding_box: box_2,
-            rigidbody: None,
-        });
+        let a = Bvh::register_collider(
+            crap_box,
+            super::CuboidCollider {
+                transform: trans.next().unwrap(),
+                rigidbody: None,
+            },
+        );
+        let b = Bvh::register_collider(
+            box_2,
+            super::CuboidCollider {
+                transform: trans.next().unwrap(),
+                rigidbody: None,
+            },
+        );
+        let c = Bvh::register_collider(
+            box_2,
+            super::CuboidCollider {
+                transform: trans.next().unwrap(),
+                rigidbody: None,
+            },
+        );
 
         let _a = tree.insert(a);
         let _b = tree.insert(b);
@@ -955,21 +961,27 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        let a = Bvh::register_collider(super::CuboidCollider {
-            transform: trans.next().unwrap(),
-            bounding_box: crap_box,
-            rigidbody: None,
-        });
-        let b = Bvh::register_collider(super::CuboidCollider {
-            transform: trans.next().unwrap(),
-            bounding_box: box_2,
-            rigidbody: None,
-        });
-        let c = Bvh::register_collider(super::CuboidCollider {
-            transform: trans.next().unwrap(),
-            bounding_box: box_2,
-            rigidbody: None,
-        });
+        let a = Bvh::register_collider(
+            crap_box,
+            super::CuboidCollider {
+                transform: trans.next().unwrap(),
+                rigidbody: None,
+            },
+        );
+        let b = Bvh::register_collider(
+            box_2,
+            super::CuboidCollider {
+                transform: trans.next().unwrap(),
+                rigidbody: None,
+            },
+        );
+        let c = Bvh::register_collider(
+            box_2,
+            super::CuboidCollider {
+                transform: trans.next().unwrap(),
+                rigidbody: None,
+            },
+        );
 
         let _a = tree.insert(a);
         let b = tree.insert(b);
@@ -1014,11 +1026,13 @@ mod tree_tests {
         for bounding_box in [
             crap_box, box_2, box_3, box_4, crap_box, box_5, box_6, box_2, box_4, box_6,
         ] {
-            let leaf = Bvh::register_collider(CuboidCollider {
-                transform: trans.next().unwrap(),
+            let leaf = Bvh::register_collider(
                 bounding_box,
-                rigidbody: None,
-            });
+                CuboidCollider {
+                    transform: trans.next().unwrap(),
+                    rigidbody: None,
+                },
+            );
             tree.insert(leaf);
         }
 
@@ -1058,32 +1072,38 @@ mod tree_tests {
             min: (2.0, -5.0, 5.0).into(),
         };
 
-        let leaf = Bvh::register_collider(CuboidCollider {
-            transform: trans.next().unwrap(),
-            bounding_box: box_6,
-            rigidbody: None,
-        });
+        let leaf = Bvh::register_collider(
+            box_6,
+            CuboidCollider {
+                transform: trans.next().unwrap(),
+                rigidbody: None,
+            },
+        );
         let a = tree.insert(leaf);
 
         for bounding_box in [
             crap_box, box_2, box_3, box_4, crap_box, box_5, box_6, box_2, box_4, box_6,
         ] {
-            let leaf = Bvh::register_collider(CuboidCollider {
-                transform: trans.next().unwrap(),
+            let leaf = Bvh::register_collider(
                 bounding_box,
-                rigidbody: None,
-            });
+                CuboidCollider {
+                    transform: trans.next().unwrap(),
+                    rigidbody: None,
+                },
+            );
             tree.insert(leaf);
             // unsafe {
             //     println!("{:#?}", tree.root.unwrap().as_ref());
             // }
         }
 
-        let leaf = Bvh::register_collider(CuboidCollider {
-            transform: trans.next().unwrap(),
-            bounding_box: box_2,
-            rigidbody: None,
-        });
+        let leaf = Bvh::register_collider(
+            box_2,
+            CuboidCollider {
+                transform: trans.next().unwrap(),
+                rigidbody: None,
+            },
+        );
         let b = tree.insert(leaf);
 
         tree.remove(a).unwrap();
@@ -1107,17 +1127,21 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        let a = Bvh::register_collider(super::CuboidCollider {
-            transform: trans.next().unwrap(),
-            bounding_box: crap_box,
-            rigidbody: None,
-        });
+        let a = Bvh::register_collider(
+            crap_box,
+            super::CuboidCollider {
+                transform: trans.next().unwrap(),
+                rigidbody: None,
+            },
+        );
         tree.insert(a);
-        let b = Bvh::register_collider(super::CuboidCollider {
-            transform: trans.next().unwrap(),
-            bounding_box: box_2,
-            rigidbody: None,
-        });
+        let b = Bvh::register_collider(
+            box_2,
+            super::CuboidCollider {
+                transform: trans.next().unwrap(),
+                rigidbody: None,
+            },
+        );
         let b = tree.insert(b);
 
         tree.remove(b).unwrap();
@@ -1134,11 +1158,13 @@ mod tree_tests {
             max: (1.0, 1.0, 1.0).into(),
             min: (0.0, 0.0, 0.0).into(),
         };
-        let remove = Bvh::register_collider(super::CuboidCollider {
-            transform: trans.next().unwrap(),
-            bounding_box: crap_box,
-            rigidbody: None,
-        });
+        let remove = Bvh::register_collider(
+            crap_box,
+            super::CuboidCollider {
+                transform: trans.next().unwrap(),
+                rigidbody: None,
+            },
+        );
         let remove = tree.insert(remove);
 
         tree.remove(remove).unwrap();
