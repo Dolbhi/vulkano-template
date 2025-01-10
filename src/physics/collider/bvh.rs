@@ -5,6 +5,7 @@ use std::{
     marker::PhantomData,
     mem::{self, ManuallyDrop},
     ptr::NonNull,
+    sync::Arc,
 };
 
 #[derive(Default)]
@@ -24,7 +25,7 @@ pub struct Node {
 
 enum NodeContent {
     Branch(NonNull<BranchLinks>),
-    Leaf(CuboidCollider),
+    Leaf(Arc<CuboidCollider>),
     /// only used for empty root
     None,
 }
@@ -60,7 +61,10 @@ impl Bvh {
         }
     }
 
-    pub fn register_collider(bounds: BoundingBox, collider: CuboidCollider) -> LeafOutsideHierachy {
+    pub fn register_collider(
+        bounds: BoundingBox,
+        collider: Arc<CuboidCollider>,
+    ) -> LeafOutsideHierachy {
         LeafOutsideHierachy {
             leaf: Node::new(bounds, collider),
         }
@@ -261,7 +265,7 @@ impl Bvh {
         calc_bounds: F,
     ) -> Result<(), ()>
     where
-        F: FnOnce(&mut CuboidCollider) -> BoundingBox,
+        F: FnOnce(&CuboidCollider) -> BoundingBox,
     {
         if leaf_ref.hierachy != self {
             // Leaf does not belong to this hierachy
@@ -275,7 +279,7 @@ impl Bvh {
                 // modify collider safely
 
                 // update bounds
-                res.leaf.as_mut().bounds = calc_bounds(res.get_collider_mut());
+                res.leaf.as_mut().bounds = calc_bounds(res.get_collider());
                 // re-insert leaf and reconcille clone and og (kill og)
                 *leaf_ref = self.insert(res);
             }
@@ -283,7 +287,7 @@ impl Bvh {
         }
     }
 
-    pub fn get_overlaps(&self) -> Vec<(&CuboidCollider, &CuboidCollider)> {
+    pub fn get_overlaps(&self) -> Vec<(&Arc<CuboidCollider>, &Arc<CuboidCollider>)> {
         match self.root {
             Some(root) => unsafe {
                 if let NodeContent::Branch(branch) = (*root.as_ptr()).content {
@@ -307,7 +311,7 @@ impl Bvh {
         &self,
         ray: &Ray,
         transforms: &mut TransformSystem,
-    ) -> Option<(f32, &CuboidCollider)> {
+    ) -> Option<(f32, &Arc<CuboidCollider>)> {
         self.root
             .and_then(|root_node| unsafe { root_node.as_ref().raycast(ray, transforms) })
     }
@@ -392,7 +396,7 @@ impl Drop for Bvh {
 }
 
 impl Node {
-    fn new(bounds: BoundingBox, collider: CuboidCollider) -> NonNull<Self> {
+    fn new(bounds: BoundingBox, collider: Arc<CuboidCollider>) -> NonNull<Self> {
         unsafe {
             NonNull::new_unchecked(Box::into_raw(Box::new(Node {
                 parent: None,
@@ -472,7 +476,7 @@ impl Node {
     fn check_overlap<'a>(
         &'a self,
         other: &'a Node,
-        results: &mut Vec<(&'a CuboidCollider, &'a CuboidCollider)>,
+        results: &mut Vec<(&'a Arc<CuboidCollider>, &'a Arc<CuboidCollider>)>,
     ) {
         unsafe {
             // recurse to children if any
@@ -551,7 +555,7 @@ impl Node {
         &self,
         ray: &Ray,
         transforms: &mut TransformSystem,
-    ) -> Option<(f32, &CuboidCollider)> {
+    ) -> Option<(f32, &Arc<CuboidCollider>)> {
         match &self.content {
             NodeContent::Leaf(collider) => {
                 let mut model = transforms.get_global_model(&collider.transform).unwrap();
@@ -716,15 +720,15 @@ impl LeafOutsideHierachy {
         }
     }
 
-    pub fn get_collider_mut(&mut self) -> &mut CuboidCollider {
-        unsafe {
-            if let NodeContent::Leaf(collider) = &mut self.leaf.as_mut().content {
-                collider
-            } else {
-                panic!("Leaf reference does not point to leaf")
-            }
-        }
-    }
+    // pub fn get_collider_mut(&mut self) -> &mut CuboidCollider {
+    //     unsafe {
+    //         if let NodeContent::Leaf(collider) = &mut self.leaf.as_mut().content {
+    //             collider
+    //         } else {
+    //             panic!("Leaf reference does not point to leaf")
+    //         }
+    //     }
+    // }
 }
 
 impl Debug for LeafInHierachy {
@@ -794,7 +798,10 @@ impl<'a> Iterator for DepthIter<'a> {
 
 #[cfg(test)]
 mod tree_tests {
-    use std::ptr::{self, addr_of, NonNull};
+    use std::{
+        ptr::{self, addr_of, NonNull},
+        sync::Arc,
+    };
 
     use crate::{game_objects::transform::TransformSystem, physics::collider::CuboidCollider};
 
@@ -919,24 +926,24 @@ mod tree_tests {
 
         let a = Bvh::register_collider(
             crap_box,
-            super::CuboidCollider {
+            Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
-            },
+            }),
         );
         let b = Bvh::register_collider(
             box_2,
-            super::CuboidCollider {
+            Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
-            },
+            }),
         );
         let c = Bvh::register_collider(
             box_2,
-            super::CuboidCollider {
+            Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
-            },
+            }),
         );
 
         let _a = tree.insert(a);
@@ -963,24 +970,24 @@ mod tree_tests {
 
         let a = Bvh::register_collider(
             crap_box,
-            super::CuboidCollider {
+            Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
-            },
+            }),
         );
         let b = Bvh::register_collider(
             box_2,
-            super::CuboidCollider {
+            Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
-            },
+            }),
         );
         let c = Bvh::register_collider(
             box_2,
-            super::CuboidCollider {
+            Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
-            },
+            }),
         );
 
         let _a = tree.insert(a);
@@ -1028,10 +1035,10 @@ mod tree_tests {
         ] {
             let leaf = Bvh::register_collider(
                 bounding_box,
-                CuboidCollider {
+                Arc::new(CuboidCollider {
                     transform: trans.next().unwrap(),
                     rigidbody: None,
-                },
+                }),
             );
             tree.insert(leaf);
         }
@@ -1074,10 +1081,10 @@ mod tree_tests {
 
         let leaf = Bvh::register_collider(
             box_6,
-            CuboidCollider {
+            Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
-            },
+            }),
         );
         let a = tree.insert(leaf);
 
@@ -1086,10 +1093,10 @@ mod tree_tests {
         ] {
             let leaf = Bvh::register_collider(
                 bounding_box,
-                CuboidCollider {
+                Arc::new(CuboidCollider {
                     transform: trans.next().unwrap(),
                     rigidbody: None,
-                },
+                }),
             );
             tree.insert(leaf);
             // unsafe {
@@ -1099,10 +1106,10 @@ mod tree_tests {
 
         let leaf = Bvh::register_collider(
             box_2,
-            CuboidCollider {
+            Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
-            },
+            }),
         );
         let b = tree.insert(leaf);
 
@@ -1129,18 +1136,18 @@ mod tree_tests {
 
         let a = Bvh::register_collider(
             crap_box,
-            super::CuboidCollider {
+            Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
-            },
+            }),
         );
         tree.insert(a);
         let b = Bvh::register_collider(
             box_2,
-            super::CuboidCollider {
+            Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
-            },
+            }),
         );
         let b = tree.insert(b);
 
@@ -1160,10 +1167,10 @@ mod tree_tests {
         };
         let remove = Bvh::register_collider(
             crap_box,
-            super::CuboidCollider {
+            Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
-            },
+            }),
         );
         let remove = tree.insert(remove);
 

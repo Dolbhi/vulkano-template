@@ -273,7 +273,7 @@ impl ColliderSystem {
     ) -> LeafInHierachy {
         self.bounds_tree.insert(Bvh::register_collider(
             collider.calc_bounding(transforms),
-            collider,
+            Arc::new(collider),
         ))
     }
     pub fn remove(
@@ -287,7 +287,7 @@ impl ColliderSystem {
         self.bounds_tree.iter()
     }
 
-    pub fn get_potential_overlaps(&self) -> Vec<(&CuboidCollider, &CuboidCollider)> {
+    pub fn get_potential_overlaps(&self) -> Vec<(&Arc<CuboidCollider>, &Arc<CuboidCollider>)> {
         self.bounds_tree.get_overlaps()
     }
 
@@ -297,7 +297,7 @@ impl ColliderSystem {
         start: Vector,
         direction: Vector,
         distance: f32,
-    ) -> Option<(Vector, &CuboidCollider)> {
+    ) -> Option<(Vector, &Arc<CuboidCollider>)> {
         let ray = Ray::new(start, direction, distance);
         let result = self.bounds_tree.raycast(&ray, transforms);
         result.map(|(d, c)| (ray.calc_point(d), c))
