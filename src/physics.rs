@@ -47,7 +47,7 @@ pub struct RigidBody {
 
     pub inv_mass: f32,
     /// sqrt of masses at unit distance on principle axes
-    pub sqrt_angular_mass: Vector,
+    pub principle_moi: Vector,
     pub gravity_multiplier: f32,
 
     pub contact_refs: Vec<Arc<AtomicUsize>>,
@@ -62,7 +62,7 @@ impl RigidBody {
             bivelocity: Vector::zero(),
 
             inv_mass: 1.,
-            sqrt_angular_mass: (1., 1., 1.).into(),
+            principle_moi: (1., 1., 1.).into(),
             gravity_multiplier: 1.,
 
             contact_refs: Vec::new(),
@@ -117,7 +117,7 @@ impl RigidBody {
         if self.inv_mass.is_zero() {
             return;
         }
-        self.sqrt_angular_mass = (1. / (self.inv_mass * 24.)).sqrt() * scale;
+        self.principle_moi = scale.map(|c| c * c) / (self.inv_mass * 12.);
     }
 
     /// inverse moment of inertia about an axis (and other stuff), calculated via black magic
@@ -134,16 +134,14 @@ impl RigidBody {
         // let world_sam = rotation * self.sqrt_angular_mass;
         // (tpi_squared * tpi_squared) / torque_per_impulse.cross(world_sam).magnitude2()
         let local_torque = rotation.conjugate() * torque_per_impulse;
-        let principle_moi = self.sqrt_angular_mass.map(|c| c * c);
-        let moi = 2.
-            * local_torque.dot(
-                (
-                    local_torque[0] * (principle_moi[1] + principle_moi[2]),
-                    local_torque[1] * (principle_moi[2] + principle_moi[0]),
-                    local_torque[2] * (principle_moi[0] + principle_moi[1]),
-                )
-                    .into(),
-            );
+        let moi = local_torque.dot(
+            (
+                local_torque[0] * (self.principle_moi[0]),
+                local_torque[1] * (self.principle_moi[1]),
+                local_torque[2] * (self.principle_moi[2]),
+            )
+                .into(),
+        );
         (tpi_squared * tpi_squared) / moi
         // 6.
     }
@@ -162,10 +160,11 @@ mod physics_tests {
     fn check_angular_vpi() {
         let mut transform = TransformSystem::new();
         let mut rb = RigidBody::new(transform.next().unwrap());
+        rb.inv_mass = 0.5;
 
         rb.set_moi_as_cuboid((1., 1., 1.).into());
 
-        println!("WHATS THE VECTOR {:?}", rb.sqrt_angular_mass);
+        println!("WHATS THE VECTOR {:?}", rb.principle_moi);
 
         println!(
             "(1,0,0): {:?}",
