@@ -14,7 +14,7 @@ use core::f32;
 use ray::Ray;
 use std::{
     fmt::Debug,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock, Weak},
 };
 
 const CROSS_INDICES: [[usize; 2]; 3] = [[1, 2], [2, 0], [0, 1]];
@@ -30,10 +30,24 @@ pub struct CuboidCollider {
     rigidbody: Option<Arc<RwLock<RigidBody>>>,
     // bounding_box: BoundingBox,
 }
+
 #[derive(Default)]
 pub struct ColliderSystem {
     bounds_tree: Bvh,
 }
+
+pub struct ContactIdentifier {
+    pub collider: Weak<CuboidCollider>,
+    element: CuboidElement,
+}
+pub struct ContactIdPair(pub ContactIdentifier, pub ContactIdentifier);
+#[derive(PartialEq, Eq)]
+enum CuboidElement {
+    Vertex(u8),
+    Face(u8),
+    Edge(u8),
+}
+use CuboidElement::*;
 
 impl BoundingBox {
     pub fn new(min: impl Into<Vector>, max: impl Into<Vector>) -> Self {
@@ -143,14 +157,14 @@ const CUBE_VERTICES: [Vector; 8] = [
         z: -1.0,
     },
     Vector {
-        x: -1.0,
-        y: -1.0,
-        z: 1.0,
-    },
-    Vector {
         x: 1.0,
         y: 1.0,
         z: -1.0,
+    },
+    Vector {
+        x: -1.0,
+        y: -1.0,
+        z: 1.0,
     },
     Vector {
         x: 1.0,
@@ -379,9 +393,10 @@ impl ColliderSystem {
                 let points_2 =
                     CUBE_VERTICES.map(|v| (space_2_to_space_1 * v.extend(1.)).truncate());
                 let mut max_pen_pf_sqr = 0.;
-                let mut contact_point_pf = [0., 0., 0.].into();
+                let mut contact_point_pf = &[0., 0., 0.].into();
                 let mut pen_axis = 0;
-                for point in points_2 {
+                let mut pf_elems = (Vertex(0), Face(0));
+                for (p_i, point) in points_2.iter().enumerate() {
                     let depths = point.map(|c| 1. - c.abs());
 
                     if depths.x < 0. || depths.y < 0. || depths.z < 0. {
@@ -390,11 +405,12 @@ impl ColliderSystem {
 
                     let mut min_pen = None;
                     let mut min_index = 0;
+                    let mut min_elems = (0, 0);
 
                     // for each axis
-                    for i in 0..2 {
+                    for i in 0..3 {
                         // point projected onto closest face
-                        let mut face_point = point;
+                        let mut face_point = *point;
                         face_point[i] = face_point[i].signum();
                         // check if it is in 2
                         let point_from_2 = face_point - pos_2_in_1;
@@ -409,10 +425,12 @@ impl ColliderSystem {
                             if depth_sqr < old_pen {
                                 min_pen = Some(depth_sqr);
                                 min_index = i;
+                                min_elems = (i as u8, p_i as u8);
                             }
                         } else {
                             min_pen = Some(depth_sqr);
                             min_index = i;
+                            min_elems = (i as u8, p_i as u8);
                         }
                     }
 
@@ -421,6 +439,7 @@ impl ColliderSystem {
                             max_pen_pf_sqr = depth;
                             contact_point_pf = point;
                             pen_axis = (1 + min_index as i32) * point.x.signum() as i32;
+                            pf_elems = (Face(min_elems.0), Vertex(min_elems.1));
                         }
                     };
                 }
@@ -438,8 +457,9 @@ impl ColliderSystem {
 
                     let mut min_pen = None;
                     let mut min_index = 0;
+                    let mut min_elems = (0, 0);
                     // for each axis
-                    for j in 0..2 {
+                    for j in 0..3 {
                         // // point projected onto closest face
                         // let mut face_point = point;
                         // face_point[i] = face_point[i].signum();
@@ -456,18 +476,21 @@ impl ColliderSystem {
                             if depth_sqr < old_pen {
                                 min_pen = Some(depth_sqr);
                                 min_index = j;
+                                min_elems = (i as u8, j as u8);
                             }
                         } else {
                             min_pen = Some(depth_sqr);
                             min_index = j;
+                            min_elems = (i as u8, j as u8);
                         }
                     }
 
                     if let Some(depth) = min_pen {
                         if depth > max_pen_pf_sqr {
                             max_pen_pf_sqr = depth;
-                            contact_point_pf = CUBE_VERTICES[i];
+                            contact_point_pf = &CUBE_VERTICES[i];
                             pen_axis = (4 + min_index as i32) * a2_proj[min_index].signum() as i32;
+                            pf_elems = (Vertex(min_elems.0), Face(min_elems.1))
                         }
                     };
                 }
@@ -477,12 +500,14 @@ impl ColliderSystem {
                 let mut contact_point_ee = [0., 0., 0.].into();
                 let mut pen_axis_1 = 0;
                 let mut pen_axis_2 = 0;
+                let mut ee_elems = (Edge(0), Edge(0));
                 // for each unique axis point on 2
-                for point in [1, 2, 3, 7].map(|i| points_2[i]) {
+                for p2_i in [1, 2, 4, 7] {
+                    let point = points_2[p2_i as usize];
                     // for each edge from that point
-                    for (i, a2) in axes_2.iter().enumerate() {
+                    for (a2_i, a2) in axes_2.iter().enumerate() {
                         // closest point on edge to 1's centre
-                        let d = point - a2.dot(point) * axes_2_inv[i];
+                        let d = point - a2.dot(point) * axes_2_inv[a2_i];
 
                         // closest vertex on 1 to d (closest vertex to edge)
                         let p1: Vector = [d.x.signum(), d.y.signum(), d.z.signum()].into();
@@ -500,20 +525,20 @@ impl ColliderSystem {
                             .map(|a_proj| point - a_proj.dot(p1_p2) * a2 / a_proj.magnitude2());
 
                         let mut potential_pen = None;
-                        let mut potential_index = None;
+                        let mut potential_a1_i = None;
 
                         // for each closest point
                         for a1_i in 0..3 {
                             // check if point is in 2
                             let d2_from_2 = d2_per_edge[a1_i] - space_2_to_space_1.w.truncate();
-                            if d2_from_2.dot(axes_2_inv[i]).abs() > 1. {
+                            if d2_from_2.dot(axes_2_inv[a2_i]).abs() > 1. {
                                 continue;
                             }
 
                             // check if closest point on edge is in 2
                             let mut d1_from_2 = d2_from_2;
                             d1_from_2[a1_i] += p1[a1_i] - d2_per_edge[a1_i][a1_i];
-                            if d1_from_2.dot(axes_2_inv[i]).abs() > 1. {
+                            if d1_from_2.dot(axes_2_inv[a2_i]).abs() > 1. {
                                 continue;
                             }
 
@@ -537,22 +562,29 @@ impl ColliderSystem {
                             if let Some(min_depth) = potential_pen {
                                 if depth < min_depth {
                                     potential_pen = Some(depth);
-                                    potential_index = Some(a1_i)
+                                    potential_a1_i = Some(a1_i);
                                 }
                             } else {
                                 potential_pen = Some(depth);
-                                potential_index = Some(a1_i);
+                                potential_a1_i = Some(a1_i);
                             }
                         }
 
                         if let Some(depth) = potential_pen {
                             if depth > max_pen_ee_sqr {
-                                let index = potential_index.unwrap();
+                                let a1_i = potential_a1_i.unwrap();
 
                                 max_pen_ee_sqr = depth;
-                                contact_point_ee = d2_per_edge[index];
-                                pen_axis_1 = index + 1;
-                                pen_axis_2 = i + 4;
+                                contact_point_ee = d2_per_edge[a1_i];
+                                pen_axis_1 = a1_i + 1;
+                                pen_axis_2 = a2_i + 4;
+                                ee_elems = (
+                                    CuboidElement::from_vertex_axis(
+                                        CuboidElement::closest_vertex(p1),
+                                        a1_i as u8,
+                                    ),
+                                    CuboidElement::from_vertex_axis(p2_i, a2_i as u8),
+                                )
                             }
                         }
                     }
@@ -571,13 +603,23 @@ impl ColliderSystem {
                     // println!("pf collision normal: {:?}", normal);
                     let point = model_1 * contact_point_pf.extend(1.);
 
+                    let contact_id = ContactIdPair(
+                        ContactIdentifier {
+                            collider: Arc::downgrade(coll_1),
+                            element: pf_elems.0,
+                        },
+                        ContactIdentifier {
+                            collider: Arc::downgrade(coll_2),
+                            element: pf_elems.1,
+                        },
+                    );
+
                     let (index, contact) = Contact::new(
                         transforms,
                         point.truncate(),
                         normal.normalize(),
                         max_pen_pf_sqr.sqrt(),
-                        coll_1.rigidbody.clone().unwrap(),
-                        coll_2.rigidbody.clone(),
+                        contact_id,
                     );
                     result.add_contact(index, contact);
                 } else {
@@ -585,18 +627,62 @@ impl ColliderSystem {
                     // println!("ee collision normal: {:?}", normal);
                     let point = model_1 * contact_point_ee.extend(1.);
 
+                    let contact_id = ContactIdPair(
+                        ContactIdentifier {
+                            collider: Arc::downgrade(coll_1),
+                            element: ee_elems.0,
+                        },
+                        ContactIdentifier {
+                            collider: Arc::downgrade(coll_2),
+                            element: ee_elems.1,
+                        },
+                    );
+
                     let (index, contact) = Contact::new(
                         transforms,
                         point.truncate(),
                         normal.normalize(),
                         max_pen_ee_sqr.sqrt(),
-                        coll_1.rigidbody.clone().unwrap(),
-                        coll_2.rigidbody.clone(),
+                        contact_id,
                     );
                     result.add_contact(index, contact);
                 }
             }
         }
+        result
+    }
+}
+
+impl PartialEq for ContactIdentifier {
+    fn eq(&self, other: &Self) -> bool {
+        self.collider.ptr_eq(&other.collider) && self.element == other.element
+    }
+}
+impl PartialEq for ContactIdPair {
+    fn eq(&self, other: &Self) -> bool {
+        (self.0 == other.0 && self.1 == other.1) || (self.0 == other.1 && self.1 == other.0)
+    }
+}
+
+impl CuboidElement {
+    fn from_vertex_axis(vertex: u8, axis: u8) -> Self {
+        let axis_mask = 1 << axis;
+        let axis_flags = axis << 3;
+        Edge(axis_flags | vertex | axis_mask)
+    }
+
+    // fn get_edge_axis(edge: u8) -> u8 {
+    //     edge >> 3
+    // }
+
+    fn closest_vertex(point: Vector) -> u8 {
+        let mut result = 0;
+        point.map(|c| {
+            result <<= 1;
+            if c > 0. {
+                result += 1;
+            }
+        });
         result
     }
 }

@@ -1,4 +1,4 @@
-use super::{geo_alg::bivec_exp, RigidBody, Vector};
+use super::{collider::ContactIdPair, geo_alg::bivec_exp, RigidBody, Vector};
 use crate::{game_objects::transform::TransformSystem, utilities::MaxHeap};
 use cgmath::InnerSpace;
 use std::sync::{atomic::AtomicUsize, Arc, RwLock};
@@ -25,6 +25,10 @@ pub struct Contact {
     rb_2: Option<RigidBodyRef>,
 
     target_delta_velocity: f32,
+
+    contact_id: ContactIdPair,
+
+    age: u8,
 }
 
 struct RigidBodyRef {
@@ -227,9 +231,27 @@ impl Contact {
         position: Vector,
         normal: Vector,
         penetration: f32,
-        rb_1: Arc<RwLock<RigidBody>>,
-        rb_2: Option<Arc<RwLock<RigidBody>>>,
+        // rb_1: Arc<RwLock<RigidBody>>,
+        // rb_2: Option<Arc<RwLock<RigidBody>>>,
+        contact_id: ContactIdPair,
     ) -> (Arc<AtomicUsize>, Self) {
+        let rb_1 = contact_id
+            .0
+            .collider
+            .upgrade()
+            .unwrap()
+            .get_rigidbody()
+            .as_ref()
+            .unwrap()
+            .clone();
+        let rb_2 = contact_id
+            .1
+            .collider
+            .upgrade()
+            .unwrap()
+            .get_rigidbody()
+            .clone();
+
         let heap_index = Arc::new(AtomicUsize::new(usize::MAX));
 
         // aquire rb 1 data
@@ -320,6 +342,9 @@ impl Contact {
                     rb_2: Some(rb_2),
 
                     target_delta_velocity,
+
+                    contact_id,
+                    age: 0,
                 },
             )
         } else {
@@ -339,6 +364,9 @@ impl Contact {
                     rb_2: None,
 
                     target_delta_velocity: (point_vel_1 + restituition * old_vel_1).dot(normal),
+
+                    contact_id,
+                    age: 0,
                 },
             )
         }
