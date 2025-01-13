@@ -250,8 +250,7 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         transform,
         collider,
         ro,
-        rigidbody,
-        TransformTracker("prefab")
+        rigidbody // , TransformTracker("prefab")
     );
 
     let transform = loader.world.transforms.add_transform(

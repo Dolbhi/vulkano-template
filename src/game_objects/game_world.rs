@@ -132,7 +132,7 @@ impl GameWorld {
             }
         }
 
-        let mut contact_resolver = self.colliders.get_contacts(&mut self.transforms);
+        let contact_resolver = self.colliders.get_contacts(&mut self.transforms);
         contact_resolver.resolve(&mut self.transforms);
         // store old velocity
         let mut query = <&mut Arc<RwLock<RigidBody>>>::query();

@@ -255,7 +255,7 @@ impl App {
                         Ok(()) => {
                             self.game_state = GameState::Playing;
                             self.lock_cursor();
-                            self.game_thread.set_paused(false);
+                            self.game_thread.set_paused(true);
                         }
                         Err(e) => println!("[Error] {e}"),
                     },
@@ -610,9 +610,14 @@ impl App {
                     });
                 }
                 // show contacts
-                let mut contacts = colliders.get_contacts(transforms);
-                for contact in contacts.get_contacts() {
-                    let (position, normal, _) = contact.get_debug_info();
+                let contacts = colliders.get_last_contacts();
+                for (position, normal, age) in contacts {
+                    // colour
+                    let color = if *age == 0 {
+                        [0., 0., 1., 1.]
+                    } else {
+                        [0., 1., 1., 1.]
+                    };
 
                     // contact point
                     let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
@@ -620,7 +625,7 @@ impl App {
                     bounding_boxes.push(GPUAABB {
                         min: min_cast.into(),
                         max: max_cast.into(),
-                        color: [0., 0., 1., 1.],
+                        color,
                     });
 
                     // normal indicator
@@ -631,10 +636,9 @@ impl App {
                     bounding_boxes.push(GPUAABB {
                         min: min_cast.into(),
                         max: max_cast.into(),
-                        color: [0., 0., 1., 1.],
+                        color,
                     });
                 }
-                contacts.clear();
 
                 // raycast
                 let cam_model = transforms.get_global_model(&camera.transform).unwrap();

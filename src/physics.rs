@@ -5,8 +5,12 @@ mod geo_alg;
 
 use crate::game_objects::transform::{Transform, TransformID};
 use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, Quaternion, Vector3, Zero};
+use collider::ContactIdPair;
 pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy};
-use std::sync::{atomic::AtomicUsize, Arc};
+use std::{
+    ops::ControlFlow,
+    sync::{atomic::AtomicUsize, Arc},
+};
 
 type Vector = Vector3<f32>;
 
@@ -51,8 +55,12 @@ pub struct RigidBody {
     pub gravity_multiplier: f32,
 
     pub contact_refs: Vec<Arc<AtomicUsize>>,
+    pub past_contacts: Vec<(u8, ContactIdPair)>,
 
     pub old_velocity: Vector,
+
+    /// were contacts cached here last frame
+    pub caching_contacts: bool,
 }
 impl RigidBody {
     pub fn new(transform: TransformID) -> Self {
@@ -66,14 +74,17 @@ impl RigidBody {
             gravity_multiplier: 1.,
 
             contact_refs: Vec::new(),
+            past_contacts: Vec::new(),
 
             old_velocity: Vector::zero(),
+
+            caching_contacts: false,
         }
     }
 
     pub fn update(&mut self, transform: &mut Transform, delta_secs: f32) {
-        // self.velocity *= 1. - 0.05 * delta_secs;
-        // self.bivelocity *= 1. - 0.05 * delta_secs;
+        self.velocity *= 1. - 0.05 * delta_secs;
+        self.bivelocity *= 1. - 0.05 * delta_secs;
 
         self.velocity += GRAVITY * delta_secs * self.gravity_multiplier;
 
@@ -81,6 +92,13 @@ impl RigidBody {
             *t += self.velocity * delta_secs;
             *r = geo_alg::bivec_exp((delta_secs / 2.) * self.bivelocity).into_quaternion() * *r;
         });
+
+        self.contact_refs.clear();
+        if self.caching_contacts {
+            self.caching_contacts = false;
+        } else {
+            self.past_contacts.clear();
+        }
 
         // println!("MASSES: {:?}", self.sqrt_angular_mass);
     }
@@ -148,6 +166,31 @@ impl RigidBody {
 
     pub fn set_old_velocity(&mut self) {
         self.old_velocity = self.velocity;
+    }
+
+    pub fn remove_cached_contact(&mut self, id: &ContactIdPair) {
+        // let mut index = None;
+        let index = self
+            .past_contacts
+            .iter()
+            .enumerate()
+            .try_for_each(|(i, item)| {
+                if *id == item.1 {
+                    // index = Some(i);
+                    ControlFlow::Break(i)
+                } else {
+                    ControlFlow::Continue(())
+                }
+            });
+        // for (i, item) in self.past_contacts.iter().enumerate() {
+        //     if *id == item.1 {
+        //         index = Some(i);
+        //         break;
+        //     }
+        // }
+        if let ControlFlow::Break(i) = index {
+            self.past_contacts.remove(i);
+        }
     }
 }
 

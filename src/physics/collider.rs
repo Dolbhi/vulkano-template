@@ -9,7 +9,7 @@ use super::{
 };
 use crate::game_objects::transform::{TransformID, TransformSystem};
 use bvh::{Bvh, DepthIter, LeafOutsideHierachy};
-use cgmath::{InnerSpace, Matrix, Matrix4, SquareMatrix, Zero};
+use cgmath::{InnerSpace, Matrix, Matrix4, MetricSpace, SquareMatrix, Zero};
 use core::f32;
 use ray::Ray;
 use std::{
@@ -18,6 +18,7 @@ use std::{
 };
 
 const CROSS_INDICES: [[usize; 2]; 3] = [[1, 2], [2, 0], [0, 1]];
+const CACHED_NEG_DEPTH: f32 = -0.1;
 
 #[derive(Clone, Copy, Debug)]
 pub struct BoundingBox {
@@ -34,14 +35,17 @@ pub struct CuboidCollider {
 #[derive(Default)]
 pub struct ColliderSystem {
     bounds_tree: Bvh,
+    contact_resolver: ContactResolver,
 }
 
+#[derive(Debug)]
 pub struct ContactIdentifier {
     pub collider: Weak<CuboidCollider>,
     element: CuboidElement,
 }
+#[derive(Debug)]
 pub struct ContactIdPair(pub ContactIdentifier, pub ContactIdentifier);
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 enum CuboidElement {
     Vertex(u8),
     Face(u8),
@@ -265,6 +269,7 @@ impl ColliderSystem {
     pub fn new() -> Self {
         Self {
             bounds_tree: Bvh::new(),
+            contact_resolver: ContactResolver::new(),
         }
     }
 
@@ -304,6 +309,9 @@ impl ColliderSystem {
     pub fn get_potential_overlaps(&self) -> Vec<(&Arc<CuboidCollider>, &Arc<CuboidCollider>)> {
         self.bounds_tree.get_overlaps()
     }
+    pub fn get_last_contacts(&self) -> &Vec<(Vector, Vector, u8)> {
+        &self.contact_resolver.past_contacts
+    }
 
     pub fn raycast(
         &self,
@@ -318,9 +326,7 @@ impl ColliderSystem {
     }
 
     #[allow(clippy::collapsible_else_if)]
-    pub fn get_contacts(&self, transforms: &mut TransformSystem) -> ContactResolver {
-        let mut result = ContactResolver::new();
-
+    pub fn get_contacts(&mut self, transforms: &mut TransformSystem) -> &mut ContactResolver {
         for (mut coll_1, mut coll_2) in self.bounds_tree.get_overlaps() {
             if let Some(rb_1) = &coll_1.rigidbody {
                 if let Some(rb_2) = &coll_2.rigidbody {
@@ -620,8 +626,9 @@ impl ColliderSystem {
                         normal.normalize(),
                         max_pen_pf_sqr.sqrt(),
                         contact_id,
+                        0,
                     );
-                    result.add_contact(index, contact);
+                    self.contact_resolver.add_contact(index, contact);
                 } else {
                     let normal = axes[pen_axis_1 - 1].cross(axes[pen_axis_2 - 1]);
                     // println!("ee collision normal: {:?}", normal);
@@ -644,12 +651,51 @@ impl ColliderSystem {
                         normal.normalize(),
                         max_pen_ee_sqr.sqrt(),
                         contact_id,
+                        0,
                     );
-                    result.add_contact(index, contact);
+                    self.contact_resolver.add_contact(index, contact);
                 }
             }
         }
-        result
+
+        self.add_cached_contacts(transforms);
+
+        &mut self.contact_resolver
+    }
+
+    fn add_cached_contacts(&mut self, transform_sys: &mut TransformSystem) {
+        let contacts = self.contact_resolver.get_contacts();
+        let mut cached_contacts = Vec::with_capacity(contacts.len());
+        for contact in contacts {
+            let (rb_1, o_rb_2) = contact.get_rigidbodies();
+
+            for (age, contact) in rb_1.write().unwrap().past_contacts.drain(..) {
+                println!("[Uncaching contacts] age: {:?}", age);
+                if let Some(res) = contact.into_contact(age, transform_sys) {
+                    cached_contacts.push(res);
+                }
+            }
+            if let Some(rb_2) = o_rb_2 {
+                for (age, contact) in rb_2.write().unwrap().past_contacts.drain(..) {
+                    println!("[Uncaching contacts] age: {:?}", age);
+                    if let Some(res) = contact.into_contact(age, transform_sys) {
+                        cached_contacts.push(res);
+                    }
+                }
+            }
+        }
+
+        for (position, normal, penetration, contact_id, age) in cached_contacts {
+            let (index, contact) = Contact::new(
+                transform_sys,
+                position,
+                normal,
+                penetration,
+                contact_id,
+                age,
+            );
+            self.contact_resolver.add_contact(index, contact);
+        }
     }
 }
 
@@ -664,11 +710,106 @@ impl PartialEq for ContactIdPair {
     }
 }
 
+impl ContactIdPair {
+    fn into_contact(
+        self,
+        age: u8,
+        transform_sys: &mut TransformSystem,
+    ) -> Option<(Vector, Vector, f32, Self, u8)> {
+        let coll_1 = self.0.collider.upgrade()?;
+        let coll_2 = self.1.collider.upgrade()?;
+
+        let model_1 = transform_sys.get_global_model(&coll_1.transform).unwrap(); // impl func to try get model without mut
+        let model_2 = transform_sys.get_global_model(&coll_2.transform).unwrap();
+
+        let (position, normal, penetration) = match (&self.0.element, &self.1.element) {
+            (Vertex(v), Face(f)) => {
+                let p1_world = model_1 * CUBE_VERTICES[*v as usize].extend(1.0);
+                let p1_2 = (model_2.invert().unwrap() * p1_world).truncate();
+                let d1 = p1_2.map(|c| 1. - c.abs());
+
+                if d1.x < CACHED_NEG_DEPTH || d1.y < CACHED_NEG_DEPTH || d1.z < CACHED_NEG_DEPTH {
+                    return None;
+                }
+
+                let depth_world = d1[*f as usize] * model_2[*f as usize].magnitude();
+
+                (
+                    p1_world.truncate(),
+                    model_2[*f as usize].truncate().normalize(),
+                    depth_world,
+                )
+            }
+            (Face(f), Vertex(v)) => {
+                let p2_world = model_2 * CUBE_VERTICES[*v as usize].extend(1.0);
+                let p2_1 = (model_1.invert().unwrap() * p2_world).truncate();
+                let d2 = p2_1.map(|c| 1. - c.abs());
+
+                if d2.x < CACHED_NEG_DEPTH || d2.y < CACHED_NEG_DEPTH || d2.z < CACHED_NEG_DEPTH {
+                    return None;
+                }
+
+                let depth_world = d2[*f as usize] * model_1[*f as usize].magnitude();
+
+                (
+                    p2_world.truncate(),
+                    model_1[*f as usize].truncate().normalize(),
+                    depth_world,
+                )
+            }
+            (Edge(e1), Edge(e2)) => {
+                let (p1, a1_i) = CuboidElement::into_vertex_axis(*e1);
+                let (p2, a2_i) = CuboidElement::into_vertex_axis(*e2);
+
+                let p1 = (model_1 * p1.extend(1.)).truncate();
+                let p2 = (model_2 * p2.extend(1.)).truncate();
+                let a1 = model_1[a1_i].truncate();
+                let a2 = model_2[a2_i].truncate();
+
+                let normal = a1.cross(a2).normalize();
+
+                let p2_p1 = p2 - p1;
+                // let depth = p2_p1.dot(normal).abs();
+
+                let n2 = a2.cross(normal);
+                let c1 = p1 + (p2_p1.dot(n2) / a1.dot(n2)) * a1;
+
+                let n1 = a1.cross(normal);
+                let c2 = p2 - (p2_p1.dot(n1) / a2.dot(n1)) * a2;
+
+                let depth = c1.distance(model_1.w.truncate()) - c2.distance(model_1.w.truncate());
+
+                // its an intercept if c1 is closer to the centre of 2 than the centre of 1
+                if depth < CACHED_NEG_DEPTH {
+                    return None;
+                } else {
+                    (c1, normal, depth)
+                }
+            }
+            _ => {
+                panic!(
+                    "Invalid contact id pair: {:?} {:?}",
+                    self.0.element, self.1.element
+                )
+            }
+        };
+
+        Some((position, normal, penetration, self, age)) // todo: make contact create info struct
+    }
+}
+
 impl CuboidElement {
     fn from_vertex_axis(vertex: u8, axis: u8) -> Self {
         let axis_mask = 1 << axis;
         let axis_flags = axis << 3;
         Edge(axis_flags | vertex | axis_mask)
+    }
+
+    fn into_vertex_axis(edge: u8) -> (Vector, usize) {
+        let vertex = edge & 0b111; // get 3 least sig bits
+        let axis = edge >> 3; // get 2 most sig bits
+
+        (CUBE_VERTICES[vertex as usize], axis as usize)
     }
 
     // fn get_edge_axis(edge: u8) -> u8 {
@@ -677,12 +818,31 @@ impl CuboidElement {
 
     fn closest_vertex(point: Vector) -> u8 {
         let mut result = 0;
-        point.map(|c| {
-            result <<= 1;
-            if c > 0. {
-                result += 1;
-            }
-        });
+        if point.x > 0. {
+            result += 0b001;
+        }
+        if point.y > 0. {
+            result += 0b010;
+        }
+        if point.z > 0. {
+            result += 0b100;
+        }
         result
+    }
+}
+
+#[cfg(test)]
+mod coll_tests {
+    use super::CuboidElement;
+
+    #[test]
+    fn bit_manips() {
+        let vertex = CuboidElement::closest_vertex((0.12, 1.2, -2.).into());
+        let edge = CuboidElement::from_vertex_axis(1, 1);
+        let (v, a) = CuboidElement::into_vertex_axis(0b01_010);
+
+        println!("c_v: {:?}", vertex);
+        println!("e: {:?}", edge);
+        println!("v: {:?}, a: {:?}", v, a);
     }
 }
