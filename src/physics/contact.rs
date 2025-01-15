@@ -4,7 +4,7 @@ use cgmath::InnerSpace;
 use std::sync::{atomic::AtomicUsize, Arc, RwLock};
 
 const PEN_RESTITUTION: f32 = 1.;
-const VEL_RESTITUTION_LIMIT: f32 = 1.0;
+const MIN_BOUNCE_VEL: f32 = 0.2;
 const ANGULAR_MOVE_LIMIT_RAD: f32 = 0.5;
 const MAX_CONTACT_AGE: u8 = 4;
 const VELOCITY_ITER_LIMIT: u32 = 200;
@@ -149,7 +149,7 @@ impl ContactResolver {
     fn resolve_velocity(&mut self) {
         let mut iters = 0;
         while let Some((index, mut contact)) = self.pending_contacts.extract_min() {
-            if iters > VELOCITY_ITER_LIMIT || contact.target_delta_velocity < 0.001 {
+            if iters > VELOCITY_ITER_LIMIT || contact.target_delta_velocity <= 0.001 {
                 self.settled_contacts.push((index, contact));
                 break;
             }
@@ -373,7 +373,7 @@ impl Contact {
 
             let closing_velocity = point_vel_1 - point_vel_2;
             let old_closing_velocity = old_vel_1 - old_vel_2;
-            let restituition = if -closing_velocity.dot(normal) < VEL_RESTITUTION_LIMIT {
+            let restituition = if -closing_velocity.dot(normal) < MIN_BOUNCE_VEL {
                 0.0
             } else {
                 0.5
@@ -400,7 +400,7 @@ impl Contact {
                 },
             )
         } else {
-            let restituition = if -point_vel_1.dot(normal) < VEL_RESTITUTION_LIMIT {
+            let restituition = if -point_vel_1.dot(normal) < MIN_BOUNCE_VEL {
                 0.0
             } else {
                 0.5
