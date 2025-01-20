@@ -7,6 +7,7 @@ pub mod render;
 pub mod shaders;
 pub mod ui;
 pub mod utilities {
+    pub mod math;
     mod max_heap;
     pub use max_heap::MaxHeap;
 }

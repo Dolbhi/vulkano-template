@@ -3,7 +3,10 @@ mod contact;
 mod geo_alg;
 // mod geo_alg_com;
 
-use crate::game_objects::transform::{Transform, TransformID};
+use crate::{
+    game_objects::transform::{Transform, TransformID},
+    utilities::math::skew,
+};
 use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, Quaternion, Vector3, Zero};
 use collider::ContactIdPair;
 pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy};
@@ -164,6 +167,22 @@ impl RigidBody {
         // 6.
     }
 
+    /// inverse moment of inertia about an axis (and other stuff), calculated via black magic
+    pub fn va_per_i(&self, point: Vector, rotation: Matrix3<f32>) -> Matrix3<f32> {
+        let point_squared = point.magnitude2();
+        if point_squared.is_zero() {
+            return Matrix3::zero();
+        }
+
+        let t = skew(point) * rotation;
+        let result = Matrix3 {
+            x: t.x / self.principle_moi.x,
+            y: t.y / self.principle_moi.y,
+            z: t.z / self.principle_moi.z,
+        };
+        result * t.transpose()
+    }
+
     pub fn set_old_velocity(&mut self) {
         self.old_velocity = self.velocity;
     }
@@ -196,6 +215,8 @@ impl RigidBody {
 
 #[cfg(test)]
 mod physics_tests {
+    use cgmath::{Matrix3, One, Vector3};
+
     use crate::game_objects::transform::TransformSystem;
     use crate::physics::RigidBody;
 
@@ -228,6 +249,25 @@ mod physics_tests {
         println!(
             "(-1,0,-1): {:?}",
             rb.angular_vel_per_impulse((-1., 0., -1.).into(), (1., 0., 0., 0.).into())
+        );
+
+        println!(
+            "(1,0,0): {:?}",
+            rb.va_per_i((0., 1., 0.).into(), Matrix3::one())
+                * Vector3 {
+                    x: 0.,
+                    y: 0.,
+                    z: 1.
+                }
+        );
+        println!(
+            "(1,0,1): {:?}",
+            rb.va_per_i((1., 0., -1.).into(), Matrix3::one())
+                * Vector3 {
+                    x: 0.,
+                    y: 1.,
+                    z: 0.
+                }
         );
     }
 }
