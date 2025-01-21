@@ -254,7 +254,7 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     );
 
     let transform = loader.world.transforms.add_transform(
-        TransformCreateInfo::from([1.9, 5., 1.9]).set_rotation(Quaternion::from_axis_angle(
+        TransformCreateInfo::from([1.9, 5.4, 1.9]).set_rotation(Quaternion::from_axis_angle(
             [(0.5f32).sqrt(), 0., (0.5f32).sqrt()].into(),
             Rad(PI / 3.),
         )),

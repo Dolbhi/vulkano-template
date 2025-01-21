@@ -7,7 +7,7 @@ use crate::{
     game_objects::transform::{Transform, TransformID},
     utilities::math::skew,
 };
-use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, Quaternion, Vector3, Zero};
+use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, Quaternion, SquareMatrix, Vector3, Zero};
 use collider::ContactIdPair;
 pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy};
 use std::{
@@ -114,9 +114,8 @@ impl RigidBody {
         // let angular_inertia = self.angular_vel_per_impulse(torque_per_impulse, rotation);
         // self.bivelocity += impulse_mag * torque_per_impulse * angular_inertia;
 
-        let torque = -impulse.cross(point);
-        let angular_inertia = self.angular_vel_per_impulse(torque.normalize(), rotation);
-        self.bivelocity += torque * angular_inertia;
+        let angular_inertia = self.w_per_i(point, rotation.into());
+        self.bivelocity += angular_inertia * impulse;
 
         println!(
             "[Point impulse] point: {:?}, impulse: {:?}, delta_v: {:?}, angular_inertia: {:?}",
@@ -181,6 +180,18 @@ impl RigidBody {
             z: t.z / self.principle_moi.z,
         };
         result * t.transpose()
+    }
+
+    /// inverse moment of inertia about an axis (and other stuff), calculated via black magic
+    pub fn w_per_i(&self, point: Vector, rotation: Matrix3<f32>) -> Matrix3<f32> {
+        let point_squared = point.magnitude2();
+        if point_squared.is_zero() {
+            return Matrix3::zero();
+        }
+
+        let inv_moi = Matrix3::from_diagonal(self.principle_moi.map(|c| 1. / c));
+
+        rotation * inv_moi * rotation.transpose() * skew(point)
     }
 
     pub fn set_old_velocity(&mut self) {
@@ -267,6 +278,16 @@ mod physics_tests {
                     x: 0.,
                     y: 1.,
                     z: 0.
+                }
+        );
+
+        println!(
+            "(1,0,0): {:?}",
+            rb.w_per_i((0., 1., 0.).into(), Matrix3::one())
+                * Vector3 {
+                    x: 0.,
+                    y: 0.,
+                    z: 1.
                 }
         );
     }
