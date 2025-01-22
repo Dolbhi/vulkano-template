@@ -106,7 +106,12 @@ impl RigidBody {
         // println!("MASSES: {:?}", self.sqrt_angular_mass);
     }
 
-    pub fn apply_impulse(&mut self, point: Vector, impulse: Vector, rotation: Quaternion<f32>) {
+    pub fn apply_impulse(
+        &mut self,
+        point: Vector,
+        impulse: Vector,
+        rotation: impl Into<Matrix3<f32>>,
+    ) {
         self.velocity += impulse * self.inv_mass;
 
         // let impulse_mag = impulse.magnitude();
@@ -115,15 +120,17 @@ impl RigidBody {
         // self.bivelocity += impulse_mag * torque_per_impulse * angular_inertia;
 
         let angular_inertia = self.w_per_i(point, rotation.into());
-        self.bivelocity += angular_inertia * impulse;
+        let delta_bv = angular_inertia * impulse;
+        self.bivelocity += delta_bv;
 
-        println!(
-            "[Point impulse] point: {:?}, impulse: {:?}, delta_v: {:?}, angular_inertia: {:?}",
-            point,
-            impulse,
-            impulse * self.inv_mass,
-            angular_inertia
-        );
+        // println!(
+        //     "[Point impulse]\n\tpoint: {:?},\n\timpulse: {:?},\n\tdelta_v: {:?},\n\tdelta_bv: {:?},\n\tangular_inertia: {:?}",
+        //     point,
+        //     impulse,
+        //     impulse * self.inv_mass,
+        //     delta_bv,
+        //     angular_inertia
+        // );
     }
 
     pub fn point_velocity(&self, point: Vector) -> Vector {
@@ -226,10 +233,20 @@ impl RigidBody {
 
 #[cfg(test)]
 mod physics_tests {
-    use cgmath::{Matrix3, One, Vector3};
+    use std::f32::consts::PI;
+
+    use cgmath::{Matrix3, One, Quaternion, Vector3};
 
     use crate::game_objects::transform::TransformSystem;
     use crate::physics::RigidBody;
+
+    #[test]
+    fn quat_convert() {
+        let quat = Quaternion::new((PI / 4.).cos(), (PI / 4.).sin(), 0., 0.);
+        let mat: Matrix3<f32> = quat.into();
+        println!("{:?}", quat * Vector3::new(0., 1., 0.));
+        println!("{:?}", mat);
+    }
 
     #[test]
     fn check_angular_vpi() {
