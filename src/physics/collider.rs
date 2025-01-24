@@ -699,6 +699,26 @@ impl ColliderSystem {
     }
 }
 
+#[derive(PartialEq)]
+enum ContactIdCompResult {
+    SameVertex,
+    SameEdge,
+    None,
+}
+impl ContactIdentifier {
+    fn compare(&self, other: &Self) -> ContactIdCompResult {
+        if self == other {
+            match self.element {
+                CuboidElement::Vertex(_) => ContactIdCompResult::SameVertex,
+                CuboidElement::Edge(_) => ContactIdCompResult::SameEdge,
+                _ => ContactIdCompResult::None,
+            }
+        } else {
+            ContactIdCompResult::None
+        }
+    }
+}
+
 impl PartialEq for ContactIdentifier {
     fn eq(&self, other: &Self) -> bool {
         self.collider.ptr_eq(&other.collider) && self.element == other.element
@@ -706,7 +726,20 @@ impl PartialEq for ContactIdentifier {
 }
 impl PartialEq for ContactIdPair {
     fn eq(&self, other: &Self) -> bool {
-        (self.0 == other.0 && self.1 == other.1) || (self.0 == other.1 && self.1 == other.0)
+        match self.0.compare(&other.0) {
+            ContactIdCompResult::SameVertex => true,
+            ContactIdCompResult::SameEdge => {
+                self.1.compare(&other.1) == ContactIdCompResult::SameEdge
+            }
+            ContactIdCompResult::None => match self.0.compare(&other.1) {
+                ContactIdCompResult::SameVertex => true,
+                ContactIdCompResult::SameEdge => {
+                    self.1.compare(&other.0) == ContactIdCompResult::SameEdge
+                }
+                ContactIdCompResult::None => false,
+            },
+        }
+        // (self.0 == other.0 && self.1 == other.1) || (self.0 == other.1 && self.1 == other.0)
     }
 }
 

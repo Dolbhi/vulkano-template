@@ -6,7 +6,7 @@ use std::sync::{atomic::AtomicUsize, Arc, RwLock};
 const PEN_RESTITUTION: f32 = 1.;
 const MIN_BOUNCE_VEL: f32 = 0.5;
 const ANGULAR_MOVE_LIMIT_RAD: f32 = 0.5;
-const MAX_CONTACT_AGE: u8 = 4;
+const MAX_CONTACT_AGE: u8 = 3;
 const VELOCITY_ITER_LIMIT: u32 = 100;
 
 #[derive(PartialEq, Clone, Copy)]
