@@ -542,9 +542,15 @@ impl ColliderSystem {
                             }
 
                             // check if closest point on edge is in 2
-                            let mut d1_from_2 = d2_from_2;
-                            d1_from_2[a1_i] += p1[a1_i] - d2_per_edge[a1_i][a1_i];
-                            if d1_from_2.dot(axes_2_inv[a2_i]).abs() > 1. {
+                            // let mut d1_from_2 = d2_from_2;
+                            // d1_from_2[a1_i] += p1[a1_i] - d2_per_edge[a1_i][a1_i];
+                            let mut d1_from_2 = p1;
+                            d1_from_2[a1_i] = d2_per_edge[a1_i][a1_i];
+                            d1_from_2 -= space_2_to_space_1.w.truncate();
+                            if d1_from_2.dot(axes_2_inv[0]).abs() > 1.
+                                || d1_from_2.dot(axes_2_inv[1]).abs() > 1.
+                                || d1_from_2.dot(axes_2_inv[2]).abs() > 1.
+                            {
                                 continue;
                             }
 
@@ -582,8 +588,8 @@ impl ColliderSystem {
 
                                 max_pen_ee_sqr = depth;
                                 contact_point_ee = d2_per_edge[a1_i];
-                                pen_axis_1 = a1_i + 1;
-                                pen_axis_2 = a2_i + 4;
+                                pen_axis_1 = a1_i;
+                                pen_axis_2 = a2_i + 3;
                                 ee_elems = (
                                     CuboidElement::from_vertex_axis(
                                         CuboidElement::closest_vertex(p1),
@@ -630,7 +636,10 @@ impl ColliderSystem {
                     );
                     self.contact_resolver.add_contact(index, contact);
                 } else {
-                    let normal = axes[pen_axis_1 - 1].cross(axes[pen_axis_2 - 1]);
+                    // println!("[e-e contact generation]\n\tpen_axis_1: {:?},\n\tpen_axis_2: {:?},\n\taxis 1: {:?},\n\taxis 2: {:?}",
+                    //     pen_axis_1, pen_axis_2, axes[pen_axis_1], axes[pen_axis_2]
+                    // );
+                    let normal = axes[pen_axis_1].cross(axes[pen_axis_2]);
                     // println!("ee collision normal: {:?}", normal);
                     let point = model_1 * contact_point_ee.extend(1.);
 

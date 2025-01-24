@@ -96,12 +96,12 @@ impl ContactResolver {
             }
 
             println!(
-                "[Penetration resolution start] pos: {:?}, normal: {:?}, pen: {:?}, age: {:?}",
-                contact.position, contact.normal, contact.penetration, contact.age
+                "[Penetration resolution start]\n\tpos: {:?},\n\tnormal: {:?},\n\tpen: {:?},\n\tage: {:?},\n\tid: {:?}",
+                contact.position, contact.normal, contact.penetration, contact.age, contact.contact_id
             );
 
             println!(
-                "\t[rb1] rel_pos: {:?}, t_per_i: {:?}, l_inertia: {:?}, a_inertia: {:?}",
+                "\t[rb1]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
                 contact.rb_1.relative_pos,
                 contact.rb_1.torque_per_impulse,
                 contact.rb_1.linear_inertia,
@@ -110,7 +110,7 @@ impl ContactResolver {
 
             if let Some(rb_2) = &contact.rb_2 {
                 println!(
-                    "\t[rb2] rel_pos: {:?}, t_per_i: {:?}, l_inertia: {:?}, a_inertia: {:?}",
+                    "\t[rb2]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
                     rb_2.relative_pos,
                     rb_2.torque_per_impulse,
                     rb_2.linear_inertia,
