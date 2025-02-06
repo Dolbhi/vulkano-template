@@ -102,7 +102,7 @@ pub struct App {
     bounds_debug_depth: Option<usize>,
 }
 
-const FIXED_DELTA_TIME: f32 = 0.01;
+const FIXED_DELTA_TIME: f32 = 0.02;
 /// Struct for handling the logic thread of the game world
 struct GameWorldThread {
     thread: JoinHandle<()>,
@@ -672,7 +672,7 @@ impl App {
                             let point = point + model.w.truncate();
                             rigidbody.write().unwrap().apply_impulse(
                                 point,
-                                -0.5 * cam_model.z.truncate().normalize(),
+                                -1.5 * cam_model.z.truncate().normalize(),
                                 *rotation,
                             );
                         }

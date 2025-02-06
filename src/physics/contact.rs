@@ -3,13 +3,14 @@ use crate::{game_objects::transform::TransformSystem, utilities::MaxHeap};
 use cgmath::{InnerSpace, Matrix3, One, SquareMatrix};
 use std::sync::{atomic::AtomicUsize, Arc, RwLock};
 
-const PEN_RESTITUTION: f32 = 1.;
-const MIN_BOUNCE_VEL: f32 = 0.5;
+const PEN_RESTITUTION: f32 = 1.; // useless for now
+const MIN_BOUNCE_VEL: f32 = 0.5; // time step dependent?
+const MIN_CONTACT_VEL: f32 = 0.02; // time step dependent
 const ANGULAR_MOVE_LIMIT_RAD: f32 = 0.5;
 const MAX_CONTACT_AGE: u8 = 3;
 const VELOCITY_ITER_LIMIT: u32 = 100;
-const STATIC_FRICTION_COEFF: f32 = 0.3;
-const DYNAMIC_FRICTION_COEFF: f32 = 0.00001;
+const STATIC_FRICTION_COEFF: f32 = 5.;
+const DYNAMIC_FRICTION_COEFF: f32 = 10.;
 
 #[derive(PartialEq, Clone, Copy)]
 struct OrdF32(pub f32);
@@ -28,6 +29,7 @@ pub struct Contact {
     penetration: f32,
 
     inv_total_inertia: Matrix3<f32>, // TODO: pre-calc impulse?
+    inv_normal_inertia: f32,
     rb_1: RigidBodyRef,
     rb_2: Option<RigidBodyRef>,
 
@@ -151,7 +153,7 @@ impl ContactResolver {
         let mut iters = 0;
         while let Some((index, mut contact)) = self.pending_contacts.extract_min() {
             if iters > VELOCITY_ITER_LIMIT
-                || contact.target_delta_velocity.dot(contact.normal) <= 0.001
+                || contact.target_delta_velocity.dot(contact.normal) <= MIN_CONTACT_VEL
             {
                 self.settled_contacts.push((index, contact));
                 break;
@@ -173,26 +175,47 @@ impl ContactResolver {
             // );
 
             let impulse = contact.inv_total_inertia * contact.target_delta_velocity;
-            println!("\tInitial impulse: {:?}", impulse);
-            // let impulse_r = impulse.dot(contact.normal);
-            // let impulse_r2 = impulse_r * impulse_r;
-            // let impulse = if impulse.magnitude2() - impulse_r2
-            //     > STATIC_FRICTION_COEFF * STATIC_FRICTION_COEFF * impulse_r2
-            // {
-            //     // required friction too high
-            //     // TODO: combine with if statement below so rb_2 is only unwrapped once
-            //     let velocity_diff = if let Some(rb_2) = &contact.rb_2 {
-            //         contact.rb_1.point_vel - rb_2.point_vel
-            //     } else {
-            //         contact.rb_1.point_vel
-            //     };
-            //     let v_f = velocity_diff - velocity_diff.dot(contact.normal) * contact.normal;
-            //     impulse_r * contact.normal
-            //         + v_f * DYNAMIC_FRICTION_COEFF * impulse_r.abs() * delta_seconds
-            // } else {
-            //     impulse
-            // };
-            // println!("\tfinal impulse: {:?}", impulse);
+            println!("\tStatic impulse: {:?}", impulse);
+            let impulse_r = impulse.dot(contact.normal);
+            let impulse_r2 = impulse_r * impulse_r;
+            let impulse = if impulse.magnitude2() - impulse_r2
+                > STATIC_FRICTION_COEFF * STATIC_FRICTION_COEFF * impulse_r2
+            {
+                // required friction too high
+
+                // calc impluse for zero friction
+                let normal_vel = contact.target_delta_velocity.dot(contact.normal);
+                let smooth_impulse = contact.inv_normal_inertia * normal_vel;
+
+                let tangent_vel =
+                    (contact.target_delta_velocity.magnitude2() - (normal_vel * normal_vel)).sqrt();
+                let coeff = DYNAMIC_FRICTION_COEFF * tangent_vel * delta_seconds;
+
+                // get normal and tangent components of static impulse
+                let static_normal = impulse.dot(contact.normal);
+                let static_tangent = (impulse.magnitude2() - static_normal * static_normal).sqrt();
+
+                let x = coeff * smooth_impulse / (static_tangent - coeff * static_normal);
+                let x = if x.is_nan() || x.is_sign_negative() {
+                    1.
+                } else {
+                    x.clamp(0., 1.)
+                };
+                (1. - x) * smooth_impulse * contact.normal + x * impulse
+
+                // // TODO: combine with if statement below so rb_2 is only unwrapped once
+                // let velocity_diff = if let Some(rb_2) = &contact.rb_2 {
+                //     contact.rb_1.point_vel - rb_2.point_vel
+                // } else {
+                //     contact.rb_1.point_vel
+                // };
+                // let v_f = velocity_diff - velocity_diff.dot(contact.normal) * contact.normal;
+                // impulse_r * contact.normal
+                //     + v_f * DYNAMIC_FRICTION_COEFF * impulse_r.abs() * delta_seconds
+            } else {
+                impulse
+            };
+            println!("\tfinal impulse: {:?}", impulse);
 
             if let Some(rb_2) = &contact.rb_2 {
                 // calculate inertia
@@ -406,7 +429,7 @@ impl Contact {
                 closing_velocity + restituition * (old_closing_velocity.dot(normal) * normal);
             //   ^cancels out the current velocity
             //                      ^bounce using only old velocity
-
+            let total_inertia = total_inertia_1 + total_inertia_2;
             (
                 heap_index,
                 Contact {
@@ -414,7 +437,8 @@ impl Contact {
                     normal,
                     penetration,
 
-                    inv_total_inertia: (total_inertia_1 + total_inertia_2).invert().unwrap(),
+                    inv_total_inertia: total_inertia.invert().unwrap(),
+                    inv_normal_inertia: normal.dot(total_inertia * normal).recip(),
                     rb_1,
                     rb_2: Some(rb_2),
 
@@ -438,6 +462,7 @@ impl Contact {
                     penetration,
 
                     inv_total_inertia: total_inertia_1.invert().unwrap(),
+                    inv_normal_inertia: normal.dot(total_inertia_1 * normal).recip(),
                     rb_1,
                     rb_2: None,
 
