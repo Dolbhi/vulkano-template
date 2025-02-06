@@ -8,6 +8,8 @@ const MIN_BOUNCE_VEL: f32 = 0.5;
 const ANGULAR_MOVE_LIMIT_RAD: f32 = 0.5;
 const MAX_CONTACT_AGE: u8 = 3;
 const VELOCITY_ITER_LIMIT: u32 = 100;
+const STATIC_FRICTION_COEFF: f32 = 0.3;
+const DYNAMIC_FRICTION_COEFF: f32 = 0.00001;
 
 #[derive(PartialEq, Clone, Copy)]
 struct OrdF32(pub f32);
@@ -69,7 +71,7 @@ impl ContactResolver {
         self.pending_contacts.iter()
     }
 
-    pub fn resolve(&mut self, transform_system: &mut TransformSystem) {
+    pub fn resolve(&mut self, transform_system: &mut TransformSystem, delta_seconds: f32) {
         println!("-----Resolve Start-----");
         self.resolve_penetration(transform_system);
 
@@ -82,7 +84,7 @@ impl ContactResolver {
             );
         }
 
-        self.resolve_velocity();
+        self.resolve_velocity(delta_seconds);
 
         self.clear();
     }
@@ -145,7 +147,7 @@ impl ContactResolver {
             self.settled_contacts.push((index, contact));
         }
     }
-    fn resolve_velocity(&mut self) {
+    fn resolve_velocity(&mut self, delta_seconds: f32) {
         let mut iters = 0;
         while let Some((index, mut contact)) = self.pending_contacts.extract_min() {
             if iters > VELOCITY_ITER_LIMIT
@@ -156,10 +158,10 @@ impl ContactResolver {
             }
             iters += 1;
 
-            // println!(
-            //     "~~~ Velocity resolution start ~~~\n\tpos: {:?},\n\tnormal: {:?},\n\tvel: {:?},\n\tage: {:?}",
-            //     contact.position, contact.normal, contact.target_delta_velocity, contact.age
-            // );
+            println!(
+                "~~~ Velocity resolution start ~~~\n\tpos: {:?},\n\tnormal: {:?},\n\tvel: {:?},\n\tage: {:?}",
+                contact.position, contact.normal, contact.target_delta_velocity, contact.age
+            );
 
             // println!(
             //     "[rb1]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
@@ -171,7 +173,26 @@ impl ContactResolver {
             // );
 
             let impulse = contact.inv_total_inertia * contact.target_delta_velocity;
-            // println!("\timpulse: {:?}", impulse);
+            println!("\tInitial impulse: {:?}", impulse);
+            // let impulse_r = impulse.dot(contact.normal);
+            // let impulse_r2 = impulse_r * impulse_r;
+            // let impulse = if impulse.magnitude2() - impulse_r2
+            //     > STATIC_FRICTION_COEFF * STATIC_FRICTION_COEFF * impulse_r2
+            // {
+            //     // required friction too high
+            //     // TODO: combine with if statement below so rb_2 is only unwrapped once
+            //     let velocity_diff = if let Some(rb_2) = &contact.rb_2 {
+            //         contact.rb_1.point_vel - rb_2.point_vel
+            //     } else {
+            //         contact.rb_1.point_vel
+            //     };
+            //     let v_f = velocity_diff - velocity_diff.dot(contact.normal) * contact.normal;
+            //     impulse_r * contact.normal
+            //         + v_f * DYNAMIC_FRICTION_COEFF * impulse_r.abs() * delta_seconds
+            // } else {
+            //     impulse
+            // };
+            // println!("\tfinal impulse: {:?}", impulse);
 
             if let Some(rb_2) = &contact.rb_2 {
                 // calculate inertia
@@ -218,6 +239,8 @@ impl ContactResolver {
                 // contact.target_delta_velocity -= new_rel_vel - old_rel_vel;
                 contact.target_delta_velocity -= new_rel_vel;
             }
+            contact.target_delta_velocity =
+                contact.target_delta_velocity.dot(contact.normal) * contact.normal;
             println!(
                 "\t[Velocity final results] new target vel: {:?}",
                 contact.target_delta_velocity
