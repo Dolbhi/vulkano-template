@@ -4,7 +4,7 @@ use cgmath::{InnerSpace, Matrix3, One, SquareMatrix};
 use std::sync::{atomic::AtomicUsize, Arc, RwLock};
 
 const PEN_RESTITUTION: f32 = 1.; // useless for now
-const MIN_BOUNCE_VEL: f32 = 0.5; // time step dependent?
+const MIN_BOUNCE_VEL: f32 = 1.; // time step dependent
 const MIN_CONTACT_VEL: f32 = 0.02; // time step dependent
 const ANGULAR_MOVE_LIMIT_RAD: f32 = 0.5;
 const MAX_CONTACT_AGE: u8 = 3;
@@ -160,10 +160,10 @@ impl ContactResolver {
             }
             iters += 1;
 
-            println!(
-                "~~~ Velocity resolution start ~~~\n\tpos: {:?},\n\tnormal: {:?},\n\tvel: {:?},\n\tage: {:?}",
-                contact.position, contact.normal, contact.target_delta_velocity, contact.age
-            );
+            // println!(
+            //     "~~~ Velocity resolution start ~~~\n\tpos: {:?},\n\tnormal: {:?},\n\tvel: {:?},\n\tage: {:?}",
+            //     contact.position, contact.normal, contact.target_delta_velocity, contact.age
+            // );
 
             // println!(
             //     "[rb1]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
@@ -175,7 +175,7 @@ impl ContactResolver {
             // );
 
             let impulse = contact.inv_total_inertia * contact.target_delta_velocity;
-            println!("\tStatic impulse: {:?}", impulse);
+            // println!("\tStatic impulse: {:?}", impulse);
             let impulse_r = impulse.dot(contact.normal);
             let impulse_r2 = impulse_r * impulse_r;
             let impulse = if impulse.magnitude2() - impulse_r2
@@ -215,7 +215,7 @@ impl ContactResolver {
             } else {
                 impulse
             };
-            println!("\tfinal impulse: {:?}", impulse);
+            // println!("\tfinal impulse: {:?}", impulse);
 
             if let Some(rb_2) = &contact.rb_2 {
                 // calculate inertia
@@ -264,10 +264,10 @@ impl ContactResolver {
             }
             contact.target_delta_velocity =
                 contact.target_delta_velocity.dot(contact.normal) * contact.normal;
-            println!(
-                "\t[Velocity final results] new target vel: {:?}",
-                contact.target_delta_velocity
-            );
+            // println!(
+            //     "\t[Velocity final results] new target vel: {:?}",
+            //     contact.target_delta_velocity
+            // );
 
             self.pending_contacts.insert_with_ref(
                 contact.target_delta_velocity.dot(contact.normal).into(),
