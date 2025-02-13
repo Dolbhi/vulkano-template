@@ -425,10 +425,18 @@ impl Contact {
             } else {
                 0.5
             };
-            let target_delta_velocity =
-                closing_velocity + restituition * (old_closing_velocity.dot(normal) * normal);
-            //   ^cancels out the current velocity
-            //                      ^bounce using only old velocity
+            // tdv(r) = v(r) + res * (v(r) - dv(r))
+            //        = v(r) + res * ov(r)
+            // tdv(f) = v(f) + dv(f)
+            //        = v(f) + v(f) - ov(f)
+            // tdv = v + res * ov(r) + v(f) - ov(f)
+            let old_normal_velocity = old_closing_velocity.dot(normal) * normal;
+            // let delta_velocity = closing_velocity - old_closing_velocity;
+            // let tangent_delta_velocity = delta_velocity - delta_velocity.dot(normal) * normal;
+            let target_delta_velocity = closing_velocity + restituition * old_normal_velocity; // + tangent_delta_velocity;
+                                                                                               //  ^cancels out the current velocity
+                                                                                               //                     ^bounce using only old velocity
+                                                                                               //                                                          ^cancels tangent velocity next frame
             let total_inertia = total_inertia_1 + total_inertia_2;
             (
                 heap_index,
@@ -454,6 +462,13 @@ impl Contact {
             } else {
                 0.5
             };
+            let old_normal_velocity = old_vel_1.dot(normal) * normal;
+            // let delta_velocity = point_vel_1 - old_vel_1;
+            // let tangent_delta_velocity = delta_velocity - delta_velocity.dot(normal) * normal;
+            let target_delta_velocity = point_vel_1 + restituition * old_normal_velocity; // + tangent_delta_velocity;
+                                                                                          //  ^cancels out the current velocity
+                                                                                          //                ^bounce using only old velocity
+                                                                                          //                                                     ^cancels tangent velocity next frame
             (
                 heap_index,
                 Contact {
@@ -466,8 +481,7 @@ impl Contact {
                     rb_1,
                     rb_2: None,
 
-                    target_delta_velocity: point_vel_1
-                        + restituition * old_vel_1.dot(normal) * normal,
+                    target_delta_velocity,
 
                     contact_id,
                     age,

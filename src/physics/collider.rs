@@ -19,7 +19,7 @@ use std::{
 
 const CROSS_INDICES: [[usize; 2]; 3] = [[1, 2], [2, 0], [0, 1]];
 /// allow resolving velocity of contacts close to penetrating, penetration resolution won't happen if it remains negative
-const CACHED_NEG_DEPTH: f32 = -0.1;
+const CACHED_NEG_DEPTH: f32 = -0.2; // time step dependent
 
 #[derive(Clone, Copy, Debug)]
 pub struct BoundingBox {
