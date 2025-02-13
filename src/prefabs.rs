@@ -166,6 +166,7 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         .load_solid_material([0., 0., 1., 1.], true)
         .0;
 
+    // plane collider
     let plane_trans = TransformCreateInfo {
         rotation: Quaternion::from_axis_angle([1., 0., 0.].into(), Rad(-PI / 2.)),
         scale: [10., 10., 1.].into(),
@@ -173,7 +174,6 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     };
     loader.quick_ro(plane_trans, Square, yellow_mat, true);
 
-    // plane collider
     let transform_info = TransformCreateInfo::default()
         .set_translation([0., -0.5, 0.])
         .set_scale([5., 0.5, 5.]);
@@ -183,6 +183,32 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         &mut loader.world.transforms,
     );
     load_object_with_transform!(loader.world.world, transform, collider);
+
+    // slope collider (0.1 rad)
+    let transform_info = TransformCreateInfo::default()
+        .set_translation([10., -0.5, 0.])
+        .set_scale([5., 0.5, 5.])
+        .set_rotation(Quaternion::from_axis_angle((1., 0., 0.).into(), Rad(0.1)));
+    let transform = loader.world.transforms.add_transform(transform_info);
+    let collider = loader.world.colliders.add(
+        CuboidCollider::new(transform, None),
+        &mut loader.world.transforms,
+    );
+    let ro = loader.resources.load_ro(Cube, yellow_mat, true);
+    load_object_with_transform!(loader.world.world, transform, collider, ro);
+
+    // slope collider (0.2 rad)
+    let transform_info = TransformCreateInfo::default()
+        .set_translation([20., -0.5, 0.])
+        .set_scale([5., 0.5, 5.])
+        .set_rotation(Quaternion::from_axis_angle((1., 0., 0.).into(), Rad(0.2)));
+    let transform = loader.world.transforms.add_transform(transform_info);
+    let collider = loader.world.colliders.add(
+        CuboidCollider::new(transform, None),
+        &mut loader.world.transforms,
+    );
+    let ro = loader.resources.load_ro(Cube, yellow_mat, true);
+    load_object_with_transform!(loader.world.world, transform, collider, ro);
 
     // axis
     loader.quick_ro(
