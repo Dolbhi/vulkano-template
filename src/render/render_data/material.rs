@@ -58,9 +58,14 @@ impl<T: Clone> Shader<T> {
 
     /// Add draw calls of each object in each material of this pipeline
     ///
+    /// Mesh data is handled differently from others
+    ///
     /// NOTE: clears object vecs
     ///
-    /// *  `objects` - Hashmap of object vecs with their material as the key
+    /// *  `object_index` - Buffer index to start from (See: [AutoCommandBufferBuilder::draw_indexed])
+    /// *  `descriptor_sets` - Descriptor sets of buffers containing transform + additional data
+    /// (See: [AutoCommandBufferBuilder::bind_descriptor_sets])
+    /// *  `command_builder` - i builda da commands
     pub fn draw_objects<C, A: CommandBufferAllocator>(
         &mut self,
         object_index: &mut u32,
@@ -96,7 +101,7 @@ impl<T: Clone> Shader<T> {
                     Some(_) => {
                         // New mesh, draw old mesh and bind new one
 
-                        // draw
+                        // draw desired number of old mesh
                         command_builder
                             .draw_indexed(
                                 last_buffer_len as u32,
@@ -106,31 +111,29 @@ impl<T: Clone> Shader<T> {
                                 *object_index,
                             )
                             .unwrap();
-                        *object_index += instance_count;
-                        instance_count = 0;
 
-                        // bind mesh
-                        let index_buffer = mesh.get_index();
-                        let index_buffer_length = index_buffer.len();
-
+                        // bind new mesh
+                        let index_buffer = mesh.get_indices();
                         command_builder
-                            .bind_vertex_buffers(0, mesh.get_vertex())
+                            .bind_vertex_buffers(0, mesh.get_verticies())
                             .unwrap()
                             .bind_index_buffer(index_buffer)
                             .unwrap();
 
+                        *object_index += instance_count;
+                        instance_count = 0;
                         last_mesh = Some(mesh);
-                        last_buffer_len = index_buffer_length;
+                        last_buffer_len = mesh.indicies_len();
                     }
                     _ => {
                         // First mesh, bind for later drawing
 
                         // bind mesh
-                        let index_buffer = mesh.get_index();
+                        let index_buffer = mesh.get_indices();
                         let index_buffer_length = index_buffer.len();
 
                         command_builder
-                            .bind_vertex_buffers(0, mesh.get_vertex())
+                            .bind_vertex_buffers(0, mesh.get_verticies())
                             .unwrap()
                             .bind_index_buffer(index_buffer)
                             .unwrap();
@@ -197,7 +200,7 @@ impl<T: Clone> Shader<T> {
 }
 
 impl<T: Clone> Material<T> {
-    // bind material sets starting from set 2
+    /// bind material sets starting from set 2
     fn bind_sets<L, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &self,
         layout: &Arc<PipelineLayout>,

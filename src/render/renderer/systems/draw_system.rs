@@ -139,7 +139,10 @@ impl<K: Ord, T: Clone> DrawSystem<K, T> {
     //     write_to_storage_buffer(buffer, obj_iter, offset)
     // }
 
-    /// bind draw calls to the given command buffer builder, be sure to call `update_object_buffer()` before hand
+    /// bind draw calls to the given command buffer builder
+    ///
+    /// be sure to call `update_object_buffer()` before hand to ensure the subbuffers corresponding to
+    /// the descriptor sets are filled with updated data
     pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &mut self,
         object_index: &mut u32,

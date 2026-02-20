@@ -22,13 +22,14 @@ use vulkano::{
 
 use super::allocators::Allocators;
 
+/// Tuple containing a subbuffer and its corresponding descriptor set
 pub type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
 
-/// Buffers for vertcies and indecies, essentially a struct containing mesh data
+/// Buffers for verticies and indicies, essentially a struct containing mesh data
 #[derive(Debug)]
 pub struct MeshBuffers<V: Vertex + BufferContents> {
-    pub vertex: Subbuffer<[V]>,
-    pub index: Subbuffer<[u32]>,
+    pub verticies: Subbuffer<[V]>,
+    pub indicies: Subbuffer<[u32]>,
     // pub uniforms: Vec<Uniform<U>>,
 }
 
@@ -59,19 +60,22 @@ impl<V: Vertex + BufferContents> MeshBuffers<V> {
             .unwrap();
         fence.wait(None).unwrap();
 
-        Self { vertex, index }
+        Self {
+            verticies: vertex,
+            indicies: index,
+        }
     }
 
-    pub fn get_vertex(&self) -> Subbuffer<[V]> {
-        self.vertex.clone()
+    pub fn get_verticies(&self) -> Subbuffer<[V]> {
+        self.verticies.clone()
     }
 
-    pub fn get_index(&self) -> Subbuffer<[u32]> {
-        self.index.clone()
+    pub fn get_indices(&self) -> Subbuffer<[u32]> {
+        self.indicies.clone()
     }
 
-    pub fn index_len(&self) -> u64 {
-        self.index.len()
+    pub fn indicies_len(&self) -> u64 {
+        self.indicies.len()
     }
 }
 
