@@ -15,7 +15,7 @@ use super::material::RenderSubmit;
 /// Type T is the additional data type of the object
 pub struct RenderObject<T: Clone> {
     pub mesh: Arc<MeshBuffers<VertexFull>>,
-    pub model: Matrix4<f32>,
+    // pub model: Matrix4<f32>,
     pub material: RenderSubmit<T>,
     pub data: T,
     pub lerp: bool,
@@ -25,13 +25,16 @@ impl<T: Clone> RenderObject<T> {
     pub fn new(mesh: Arc<MeshBuffers<VertexFull>>, material: RenderSubmit<T>, data: T) -> Self {
         Self {
             mesh,
-            model: Matrix4::identity(),
+            // model: Matrix4::identity(),
             material,
             data,
             lerp: true,
         }
     }
 
+    /// Get transform matrix
+    ///
+    /// Warning: Contains unhandled unwrap from accessing transform
     pub fn update_and_upload(
         &mut self,
         transform_id: &TransformID,
@@ -43,16 +46,17 @@ impl<T: Clone> RenderObject<T> {
             transforms.get_global_model(transform_id)
         };
         // println!("Obj {:?}: {:?}", transform_id, obj);
-        self.model = transfrom_matrix.unwrap();
-        self.upload();
+        // self.model = transfrom_matrix.unwrap();
+        self.upload(transfrom_matrix.unwrap());
     }
 
-    /// Adds the render object's mesh and data to its material's render queue
-    pub fn upload(&self) {
-        self.material
-            .lock()
-            .unwrap()
-            .push((self.mesh.clone(), self.model, self.data.clone()));
+    /// Adds the render object's mesh and data to its material's render queue (`RenderSubmit`)
+    pub fn upload(&self, transform_matrix: Matrix4<f32>) {
+        self.material.lock().unwrap().push((
+            self.mesh.clone(),
+            transform_matrix,
+            self.data.clone(),
+        ));
     }
 }
 
