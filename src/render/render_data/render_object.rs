@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{Matrix4, SquareMatrix};
+use cgmath::Matrix4;
 
 use crate::{
     game_objects::transform::{TransformID, TransformSystem},
@@ -51,7 +51,7 @@ impl<T: Clone> RenderObject<T> {
     }
 
     /// Adds the render object's mesh and data to its material's render queue (`RenderSubmit`)
-    pub fn upload(&self, transform_matrix: Matrix4<f32>) {
+    fn upload(&self, transform_matrix: Matrix4<f32>) {
         self.material.lock().unwrap().push((
             self.mesh.clone(),
             transform_matrix,
