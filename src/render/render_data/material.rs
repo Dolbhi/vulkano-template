@@ -113,11 +113,10 @@ impl<T: Clone> Shader<T> {
                             .unwrap();
 
                         // bind new mesh
-                        let index_buffer = mesh.get_indices();
                         command_builder
                             .bind_vertex_buffers(0, mesh.get_verticies())
                             .unwrap()
-                            .bind_index_buffer(index_buffer)
+                            .bind_index_buffer(mesh.get_indices())
                             .unwrap();
 
                         *object_index += instance_count;
@@ -127,19 +126,14 @@ impl<T: Clone> Shader<T> {
                     }
                     _ => {
                         // First mesh, bind for later drawing
-
-                        // bind mesh
-                        let index_buffer = mesh.get_indices();
-                        let index_buffer_length = index_buffer.len();
-
                         command_builder
                             .bind_vertex_buffers(0, mesh.get_verticies())
                             .unwrap()
-                            .bind_index_buffer(index_buffer)
+                            .bind_index_buffer(mesh.get_indices())
                             .unwrap();
 
                         last_mesh = Some(mesh);
-                        last_buffer_len = index_buffer_length;
+                        last_buffer_len = mesh.indicies_len();
                     }
                 }
                 instance_count += 1;
