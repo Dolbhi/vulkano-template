@@ -14,6 +14,9 @@ pub use deferred_renderer::DeferredRenderer;
 use crate::render::Context;
 use vulkano::command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer};
 
+/// Trait for shared renderer behaviour
+///
+/// Currently only `RenderLoop` handles renderers generically (`App` uses `DeferredRenderer` explicitly)
 pub trait Renderer {
     /// Adds draw calls to the given command buffer builder
     fn build_command_buffer(

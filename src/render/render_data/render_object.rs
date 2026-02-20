@@ -32,7 +32,7 @@ impl<T: Clone> RenderObject<T> {
         }
     }
 
-    /// Get transform matrix
+    /// Upload render object data to material's render queue with updated transform
     ///
     /// Warning: Contains unhandled unwrap from accessing transform
     pub fn update_and_upload(

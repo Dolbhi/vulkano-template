@@ -85,6 +85,7 @@ pub struct ResourceManager {
     loaded_materials: HashMap<(MaterialID, bool), RenderSubmit<()>>,
     loaded_colored: HashMap<(ColoredID, bool), RenderSubmit<Vector4<f32>>>,
     loaded_textures: HashMap<TextureID, Arc<ImageView>>,
+    /// Sampler for textured materials (requires `Context`)
     linear_sampler: Arc<Sampler>,
     next_color_id: u32,
 }

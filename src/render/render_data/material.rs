@@ -26,9 +26,13 @@ pub struct Shader<T: Clone> {
 }
 
 /// Arc Mutex storing renderobject data to be uploaded
+///
+/// Each renderobject data item consists of a tuple:
+/// (Mesh buffers, Transform matrix, Additional data of type T)
 pub type RenderSubmit<T> = Arc<Mutex<Vec<(Arc<MeshBuffers<VertexFull>>, Matrix4<f32>, T)>>>;
 
 struct Material<T: Clone> {
+    /// DOCTODO: what does descriptor set do?????
     pub descriptor_set: Option<Arc<PersistentDescriptorSet>>,
     pending_objects: RenderSubmit<T>,
     pending_meshes: Vec<Arc<MeshBuffers<VertexFull>>>,

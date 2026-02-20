@@ -304,6 +304,8 @@ impl App {
     }
 
     /// upload render objects and do render loop
+    ///
+    /// Called during winit `RedrawRequested` event
     fn update_render(&mut self) {
         // do render loop
         let extends = self.render_loop.context.window.inner_size();
@@ -407,17 +409,22 @@ impl App {
                 // let cam_model = transforms.get_slerp_model(&camera.transform).unwrap();
                 let global_data = GPUGlobalData::from_camera(camera, extends);
 
-                // update basic render objects
-                let mut query = <(&TransformID, &mut RenderObject<()>)>::query();
-                // println!("==== RENDER OBJECT DATA ====");
-                for (transform_id, render_object) in query.iter_mut(world) {
-                    render_object.update_and_upload(transform_id, transforms);
-                }
+                // TODO: have `deferred_renderer` provide this method since it defines the RO types
+                // P.S. Could also have a generic method to handle any RO type
+                // P.P.S Could also have a generic method to handle any world queries with iteration???
+                {
+                    // update basic render objects
+                    let mut query = <(&TransformID, &mut RenderObject<()>)>::query();
+                    // println!("==== RENDER OBJECT DATA ====");
+                    for (transform_id, render_object) in query.iter_mut(world) {
+                        render_object.update_and_upload(transform_id, transforms);
+                    }
 
-                let mut query = <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query();
-                // println!("==== RENDER COLORED DATA ====");
-                for (transform_id, render_object) in query.iter_mut(world) {
-                    render_object.update_and_upload(transform_id, transforms);
+                    let mut query = <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query();
+                    // println!("==== RENDER COLORED DATA ====");
+                    for (transform_id, render_object) in query.iter_mut(world) {
+                        render_object.update_and_upload(transform_id, transforms);
+                    }
                 }
 
                 // upload draw data (make into renderer function)

@@ -36,6 +36,9 @@ use crate::{
 ///
 /// Should always have at least one shader present
 pub struct DrawSystem<K: Ord, T: Clone> {
+    /// Shaders stored in BTreeMap with some specified key type K (currently only [crate::render::resource_manager::ShaderID] is used)
+    ///
+    /// BTreeMap is used for efficient retrival, insertion, interation and memory usage.
     pub shaders: BTreeMap<K, Shader<T>>,
     layout_overrides: LayoutOverrides,
     // layout: PipelineLayout,
