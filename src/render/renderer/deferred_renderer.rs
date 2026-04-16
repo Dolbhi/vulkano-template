@@ -34,6 +34,7 @@ use vulkano::{
 };
 
 /// 3D render that supports both lit and unlit meshes with deferred lighting
+/// Basically a collection of draw systems and the frame data they share with a method to build the final command buffer
 pub struct DeferredRenderer {
     /// Vulkan render pass for the framebuffer recreation
     render_pass: Arc<RenderPass>,
@@ -238,6 +239,31 @@ impl DeferredRenderer {
             unlit_colored_system,
         }
     }
+    /// Get &mut to FrameData for data upload
+    ///
+    /// `RenderObject::update_and_upload(&self)` must have been called beforehand
+    pub fn prepare_frame(&mut self, image_i: usize) -> &mut FrameData {
+        // prepare frame
+        let frame = self
+            .frame_data
+            .get_mut(image_i)
+            .expect("Renderer should have a frame for every swapchain image");
+
+        frame.update_objects_data(
+            self.lit_draw_system
+                .shaders
+                .values_mut()
+                .chain(self.unlit_draw_system.shaders.values_mut()),
+        );
+        frame.update_colored_data(
+            self.lit_colored_system
+                .shaders
+                .values_mut()
+                .chain(self.unlit_colored_system.shaders.values_mut()),
+        );
+
+        frame
+    }
 }
 impl Renderer for DeferredRenderer {
     fn build_command_buffer(
@@ -348,14 +374,14 @@ impl FrameData {
 
     /// write object data to storage buffer
     ///
-    /// `RenderObject::upload(&self)` must have been called beforehand
+    /// `RenderObject::update_and_upload(&self)` must have been called beforehand
     pub fn update_objects_data<'a>(&self, shaders: impl Iterator<Item = &'a mut Shader<()>>) {
         let obj_iter = shaders.flat_map(|pipeline| pipeline.upload_pending_objects());
         write_to_storage_buffer(&self.objects_data.0, obj_iter, 0);
     }
     /// write colored data to storage buffer
     ///
-    /// `RenderObject::upload(&self)` must have been called beforehand
+    /// `RenderObject::update_and_upload(&self)` must have been called beforehand
     pub fn update_colored_data<'a>(
         &self,
         shaders: impl Iterator<Item = &'a mut Shader<Vector4<f32>>>,
@@ -364,7 +390,7 @@ impl FrameData {
         write_to_storage_buffer(&self.colored_data.0, obj_iter, 0);
     }
 
-    pub fn upload_box_data(&mut self, boxes: impl Iterator<Item = GPUAABB>) {
+    pub fn update_box_data(&mut self, boxes: impl Iterator<Item = GPUAABB>) {
         self.last_box_index = write_to_storage_buffer(&self.bounding_box_data.0, boxes, 0);
     }
 

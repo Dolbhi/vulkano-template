@@ -306,6 +306,15 @@ impl App {
     /// upload render objects and do render loop
     ///
     /// Called during winit `RedrawRequested` event
+    ///
+    /// Event outline:
+    ///  - `RenderLoop::update` is called
+    ///     - Do various structure recreation if needed
+    ///     - Wait for swapchain image to be ready
+    ///     - `upload_render_data`(passed as closure) is called
+    ///         - Do frame dependent logic updates
+    ///         - Upload all render data
+    ///     - Build command buffer and display
     fn update_render(&mut self) {
         // do render loop
         let extends = self.render_loop.context.window.inner_size();
@@ -427,31 +436,9 @@ impl App {
                     }
                 }
 
-                // upload draw data (make into renderer function)
-                let frame = {
-                    let frame = renderer
-                        .frame_data
-                        .get_mut(image_i)
-                        .expect("Renderer should have a frame for every swapchain image");
-
-                    frame.update_global_data(global_data);
-                    frame.update_objects_data(
-                        renderer
-                            .lit_draw_system
-                            .shaders
-                            .values_mut()
-                            .chain(renderer.unlit_draw_system.shaders.values_mut()),
-                    );
-                    frame.update_colored_data(
-                        renderer
-                            .lit_colored_system
-                            .shaders
-                            .values_mut()
-                            .chain(renderer.unlit_colored_system.shaders.values_mut()),
-                    );
-
-                    frame
-                };
+                // get frame data struct for upload
+                let frame = renderer.prepare_frame(image_i);
+                frame.update_global_data(global_data);
 
                 // bounding box
                 if self.bounds_debug_depth == Some(colliders.tree_depth()) {
@@ -686,7 +673,7 @@ impl App {
                     }
                 }
 
-                frame.upload_box_data(bounding_boxes.into_iter());
+                frame.update_box_data(bounding_boxes.into_iter());
 
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();
