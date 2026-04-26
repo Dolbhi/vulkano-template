@@ -9,7 +9,7 @@ use super::{
 };
 use crate::game_objects::transform::{TransformID, TransformSystem};
 use bvh::{Bvh, DepthIter, LeafOutsideHierachy};
-use cgmath::{InnerSpace, Matrix, Matrix4, MetricSpace, SquareMatrix, Zero};
+use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, MetricSpace, SquareMatrix, Zero};
 use core::f32;
 use ray::Ray;
 use std::{
@@ -341,7 +341,9 @@ impl ColliderSystem {
                     }
                 }
             } else {
+                // coll_1 does not have rigidbody
                 if coll_2.rigidbody.is_some() {
+                    // ensure coll_1 always has rigidbody
                     std::mem::swap(&mut coll_1, &mut coll_2);
                 } else {
                     // ignore contacts not involving rigidbodies
@@ -380,290 +382,297 @@ impl ColliderSystem {
                     break;
                 }
             }
+            if sep_axis_found {
+                continue;
+            };
 
-            if !sep_axis_found {
-                let inv_model_1 = model_1.invert().unwrap();
-                let model_1_sqr = [
-                    model_1.x.magnitude2(),
-                    model_1.y.magnitude2(),
-                    model_1.z.magnitude2(),
-                ];
+            let inv_model_1 = model_1.invert().unwrap();
+            let inv_axes_1: Matrix3<f32> = [
+                inv_model_1.x.truncate().into(),
+                inv_model_1.y.truncate().into(),
+                inv_model_1.z.truncate().into(),
+            ]
+            .into();
+            let model_1_sqr = [
+                model_1.x.magnitude2(),
+                model_1.y.magnitude2(),
+                model_1.z.magnitude2(),
+            ];
 
-                let space_2_to_space_1 = inv_model_1 * model_2;
-                let axes_2 = [
-                    space_2_to_space_1.x,
-                    space_2_to_space_1.y,
-                    space_2_to_space_1.z,
-                ]
-                .map(|v| v.truncate());
-                let axes_2_inv = axes_2.map(|v| v / v.magnitude2());
-                let pos_2_in_1 = space_2_to_space_1.w.truncate();
-                let model_2_sqr = [0, 1, 2].map(|i| model_2[i].magnitude2());
+            let model_2_1 = inv_model_1 * model_2;
+            let axes_2_1 = [model_2_1.x, model_2_1.y, model_2_1.z].map(|v| v.truncate());
+            let axes_2_1_inv = axes_2_1.map(|v| v / v.magnitude2());
+            let pos_2_1 = model_2_1.w.truncate();
+            let axes_2_sqr = [0, 1, 2].map(|i| model_2[i].magnitude2());
 
-                let unit_bounds = BoundingBox {
-                    min: CUBE_VERTICES[0],
-                    max: CUBE_VERTICES[7],
+            let unit_bounds = BoundingBox {
+                min: CUBE_VERTICES[0],
+                max: CUBE_VERTICES[7],
+            };
+
+            let mut max_pen_pf_sqr = 0.;
+            let mut contact_point_pf = [0., 0., 0.].into();
+            let mut pen_axis: u8 = 0;
+            let mut pf_elems = (Vertex(0), Face(0));
+            // p-f contacts
+            let points_2_1 = CUBE_VERTICES.map(|v| (model_2_1 * v.extend(1.)).truncate());
+            for p2_i in 0..4 {
+                let p2_min = points_2_1[p2_i];
+                let p2_max = points_2_1[7 - p2_i];
+                let ray = Ray {
+                    origin: p2_min,
+                    direction: p2_max - p2_min,
+                    distance: 1.,
                 };
+                let (close, far) = ray.box_intersection_raw(&unit_bounds);
 
-                let mut max_pen_pf_sqr = 0.;
-                let mut contact_point_pf = [0., 0., 0.].into();
-                let mut pen_axis = 0;
-                let mut pf_elems = (Vertex(0), Face(0));
-                // p-f contacts
-                let points_2 =
-                    CUBE_VERTICES.map(|v| (space_2_to_space_1 * v.extend(1.)).truncate());
-                for p2_i in 0..4 {
-                    let p2_min = points_2[p2_i];
-                    let p2_max = points_2[7 - p2_i];
-                    let ray = Ray {
-                        origin: p2_min,
-                        direction: p2_max - p2_min,
-                        distance: 1.,
-                    };
-                    let (close, far) = ray.box_intersection_raw(&unit_bounds);
+                if close <= far && far >= 0. && close <= 1. {
+                    let min_depth = far; // min point pen into far face
+                    let max_depth = 1. - close; // max point pen into close face
 
-                    if close <= far && far >= 0. && close <= 1. {
-                        let min_depth = far; // min point pen into far face
-                        let max_depth = 1. - close; // max point pen into close face
+                    // use smaller depth
+                    if min_depth > max_depth {
+                        let p1 = ray.calc_point(close);
+                        let a1_i = CuboidElement::closest_face(p1);
+                        let d_local = 1. - p2_max[a1_i as usize].abs(); // should be +ve i swear
+                        let depth_sqr = d_local * d_local * model_1_sqr[a1_i as usize];
 
-                        // use smaller depth
-                        if min_depth > max_depth {
-                            let p1 = ray.calc_point(close);
-                            let a1_i = CuboidElement::closest_face(p1);
-                            let d_local = 1. - p2_max[a1_i as usize].abs(); // should be +ve i swear
-                            let depth_sqr = d_local * d_local * model_1_sqr[a1_i as usize];
+                        if depth_sqr > max_pen_pf_sqr {
+                            max_pen_pf_sqr = depth_sqr;
+                            contact_point_pf = p2_max;
+                            pen_axis = a1_i + 1;
+                            pf_elems = (Face(a1_i), Vertex(7 - p2_i as u8));
+                            // use max index for p2
+                        }
+                    } else {
+                        let p1 = ray.calc_point(far);
+                        let a1_i = CuboidElement::closest_face(p1);
+                        let d_local = 1. - p2_min[a1_i as usize].abs(); // should be +ve i swear
+                        let depth_sqr = d_local * d_local * model_1_sqr[a1_i as usize];
 
-                            if depth_sqr > max_pen_pf_sqr {
-                                max_pen_pf_sqr = depth_sqr;
-                                contact_point_pf = p2_max;
-                                pen_axis = a1_i + 1;
-                                pf_elems = (Face(a1_i), Vertex(7 - p2_i as u8));
-                                // use max index for p2
-                            }
-                        } else {
-                            let p1 = ray.calc_point(far);
-                            let a1_i = CuboidElement::closest_face(p1);
-                            let d_local = 1. - p2_min[a1_i as usize].abs(); // should be +ve i swear
-                            let depth_sqr = d_local * d_local * model_1_sqr[a1_i as usize];
-
-                            if depth_sqr > max_pen_pf_sqr {
-                                max_pen_pf_sqr = depth_sqr;
-                                contact_point_pf = p2_min;
-                                pen_axis = a1_i + 1;
-                                pf_elems = (Face(a1_i), Vertex(p2_i as u8));
-                            }
+                        if depth_sqr > max_pen_pf_sqr {
+                            max_pen_pf_sqr = depth_sqr;
+                            contact_point_pf = p2_min;
+                            pen_axis = a1_i + 1;
+                            pf_elems = (Face(a1_i), Vertex(p2_i as u8));
                         }
                     }
                 }
-                // f-p contacts
-                let points_1 = CUBE_VERTICES.map(|v| v - pos_2_in_1);
-                for p1_i in 0..4 {
-                    let p1_min: Vector = axes_2_inv.map(|a| points_1[p1_i].dot(a)).into();
-                    let p1_max: Vector = axes_2_inv.map(|a| points_1[7 - p1_i].dot(a)).into();
-                    let ray = Ray {
-                        origin: p1_min,
-                        direction: p1_max - p1_min,
-                        distance: 1.,
-                    };
-                    let (close, far) = ray.box_intersection_raw(&unit_bounds);
+            }
+            // f-p contacts
+            let points_1 = CUBE_VERTICES.map(|v| v - pos_2_1);
+            for p1_i in 0..4 {
+                let p1_min: Vector = axes_2_1_inv.map(|a| points_1[p1_i].dot(a)).into();
+                let p1_max: Vector = axes_2_1_inv.map(|a| points_1[7 - p1_i].dot(a)).into();
+                let ray = Ray {
+                    origin: p1_min,
+                    direction: p1_max - p1_min,
+                    distance: 1.,
+                };
+                let (close, far) = ray.box_intersection_raw(&unit_bounds);
 
-                    if close <= far && far >= 0. && close <= 1. {
-                        let min_depth = far; // min point pen into far face
-                        let max_depth = 1. - close; // max point pen into close face
+                if close <= far && far >= 0. && close <= 1. {
+                    let min_depth = far; // min point pen into far face
+                    let max_depth = 1. - close; // max point pen into close face
 
-                        // use smaller depth
-                        if min_depth > max_depth {
-                            let p2 = ray.calc_point(close);
-                            let a2_i = CuboidElement::closest_face(p2);
-                            let d_local = 1. - p1_max[a2_i as usize].abs(); // should be +ve i swear
-                            let depth_sqr = d_local * d_local * model_2_sqr[a2_i as usize];
+                    // use smaller depth
+                    if min_depth > max_depth {
+                        let p2 = ray.calc_point(close);
+                        let a2_i = CuboidElement::closest_face(p2);
+                        let d_local = 1. - p1_max[a2_i as usize].abs(); // should be +ve i swear
+                        let depth_sqr = d_local * d_local * axes_2_sqr[a2_i as usize];
 
-                            if depth_sqr > max_pen_pf_sqr {
-                                max_pen_pf_sqr = depth_sqr;
-                                contact_point_pf = CUBE_VERTICES[7 - p1_i];
-                                pen_axis = a2_i + 4;
-                                pf_elems = (Vertex(7 - p1_i as u8), Face(a2_i));
-                                // use max index for p2
-                            }
-                        } else {
-                            let p2 = ray.calc_point(far);
-                            let a2_i = CuboidElement::closest_face(p2);
-                            let d_local = 1. - p1_min[a2_i as usize].abs(); // should be +ve i swear
-                            let depth_sqr = d_local * d_local * model_2_sqr[a2_i as usize];
+                        if depth_sqr > max_pen_pf_sqr {
+                            max_pen_pf_sqr = depth_sqr;
+                            contact_point_pf = CUBE_VERTICES[7 - p1_i];
+                            pen_axis = a2_i + 4;
+                            pf_elems = (Vertex(7 - p1_i as u8), Face(a2_i));
+                            // use max index for p2
+                        }
+                    } else {
+                        let p2 = ray.calc_point(far);
+                        let a2_i = CuboidElement::closest_face(p2);
+                        let d_local = 1. - p1_min[a2_i as usize].abs(); // should be +ve i swear
+                        let depth_sqr = d_local * d_local * axes_2_sqr[a2_i as usize];
 
-                            if depth_sqr > max_pen_pf_sqr {
-                                max_pen_pf_sqr = depth_sqr;
-                                contact_point_pf = CUBE_VERTICES[p1_i];
-                                pen_axis = a2_i + 4;
-                                pf_elems = (Vertex(p1_i as u8), Face(a2_i));
-                            }
+                        if depth_sqr > max_pen_pf_sqr {
+                            max_pen_pf_sqr = depth_sqr;
+                            contact_point_pf = CUBE_VERTICES[p1_i];
+                            pen_axis = a2_i + 4;
+                            pf_elems = (Vertex(p1_i as u8), Face(a2_i));
                         }
                     }
                 }
+            }
 
-                // e-e contacts
-                let mut max_pen_ee_sqr = 0.;
-                let mut contact_point_ee = [0., 0., 0.].into();
-                let mut pen_axis_1 = 0;
-                let mut pen_axis_2 = 0;
-                let mut ee_elems = (Edge(0), Edge(0));
-                // for each unique axis point on 2
-                for p2_i in [1, 2, 4, 7] {
-                    let point = points_2[p2_i as usize];
-                    // for each edge from that point
-                    for (a2_i, a2) in axes_2.iter().enumerate() {
-                        // closest point on edge to 1's centre
-                        let d = point - a2.dot(point) * axes_2_inv[a2_i];
+            // e-e contacts
+            let mut max_pen_ee_sqr = 0.;
+            let mut contact_point_ee = [0., 0., 0.].into();
+            let mut pen_axis_1 = 0;
+            let mut pen_axis_2 = 0;
+            let mut ee_elems = (Edge(0), Edge(0));
+            // for each unique axis point on 2
+            for p2_i in [1, 2, 4, 7] {
+                let point_2_1 = points_2_1[p2_i as usize];
+                // for each edge from that point
+                for (a2_i, axis_2_1) in axes_2_1.iter().enumerate() {
+                    // closest point on edge to 1's centre
+                    let e2_c1_1 = point_2_1 - axis_2_1.dot(point_2_1) * axes_2_1_inv[a2_i];
 
-                        // closest vertex on 1 to d (closest vertex to edge)
-                        let p1: Vector = [d.x.signum(), d.y.signum(), d.z.signum()].into();
-                        let p1_p2 = point - p1;
-                        // let test = p1_p2.mul_element_wise(*a);
+                    // closest vertex on 1 to d (closest vertex to edge)
+                    let point_1_1: Vector =
+                        [e2_c1_1.x.signum(), e2_c1_1.y.signum(), e2_c1_1.z.signum()].into();
+                    let p1_p2 = point_2_1 - point_1_1;
+                    // let test = p1_p2.mul_element_wise(*a);
 
-                        // project edge onto each x,y,z plane
-                        let a_projs: [Vector; 3] = [
-                            [0., a2.y, a2.z].into(),
-                            [a2.x, 0., a2.z].into(),
-                            [a2.x, a2.y, 0.].into(),
+                    // let p1 = (model_1 * point_1_1.extend(1.)).truncate();
+                    // let p2 = (model_1 * point_2_1.extend(1.)).truncate();
+                    // let p1_p2 = p1 - p2;
+
+                    // project edge onto each x,y,z plane
+                    let a2_projs: [Vector; 3] = [
+                        [0., axis_2_1.y, axis_2_1.z].into(),
+                        [axis_2_1.x, 0., axis_2_1.z].into(),
+                        [axis_2_1.x, axis_2_1.y, 0.].into(),
+                    ];
+
+                    // get closest point of edge to 3 edges of p1
+                    let d2_per_edge = a2_projs
+                        .map(|proj| point_2_1 - proj.dot(p1_p2) * axis_2_1 / proj.magnitude2());
+
+                    let mut potential_pen = None;
+                    let mut potential_a1_i = None;
+
+                    // for each closest point
+                    for a1_i in 0..3 {
+                        // check if point is in 2
+                        let d2_from_2 = d2_per_edge[a1_i] - model_2_1.w.truncate();
+                        if d2_from_2.dot(axes_2_1_inv[a2_i]).abs() > 1. {
+                            continue;
+                        }
+
+                        // check if closest point on edge is in 2
+                        // let mut d1_from_2 = d2_from_2;
+                        // d1_from_2[a1_i] += p1[a1_i] - d2_per_edge[a1_i][a1_i];
+                        let mut d1_from_2 = point_1_1;
+                        d1_from_2[a1_i] = d2_per_edge[a1_i][a1_i];
+                        d1_from_2 -= model_2_1.w.truncate();
+                        if d1_from_2.dot(axes_2_1_inv[0]).abs() > 1.
+                            || d1_from_2.dot(axes_2_1_inv[1]).abs() > 1.
+                            || d1_from_2.dot(axes_2_1_inv[2]).abs() > 1.
+                        {
+                            continue;
+                        }
+
+                        // check if point is in 1
+                        let d_abs = [
+                            d2_per_edge[a1_i].x.abs(),
+                            d2_per_edge[a1_i].y.abs(),
+                            d2_per_edge[a1_i].z.abs(),
                         ];
-                        // get closest point of edge to 3 edges of p1
-                        let d2_per_edge = a_projs
-                            .map(|a_proj| point - a_proj.dot(p1_p2) * a2 / a_proj.magnitude2());
+                        if d_abs[0] > 1. || d_abs[1] > 1. || d_abs[2] > 1. {
+                            continue;
+                        }
 
-                        let mut potential_pen = None;
-                        let mut potential_a1_i = None;
+                        let [ci_1, ci_2] = CROSS_INDICES[a1_i];
+                        let depth_1 = 1. - d_abs[ci_1];
+                        let depth_2 = 1. - d_abs[ci_2];
 
-                        // for each closest point
-                        for a1_i in 0..3 {
-                            // check if point is in 2
-                            let d2_from_2 = d2_per_edge[a1_i] - space_2_to_space_1.w.truncate();
-                            if d2_from_2.dot(axes_2_inv[a2_i]).abs() > 1. {
-                                continue;
-                            }
+                        let depth = depth_1 * depth_1 * model_1_sqr[ci_1]
+                            + depth_2 * depth_2 * model_1_sqr[ci_2];
 
-                            // check if closest point on edge is in 2
-                            // let mut d1_from_2 = d2_from_2;
-                            // d1_from_2[a1_i] += p1[a1_i] - d2_per_edge[a1_i][a1_i];
-                            let mut d1_from_2 = p1;
-                            d1_from_2[a1_i] = d2_per_edge[a1_i][a1_i];
-                            d1_from_2 -= space_2_to_space_1.w.truncate();
-                            if d1_from_2.dot(axes_2_inv[0]).abs() > 1.
-                                || d1_from_2.dot(axes_2_inv[1]).abs() > 1.
-                                || d1_from_2.dot(axes_2_inv[2]).abs() > 1.
-                            {
-                                continue;
-                            }
-
-                            // check if point is in 1
-                            let d_abs = [
-                                d2_per_edge[a1_i].x.abs(),
-                                d2_per_edge[a1_i].y.abs(),
-                                d2_per_edge[a1_i].z.abs(),
-                            ];
-                            if d_abs[0] > 1. || d_abs[1] > 1. || d_abs[2] > 1. {
-                                continue;
-                            }
-
-                            let [ci_1, ci_2] = CROSS_INDICES[a1_i];
-                            let depth_1 = 1. - d_abs[ci_1];
-                            let depth_2 = 1. - d_abs[ci_2];
-
-                            let depth = depth_1 * depth_1 * model_1_sqr[ci_1]
-                                + depth_2 * depth_2 * model_1_sqr[ci_2];
-
-                            if let Some(min_depth) = potential_pen {
-                                if depth < min_depth {
-                                    potential_pen = Some(depth);
-                                    potential_a1_i = Some(a1_i);
-                                }
-                            } else {
+                        if let Some(min_depth) = potential_pen {
+                            if depth < min_depth {
                                 potential_pen = Some(depth);
                                 potential_a1_i = Some(a1_i);
                             }
+                        } else {
+                            potential_pen = Some(depth);
+                            potential_a1_i = Some(a1_i);
                         }
+                    }
 
-                        if let Some(depth) = potential_pen {
-                            if depth > max_pen_ee_sqr {
-                                let a1_i = potential_a1_i.unwrap();
+                    if let Some(depth) = potential_pen {
+                        if depth > max_pen_ee_sqr {
+                            let a1_i = potential_a1_i.unwrap();
 
-                                max_pen_ee_sqr = depth;
-                                contact_point_ee = d2_per_edge[a1_i];
-                                pen_axis_1 = a1_i;
-                                pen_axis_2 = a2_i + 3;
-                                ee_elems = (
-                                    CuboidElement::from_vertex_axis(
-                                        CuboidElement::closest_vertex(p1),
-                                        a1_i as u8,
-                                    ),
-                                    CuboidElement::from_vertex_axis(p2_i, a2_i as u8),
-                                )
-                            }
+                            max_pen_ee_sqr = depth;
+                            contact_point_ee = d2_per_edge[a1_i];
+                            pen_axis_1 = a1_i;
+                            pen_axis_2 = a2_i + 3;
+                            ee_elems = (
+                                CuboidElement::from_vertex_axis(
+                                    CuboidElement::closest_vertex(point_1_1),
+                                    a1_i as u8,
+                                ),
+                                CuboidElement::from_vertex_axis(p2_i, a2_i as u8),
+                            )
                         }
                     }
                 }
+            }
 
-                // compare p-f and e-e contacts
-                // returned normal points outward from coll_1
-                // should return max pen as well
-                if max_pen_pf_sqr == 0. && max_pen_ee_sqr == 0.0 {
-                    // println!("CANT FIND CONTACT >:(");
-                    continue;
-                }
-                if max_pen_pf_sqr >= max_pen_ee_sqr {
-                    let normal = axes[pen_axis as usize - 1];
-                    // pen_axis.signum() as f32 * axes[pen_axis.unsigned_abs() as usize - 1];
-                    // println!("pf collision normal: {:?}", normal);
-                    let point = model_1 * contact_point_pf.extend(1.);
+            // compare p-f and e-e contacts
+            // returned normal points outward from coll_1
+            // should return max pen as well
+            if max_pen_pf_sqr == 0. && max_pen_ee_sqr == 0.0 {
+                // println!("CANT FIND CONTACT >:(");
+                continue;
+            }
+            if max_pen_pf_sqr >= max_pen_ee_sqr {
+                let normal = axes[pen_axis as usize - 1];
+                // pen_axis.signum() as f32 * axes[pen_axis.unsigned_abs() as usize - 1];
+                // println!("pf collision normal: {:?}", normal);
+                let point = model_1 * contact_point_pf.extend(1.);
 
-                    let contact_id = ContactIdPair(
-                        ContactIdentifier {
-                            collider: Arc::downgrade(coll_1),
-                            element: pf_elems.0,
-                        },
-                        ContactIdentifier {
-                            collider: Arc::downgrade(coll_2),
-                            element: pf_elems.1,
-                        },
-                    );
+                let contact_id = ContactIdPair(
+                    ContactIdentifier {
+                        collider: Arc::downgrade(coll_1),
+                        element: pf_elems.0,
+                    },
+                    ContactIdentifier {
+                        collider: Arc::downgrade(coll_2),
+                        element: pf_elems.1,
+                    },
+                );
 
-                    let (index, contact) = Contact::new(
-                        transforms,
-                        point.truncate(),
-                        normal.normalize(),
-                        max_pen_pf_sqr.sqrt(),
-                        contact_id,
-                        0,
-                    );
-                    self.contact_resolver.add_contact(index, contact);
-                } else {
-                    // println!("[e-e contact generation]\n\tpen_axis_1: {:?},\n\tpen_axis_2: {:?},\n\taxis 1: {:?},\n\taxis 2: {:?}",
-                    //     pen_axis_1, pen_axis_2, axes[pen_axis_1], axes[pen_axis_2]
-                    // );
-                    let normal = axes[pen_axis_1].cross(axes[pen_axis_2]);
-                    // println!("ee collision normal: {:?}", normal);
-                    let point = model_1 * contact_point_ee.extend(1.);
+                let (index, contact) = Contact::new(
+                    transforms,
+                    point.truncate(),
+                    normal.normalize(),
+                    max_pen_pf_sqr.sqrt(),
+                    contact_id,
+                    0,
+                );
+                self.contact_resolver.add_contact(index, contact);
+            } else {
+                // println!("[e-e contact generation]\n\tpen_axis_1: {:?},\n\tpen_axis_2: {:?},\n\taxis 1: {:?},\n\taxis 2: {:?}",
+                //     pen_axis_1, pen_axis_2, axes[pen_axis_1], axes[pen_axis_2]
+                // );
+                let normal = axes[pen_axis_1].cross(axes[pen_axis_2]);
+                // println!("ee collision normal: {:?}", normal);
+                let point = model_1 * contact_point_ee.extend(1.);
 
-                    let contact_id = ContactIdPair(
-                        ContactIdentifier {
-                            collider: Arc::downgrade(coll_1),
-                            element: ee_elems.0,
-                        },
-                        ContactIdentifier {
-                            collider: Arc::downgrade(coll_2),
-                            element: ee_elems.1,
-                        },
-                    );
+                let contact_id = ContactIdPair(
+                    ContactIdentifier {
+                        collider: Arc::downgrade(coll_1),
+                        element: ee_elems.0,
+                    },
+                    ContactIdentifier {
+                        collider: Arc::downgrade(coll_2),
+                        element: ee_elems.1,
+                    },
+                );
 
-                    let (index, contact) = Contact::new(
-                        transforms,
-                        point.truncate(),
-                        normal.normalize(),
-                        max_pen_ee_sqr.sqrt(),
-                        contact_id,
-                        0,
-                    );
-                    self.contact_resolver.add_contact(index, contact);
-                }
+                let (index, contact) = Contact::new(
+                    transforms,
+                    point.truncate(),
+                    normal.normalize(),
+                    max_pen_ee_sqr.sqrt(),
+                    contact_id,
+                    0,
+                );
+                self.contact_resolver.add_contact(index, contact);
             }
         }
 

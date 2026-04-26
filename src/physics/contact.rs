@@ -9,8 +9,8 @@ const MIN_CONTACT_VEL: f32 = 0.02; // time step dependent
 const ANGULAR_MOVE_LIMIT_RAD: f32 = 0.5;
 const MAX_CONTACT_AGE: u8 = 3;
 const VELOCITY_ITER_LIMIT: u32 = 100;
-const STATIC_FRICTION_COEFF: f32 = 5.;
-const DYNAMIC_FRICTION_COEFF: f32 = 10.;
+const STATIC_FRICTION_COEFF: f32 = 3.;
+const DYNAMIC_FRICTION_COEFF: f32 = 3.;
 
 #[derive(PartialEq, Clone, Copy)]
 struct OrdF32(pub f32);
@@ -178,6 +178,7 @@ impl ContactResolver {
             // println!("\tStatic impulse: {:?}", impulse);
             let impulse_r = impulse.dot(contact.normal);
             let impulse_r2 = impulse_r * impulse_r;
+            // if target tangent impulse > max static fric impulse then use dynamic fric instead
             let impulse = if impulse.magnitude2() - impulse_r2
                 > STATIC_FRICTION_COEFF * STATIC_FRICTION_COEFF * impulse_r2
             {
@@ -434,9 +435,11 @@ impl Contact {
             // let delta_velocity = closing_velocity - old_closing_velocity;
             // let tangent_delta_velocity = delta_velocity - delta_velocity.dot(normal) * normal;
             let target_delta_velocity = closing_velocity + restituition * old_normal_velocity; // + tangent_delta_velocity;
-                                                                                               //  ^cancels out the current velocity
-                                                                                               //                     ^bounce using only old velocity
-                                                                                               //                                                          ^cancels tangent velocity next frame
+
+            //                                        ^cancels out the current velocity
+            //                                                           ^bounce using only old velocity
+            //                                                                                                ^cancels tangent velocity next frame
+
             let total_inertia = total_inertia_1 + total_inertia_2;
             (
                 heap_index,
@@ -466,9 +469,10 @@ impl Contact {
             // let delta_velocity = point_vel_1 - old_vel_1;
             // let tangent_delta_velocity = delta_velocity - delta_velocity.dot(normal) * normal;
             let target_delta_velocity = point_vel_1 + restituition * old_normal_velocity; // + tangent_delta_velocity;
-                                                                                          //  ^cancels out the current velocity
-                                                                                          //                ^bounce using only old velocity
-                                                                                          //                                                     ^cancels tangent velocity next frame
+
+            //                                        ^cancels out the current velocity
+            //                                                      ^bounce using only old velocity
+            //                                                                                           ^cancels tangent velocity next frame
             (
                 heap_index,
                 Contact {
