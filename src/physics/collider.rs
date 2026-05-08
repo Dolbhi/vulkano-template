@@ -9,7 +9,7 @@ use super::{
 };
 use crate::game_objects::transform::{TransformID, TransformSystem};
 use bvh::{Bvh, DepthIter, LeafOutsideHierachy};
-use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, MetricSpace, SquareMatrix, Zero};
+use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, MetricSpace, SquareMatrix, Transform, Zero};
 use core::f32;
 use ray::Ray;
 use std::{
@@ -362,7 +362,7 @@ impl ColliderSystem {
             // }
 
             // seperating axis
-            let dist = (model_1.w - model_2.w).truncate(); // might need to normalise
+            let dist_1_2 = (model_1.w - model_2.w).truncate(); // might need to normalise
 
             let axes = [
                 model_1.x, model_1.y, model_1.z, model_2.x, model_2.y, model_2.z,
@@ -377,7 +377,7 @@ impl ColliderSystem {
                 let proj_2 =
                     axes[3].dot(axis).abs() + axes[4].dot(axis).abs() + axes[5].dot(axis).abs();
 
-                if dist.dot(axis).abs() > proj_1 + proj_2 {
+                if dist_1_2.dot(axis).abs() > proj_1 + proj_2 {
                     sep_axis_found = true;
                     break;
                 }
@@ -387,12 +387,13 @@ impl ColliderSystem {
             };
 
             let inv_model_1 = model_1.invert().unwrap();
-            let inv_axes_1: Matrix3<f32> = [
-                inv_model_1.x.truncate().into(),
-                inv_model_1.y.truncate().into(),
-                inv_model_1.z.truncate().into(),
-            ]
-            .into();
+            let inv_model_2 = model_2.invert().unwrap();
+            // let inv_axes_1: Matrix3<f32> = [
+            //     inv_model_1.x.truncate().into(),
+            //     inv_model_1.y.truncate().into(),
+            //     inv_model_1.z.truncate().into(),
+            // ]
+            // .into();
             let model_1_sqr = [
                 model_1.x.magnitude2(),
                 model_1.y.magnitude2(),
@@ -506,111 +507,174 @@ impl ColliderSystem {
             }
 
             // e-e contacts
+            let points_1 = [1, 2, 4, 7].map(|i| (model_1 * CUBE_VERTICES[i].extend(1.)).truncate());
+            let points_2 = [1, 2, 4, 7].map(|i| (model_2 * CUBE_VERTICES[i].extend(1.)).truncate());
+            let a2_a1_precalc = [model_1.x, model_1.y, model_1.z].map(|a1| {
+                let a1_inv = a1 / a1.magnitude2();
+                [model_2.x, model_2.y, model_2.z].map(|a2| {
+                    let p2 = (a2 - a1.dot(a2) * a1_inv).truncate();
+                    (
+                        a2.truncate().cross(a1.truncate()).normalize(),
+                        p2 / p2.magnitude2(),
+                    )
+                })
+            });
+            // let axes_1 = model_1.in [1, 2, 3].map(|i| {(model_2 * CUBE_VERTICES[i].extend(1.)).truncate()});
             let mut max_pen_ee_sqr = 0.;
             let mut contact_point_ee = [0., 0., 0.].into();
             let mut pen_axis_1 = 0;
             let mut pen_axis_2 = 0;
             let mut ee_elems = (Edge(0), Edge(0));
-            // for each unique axis point on 2
-            for p2_i in [1, 2, 4, 7] {
-                let point_2_1 = points_2_1[p2_i as usize];
-                // for each edge from that point
-                for (a2_i, axis_2_1) in axes_2_1.iter().enumerate() {
-                    // closest point on edge to 1's centre
-                    let e2_c1_1 = point_2_1 - axis_2_1.dot(point_2_1) * axes_2_1_inv[a2_i];
+            // for each unique axis point on 1
+            for (p1_i, p1) in points_1.iter().enumerate() {
+                for (p2_i, p2) in points_2.iter().enumerate() {
+                    let rough_d_1_2 = p1 - p2;
+                    for (e1_i, precalcs) in a2_a1_precalc.iter().enumerate() {
+                        for (e2_i, (cross, proj_a2)) in precalcs.iter().enumerate() {
+                            let d_1_2_mag = cross.dot(rough_d_1_2);
+                            let d_1_2 = d_1_2_mag * cross;
 
-                    // closest vertex on 1 to d (closest vertex to edge)
-                    let point_1_1: Vector =
-                        [e2_c1_1.x.signum(), e2_c1_1.y.signum(), e2_c1_1.z.signum()].into();
-                    let p1_p2 = point_2_1 - point_1_1;
-                    // let test = p1_p2.mul_element_wise(*a);
+                            // if d_1_2.dot((model_1.w - model_2.w).truncate())
 
-                    // let p1 = (model_1 * point_1_1.extend(1.)).truncate();
-                    // let p2 = (model_1 * point_2_1.extend(1.)).truncate();
-                    // let p1_p2 = p1 - p2;
+                            let closest_2 =
+                                p2 + proj_a2.dot(rough_d_1_2) * model_2[e2_i].truncate();
+                            let closest_1 = closest_2 + d_1_2;
+                            // check if e2 is closer than e1 to box 1 (is penetrating) AND if new pen is larger than current max pen
+                            if (closest_2 - model_2.w.truncate()).magnitude2()
+                                > (closest_1 - model_2.w.truncate()).magnitude2()
+                                && d_1_2_mag * d_1_2_mag > max_pen_ee_sqr
+                            {
+                                if (closest_2 - model_2.w.truncate()).magnitude2()
+                                    > (p2 - model_2.w.truncate()).magnitude2()
+                                    || (closest_1 - model_1.w.truncate()).magnitude2()
+                                        > (p1 - model_1.w.truncate()).magnitude2()
+                                {
+                                    continue;
+                                }
 
-                    // project edge onto each x,y,z plane
-                    let a2_projs: [Vector; 3] = [
-                        [0., axis_2_1.y, axis_2_1.z].into(),
-                        [axis_2_1.x, 0., axis_2_1.z].into(),
-                        [axis_2_1.x, axis_2_1.y, 0.].into(),
-                    ];
+                                let t1 = inv_model_1 * closest_2.extend(1.);
+                                let t2 = inv_model_2 * closest_2.extend(1.);
 
-                    // get closest point of edge to 3 edges of p1
-                    let d2_per_edge = a2_projs
-                        .map(|proj| point_2_1 - proj.dot(p1_p2) * axis_2_1 / proj.magnitude2());
+                                if t1.x.abs() > 1. || t1.y.abs() > 1. || t1.z.abs() > 1. {
+                                    continue;
+                                }
 
-                    let mut potential_pen = None;
-                    let mut potential_a1_i = None;
+                                // println!("[Debug] Closest in 1 local: {:?}", t1);
+                                // println!("[Debug] Closest in 2 local: {:?}", t2);
 
-                    // for each closest point
-                    for a1_i in 0..3 {
-                        // check if point is in 2
-                        let d2_from_2 = d2_per_edge[a1_i] - model_2_1.w.truncate();
-                        if d2_from_2.dot(axes_2_1_inv[a2_i]).abs() > 1. {
-                            continue;
-                        }
-
-                        // check if closest point on edge is in 2
-                        // let mut d1_from_2 = d2_from_2;
-                        // d1_from_2[a1_i] += p1[a1_i] - d2_per_edge[a1_i][a1_i];
-                        let mut d1_from_2 = point_1_1;
-                        d1_from_2[a1_i] = d2_per_edge[a1_i][a1_i];
-                        d1_from_2 -= model_2_1.w.truncate();
-                        if d1_from_2.dot(axes_2_1_inv[0]).abs() > 1.
-                            || d1_from_2.dot(axes_2_1_inv[1]).abs() > 1.
-                            || d1_from_2.dot(axes_2_1_inv[2]).abs() > 1.
-                        {
-                            continue;
-                        }
-
-                        // check if point is in 1
-                        let d_abs = [
-                            d2_per_edge[a1_i].x.abs(),
-                            d2_per_edge[a1_i].y.abs(),
-                            d2_per_edge[a1_i].z.abs(),
-                        ];
-                        if d_abs[0] > 1. || d_abs[1] > 1. || d_abs[2] > 1. {
-                            continue;
-                        }
-
-                        let [ci_1, ci_2] = CROSS_INDICES[a1_i];
-                        let depth_1 = 1. - d_abs[ci_1];
-                        let depth_2 = 1. - d_abs[ci_2];
-
-                        let depth = depth_1 * depth_1 * model_1_sqr[ci_1]
-                            + depth_2 * depth_2 * model_1_sqr[ci_2];
-
-                        if let Some(min_depth) = potential_pen {
-                            if depth < min_depth {
-                                potential_pen = Some(depth);
-                                potential_a1_i = Some(a1_i);
+                                max_pen_ee_sqr = d_1_2_mag * d_1_2_mag;
+                                contact_point_ee = closest_2;
+                                pen_axis_1 = e1_i;
+                                pen_axis_2 = e2_i + 3;
+                                ee_elems = (
+                                    CuboidElement::from_vertex_axis(p1_i as u8, e1_i as u8),
+                                    CuboidElement::from_vertex_axis(p2_i as u8, e2_i as u8),
+                                )
                             }
-                        } else {
-                            potential_pen = Some(depth);
-                            potential_a1_i = Some(a1_i);
-                        }
-                    }
-
-                    if let Some(depth) = potential_pen {
-                        if depth > max_pen_ee_sqr {
-                            let a1_i = potential_a1_i.unwrap();
-
-                            max_pen_ee_sqr = depth;
-                            contact_point_ee = d2_per_edge[a1_i];
-                            pen_axis_1 = a1_i;
-                            pen_axis_2 = a2_i + 3;
-                            ee_elems = (
-                                CuboidElement::from_vertex_axis(
-                                    CuboidElement::closest_vertex(point_1_1),
-                                    a1_i as u8,
-                                ),
-                                CuboidElement::from_vertex_axis(p2_i, a2_i as u8),
-                            )
                         }
                     }
                 }
             }
+            // for each unique axis point on 2
+            // for p2_i in [1, 2, 4, 7] {
+            //     let point_2_1 = points_2_1[p2_i as usize];
+            //     // for each edge from that point
+            //     for (a2_i, axis_2_1) in axes_2_1.iter().enumerate() {
+            //         // closest point on edge to 1's centre
+            //         let e2_c1_1 = point_2_1 - axis_2_1.dot(point_2_1) * axes_2_1_inv[a2_i];
+
+            //         // closest vertex on 1 to d (closest vertex to edge)
+            //         let point_1_1: Vector =
+            //             [e2_c1_1.x.signum(), e2_c1_1.y.signum(), e2_c1_1.z.signum()].into();
+            //         let p1_p2 = point_2_1 - point_1_1;
+            //         // let test = p1_p2.mul_element_wise(*a);
+
+            //         // let p1 = (model_1 * point_1_1.extend(1.)).truncate();
+            //         // let p2 = (model_1 * point_2_1.extend(1.)).truncate();
+            //         // let p1_p2 = p1 - p2;
+
+            //         // project edge onto each x,y,z plane
+            //         let a2_projs: [Vector; 3] = [
+            //             [0., axis_2_1.y, axis_2_1.z].into(),
+            //             [axis_2_1.x, 0., axis_2_1.z].into(),
+            //             [axis_2_1.x, axis_2_1.y, 0.].into(),
+            //         ];
+
+            //         // get closest point of edge to 3 edges of p1
+            //         let d2_per_edge = a2_projs
+            //             .map(|proj| point_2_1 - proj.dot(p1_p2) * axis_2_1 / proj.magnitude2());
+
+            //         let mut potential_pen = None;
+            //         let mut potential_a1_i = None;
+
+            //         // for each closest point
+            //         for a1_i in 0..3 {
+            //             // check if point is in 2
+            //             let d2_from_2 = d2_per_edge[a1_i] - model_2_1.w.truncate();
+            //             if d2_from_2.dot(axes_2_1_inv[a2_i]).abs() > 1. {
+            //                 continue;
+            //             }
+
+            //             // check if closest point on edge is in 2
+            //             // let mut d1_from_2 = d2_from_2;
+            //             // d1_from_2[a1_i] += p1[a1_i] - d2_per_edge[a1_i][a1_i];
+            //             let mut d1_from_2 = point_1_1;
+            //             d1_from_2[a1_i] = d2_per_edge[a1_i][a1_i];
+            //             d1_from_2 -= model_2_1.w.truncate();
+            //             if d1_from_2.dot(axes_2_1_inv[0]).abs() > 1.
+            //                 || d1_from_2.dot(axes_2_1_inv[1]).abs() > 1.
+            //                 || d1_from_2.dot(axes_2_1_inv[2]).abs() > 1.
+            //             {
+            //                 continue;
+            //             }
+
+            //             // check if point is in 1
+            //             let d_abs = [
+            //                 d2_per_edge[a1_i].x.abs(),
+            //                 d2_per_edge[a1_i].y.abs(),
+            //                 d2_per_edge[a1_i].z.abs(),
+            //             ];
+            //             if d_abs[0] > 1. || d_abs[1] > 1. || d_abs[2] > 1. {
+            //                 continue;
+            //             }
+
+            //             let [ci_1, ci_2] = CROSS_INDICES[a1_i];
+            //             let depth_1 = 1. - d_abs[ci_1];
+            //             let depth_2 = 1. - d_abs[ci_2];
+
+            //             let depth = depth_1 * depth_1 * model_1_sqr[ci_1]
+            //                 + depth_2 * depth_2 * model_1_sqr[ci_2];
+
+            //             if let Some(min_depth) = potential_pen {
+            //                 if depth < min_depth {
+            //                     potential_pen = Some(depth);
+            //                     potential_a1_i = Some(a1_i);
+            //                 }
+            //             } else {
+            //                 potential_pen = Some(depth);
+            //                 potential_a1_i = Some(a1_i);
+            //             }
+            //         }
+
+            //         if let Some(depth) = potential_pen {
+            //             if depth > max_pen_ee_sqr {
+            //                 let a1_i = potential_a1_i.unwrap();
+
+            //                 max_pen_ee_sqr = depth;
+            //                 contact_point_ee = d2_per_edge[a1_i];
+            //                 pen_axis_1 = a1_i;
+            //                 pen_axis_2 = a2_i + 3;
+            //                 ee_elems = (
+            //                     CuboidElement::from_vertex_axis(
+            //                         CuboidElement::closest_vertex(point_1_1),
+            //                         a1_i as u8,
+            //                     ),
+            //                     CuboidElement::from_vertex_axis(p2_i, a2_i as u8),
+            //                 )
+            //             }
+            //         }
+            //     }
+            // }
 
             // compare p-f and e-e contacts
             // returned normal points outward from coll_1
@@ -651,7 +715,7 @@ impl ColliderSystem {
                 // );
                 let normal = axes[pen_axis_1].cross(axes[pen_axis_2]);
                 // println!("ee collision normal: {:?}", normal);
-                let point = model_1 * contact_point_ee.extend(1.);
+                // let point = model_1 * contact_point_ee.extend(1.);
 
                 let contact_id = ContactIdPair(
                     ContactIdentifier {
@@ -666,7 +730,7 @@ impl ColliderSystem {
 
                 let (index, contact) = Contact::new(
                     transforms,
-                    point.truncate(),
+                    contact_point_ee,
                     normal.normalize(),
                     max_pen_ee_sqr.sqrt(),
                     contact_id,
@@ -882,6 +946,7 @@ impl CuboidElement {
         axis
     }
 
+    /// Get cube vertex id from local point coords
     fn closest_vertex(point: Vector) -> u8 {
         let mut result = 0;
         if point.x > 0. {

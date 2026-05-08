@@ -803,6 +803,8 @@ mod tree_tests {
         sync::Arc,
     };
 
+    use cgmath::Matrix4;
+
     use crate::{game_objects::transform::TransformSystem, physics::collider::CuboidCollider};
 
     use super::{BranchLinks, Bvh, Node, NodeContent};
@@ -908,6 +910,17 @@ mod tree_tests {
             root
         );
         // assert_eq!("ALL", "GOOD", "Tree: \n{:#?}", root);
+    }
+
+    #[test]
+    fn matrix_test() {
+        let test = Matrix4::from_cols(
+            [1, 2, 3, 1].into(),
+            [2, 3, 4, 2].into(),
+            [3, 4, 5, 3].into(),
+            [4, 5, 6, 4].into(),
+        );
+        assert_eq!(test.z, test[2]);
     }
 
     #[test]
