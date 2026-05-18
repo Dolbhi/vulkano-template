@@ -526,6 +526,7 @@ impl ColliderSystem {
             let mut pen_axis_2 = 0;
             let mut ee_elems = (Edge(0), Edge(0));
             // for each unique axis point on 1
+            // TODO: this mostly works, however normals can point wrong with small pen near edges (take the smaller pen contact in some cases?)
             for (p1_i, p1) in points_1.iter().enumerate() {
                 for (p2_i, p2) in points_2.iter().enumerate() {
                     let rough_d_1_2 = p1 - p2;

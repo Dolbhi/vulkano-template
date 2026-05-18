@@ -234,8 +234,8 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     let t = loader.world.transforms.add_transform([0., 1., 0.]);
     let ro = loader.resources.load_ro(Cube, green_mat, true);
     let mut rb = RigidBody::new(t);
-    // rb.velocity = (1.0, 10.0, 0.0).into();
-    // rb.bivelocity = (0.0, 0.0, -5.0).into();
+    rb.velocity = (1.0, 10.0, 0.0).into();
+    rb.bivelocity = (0.0, 0.0, -5.0).into();
     rb.inv_mass = 0.5;
     rb.set_moi_as_cuboid((1., 1., 1.).into());
     let rb = Arc::new(RwLock::new(rb));
