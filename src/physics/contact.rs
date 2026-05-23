@@ -368,21 +368,9 @@ impl Contact {
         if age == 0 {
             rb_guard_1.remove_cached_contact(&contact_id);
         }
-        // search rb for matching contact id
-        drop(rb_guard_1);
-        let rb_1 = RigidBodyRef {
-            rigidbody: rb_1,
-            index,
-            relative_pos,
-            rotation,
-            point_vel: point_vel_1,
-            torque_per_impulse,
-            linear_inertia,
-            angular_inertia,
-        };
 
-        if let Some(rb_2) = rb_2 {
-            // aquire rb 1 data
+        let (total_inertia, target_delta_velocity, rb_2) = if let Some(rb_2) = rb_2 {
+            // aquire rb 2 data
             let mut rb_guard_2 = rb_2.write().unwrap();
             let transform_2 = transform_sys
                 .get_transform(&rb_guard_2.transform)
@@ -391,6 +379,15 @@ impl Contact {
             let relative_pos = position - transform_2.translation;
             let point_vel_2 = rb_guard_2.point_velocity(relative_pos);
             let old_vel_2 = rb_guard_2.old_velocity;
+
+            // wake any rb if needed
+            if rb_guard_1.is_awake() {
+                if !rb_guard_2.is_awake() {
+                    rb_guard_2.wake();
+                }
+            } else if rb_guard_2.is_awake() {
+                rb_guard_1.wake();
+            }
 
             let inv_mass = rb_guard_2.inv_mass;
             // n x r
@@ -441,24 +438,7 @@ impl Contact {
             //                                                                                                ^cancels tangent velocity next frame
 
             let total_inertia = total_inertia_1 + total_inertia_2;
-            (
-                heap_index,
-                Contact {
-                    position,
-                    normal,
-                    penetration,
-
-                    inv_total_inertia: total_inertia.invert().unwrap(),
-                    inv_normal_inertia: normal.dot(total_inertia * normal).recip(),
-                    rb_1,
-                    rb_2: Some(rb_2),
-
-                    target_delta_velocity,
-
-                    contact_id,
-                    age,
-                },
-            )
+            (total_inertia, target_delta_velocity, Some(rb_2))
         } else {
             let restituition = if point_vel_1.dot(normal) < MIN_BOUNCE_VEL {
                 0.0
@@ -473,25 +453,39 @@ impl Contact {
             //                                        ^cancels out the current velocity
             //                                                      ^bounce using only old velocity
             //                                                                                           ^cancels tangent velocity next frame
-            (
-                heap_index,
-                Contact {
-                    position,
-                    normal,
-                    penetration,
+            (total_inertia_1, target_delta_velocity, None)
+        };
+        drop(rb_guard_1);
+        let rb_1 = RigidBodyRef {
+            rigidbody: rb_1,
+            index,
+            relative_pos,
+            rotation,
+            point_vel: point_vel_1,
+            torque_per_impulse,
+            linear_inertia,
+            angular_inertia,
+        };
 
-                    inv_total_inertia: total_inertia_1.invert().unwrap(),
-                    inv_normal_inertia: normal.dot(total_inertia_1 * normal).recip(),
-                    rb_1,
-                    rb_2: None,
+        // final contact
+        (
+            heap_index,
+            Contact {
+                position,
+                normal,
+                penetration,
 
-                    target_delta_velocity,
+                inv_total_inertia: total_inertia.invert().unwrap(),
+                inv_normal_inertia: normal.dot(total_inertia * normal).recip(),
+                rb_1,
+                rb_2: rb_2,
 
-                    contact_id,
-                    age,
-                },
-            )
-        }
+                target_delta_velocity,
+
+                contact_id,
+                age,
+            },
+        )
     }
 
     /// returns (position, normal, penetration)

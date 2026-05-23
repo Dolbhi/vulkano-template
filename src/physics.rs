@@ -22,6 +22,12 @@ const GRAVITY: Vector = Vector {
     y: -9.81,
     z: 0.,
 };
+/// Frames (updates) a rb must rest before beginning sleep
+const SLEEP_TIMER: u8 = 3;
+/// min velocity needed to reset sleep timer
+const WAKE_VEL_SQR: f32 = 0.01;
+/// min angular velocity needed to reset sleep timer
+const WAKE_BIVEL_SQR: f32 = 0.01;
 
 /// Invert a othonormal model matrix that has no skew
 ///
@@ -64,6 +70,9 @@ pub struct RigidBody {
 
     /// were contacts cached here last frame
     pub caching_contacts: bool,
+
+    /// frames (updates) before rb starts sleeping, 0 means currently sleeping
+    pub sleep_timer: u8,
 }
 impl RigidBody {
     pub fn new(transform: TransformID) -> Self {
@@ -82,19 +91,36 @@ impl RigidBody {
             old_velocity: Vector::zero(),
 
             caching_contacts: false,
+
+            sleep_timer: SLEEP_TIMER,
         }
     }
 
     pub fn update(&mut self, transform: &mut Transform, delta_secs: f32) {
-        self.velocity *= 1. - 0.05 * delta_secs;
-        self.bivelocity *= 1. - 0.05 * delta_secs;
+        if self.sleep_timer > 0
+            && self.velocity.magnitude2() < WAKE_VEL_SQR
+            && self.bivelocity.magnitude2() < WAKE_BIVEL_SQR
+        {
+            self.sleep_timer -= 1;
+        } else {
+            self.wake();
+        }
 
-        self.velocity += GRAVITY * delta_secs * self.gravity_multiplier;
+        // no velocity updates if sleeping
+        if self.is_awake() {
+            self.velocity *= 1. - 0.05 * delta_secs;
+            self.bivelocity *= 1. - 0.05 * delta_secs;
 
-        transform.mutate(|t, r, _| {
-            *t += self.velocity * delta_secs;
-            *r = geo_alg::bivec_exp((delta_secs / 2.) * self.bivelocity).into_quaternion() * *r;
-        });
+            self.velocity += GRAVITY * delta_secs * self.gravity_multiplier;
+
+            transform.mutate(|t, r, _| {
+                *t += self.velocity * delta_secs;
+                *r = geo_alg::bivec_exp((delta_secs / 2.) * self.bivelocity).into_quaternion() * *r;
+            });
+        } else {
+            self.velocity = Vector::zero();
+            self.bivelocity = Vector::zero();
+        }
 
         self.contact_refs.clear();
         if self.caching_contacts {
@@ -104,6 +130,15 @@ impl RigidBody {
         }
 
         // println!("MASSES: {:?}", self.sqrt_angular_mass);
+    }
+
+    /// reset internal sleep timer to wake rb
+    pub fn wake(&mut self) {
+        self.sleep_timer = SLEEP_TIMER;
+    }
+
+    pub fn is_awake(&self) -> bool {
+        self.sleep_timer != 0
     }
 
     pub fn apply_impulse(
@@ -205,6 +240,7 @@ impl RigidBody {
         self.old_velocity = self.velocity;
     }
 
+    /// search rb for matching contact id and remove it
     pub fn remove_cached_contact(&mut self, id: &ContactIdPair) {
         // let mut index = None;
         let index = self
