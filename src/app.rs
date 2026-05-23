@@ -445,6 +445,7 @@ impl App {
                     self.bounds_debug_depth = None;
                 }
 
+                // currently possible to exceed the bounding box rendering buffer limit with like 12 colliders
                 let mut bounding_boxes: Vec<GPUAABB> =
                     if let Some(debug_depth) = self.bounds_debug_depth {
                         colliders

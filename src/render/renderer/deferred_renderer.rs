@@ -191,7 +191,7 @@ impl DeferredRenderer {
             let bounding_box_data =
                 bounding_box_system
                     .pipeline
-                    .create_storage_buffer(&context.allocators, 1000, 1);
+                    .create_storage_buffer(&context.allocators, 1002, 1);
 
             // lighting data
             let point_data =
