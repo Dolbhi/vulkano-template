@@ -23,11 +23,11 @@ const GRAVITY: Vector = Vector {
     z: 0.,
 };
 /// Frames (updates) a rb must rest before beginning sleep
-const SLEEP_TIMER: u8 = 3;
+const SLEEP_TIMER: u8 = 10;
 /// min velocity needed to reset sleep timer
-const WAKE_VEL_SQR: f32 = 0.01;
+const WAKE_VEL_SQR: f32 = 0.1;
 /// min angular velocity needed to reset sleep timer
-const WAKE_BIVEL_SQR: f32 = 0.01;
+const WAKE_BIVEL_SQR: f32 = 0.1;
 
 /// Invert a othonormal model matrix that has no skew
 ///
@@ -97,17 +97,27 @@ impl RigidBody {
     }
 
     pub fn update(&mut self, transform: &mut Transform, delta_secs: f32) {
-        if self.sleep_timer > 0
-            && self.velocity.magnitude2() < WAKE_VEL_SQR
-            && self.bivelocity.magnitude2() < WAKE_BIVEL_SQR
-        {
-            self.sleep_timer -= 1;
-        } else {
-            self.wake();
-        }
+        println!(
+            "[Info] RB ({:?}) vel: {:?}({:?}), bivel: {:?}({:?}), sleep_timer: {:?}",
+            self.transform,
+            self.velocity,
+            self.velocity.magnitude(),
+            self.bivelocity,
+            self.bivelocity.magnitude(),
+            self.sleep_timer
+        );
 
         // no velocity updates if sleeping
         if self.is_awake() {
+            if self.velocity.magnitude2() < WAKE_VEL_SQR
+                && self.bivelocity.magnitude2() < WAKE_BIVEL_SQR
+            {
+                // println!("[Debug] RB ({:?}) sleep decrement", self.transform);
+                self.sleep_timer -= 1;
+            } else {
+                self.wake();
+            }
+
             self.velocity *= 1. - 0.05 * delta_secs;
             self.bivelocity *= 1. - 0.05 * delta_secs;
 
@@ -157,6 +167,12 @@ impl RigidBody {
         let angular_inertia = self.w_per_i(point, rotation.into());
         let delta_bv = angular_inertia * impulse;
         self.bivelocity += delta_bv;
+
+        if self.velocity.magnitude2() >= WAKE_VEL_SQR
+            || self.bivelocity.magnitude2() >= WAKE_BIVEL_SQR
+        {
+            self.wake();
+        }
 
         // println!(
         //     "[Point impulse]\n\tpoint: {:?},\n\timpulse: {:?},\n\tdelta_v: {:?},\n\tdelta_bv: {:?},\n\tangular_inertia: {:?}",

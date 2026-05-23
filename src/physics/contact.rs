@@ -99,27 +99,27 @@ impl ContactResolver {
                 break;
             }
 
-            println!(
-                "[Penetration resolution start]\n\tpos: {:?},\n\tnormal: {:?},\n\tpen: {:?},\n\tage: {:?},\n\tid: {:?}",
-                contact.position, contact.normal, contact.penetration, contact.age, contact.contact_id
-            );
+            // println!(
+            //     "[Penetration resolution start]\n\tpos: {:?},\n\tnormal: {:?},\n\tpen: {:?},\n\tage: {:?},\n\tid: {:?}",
+            //     contact.position, contact.normal, contact.penetration, contact.age, contact.contact_id
+            // );
 
-            println!(
-                "\t[rb1]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
-                contact.rb_1.relative_pos,
-                contact.rb_1.torque_per_impulse,
-                contact.rb_1.linear_inertia,
-                contact.rb_1.angular_inertia,
-            );
+            // println!(
+            //     "\t[rb1]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
+            //     contact.rb_1.relative_pos,
+            //     contact.rb_1.torque_per_impulse,
+            //     contact.rb_1.linear_inertia,
+            //     contact.rb_1.angular_inertia,
+            // );
 
             if let Some(rb_2) = &contact.rb_2 {
-                println!(
-                    "\t[rb2]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
-                    rb_2.relative_pos,
-                    rb_2.torque_per_impulse,
-                    rb_2.linear_inertia,
-                    rb_2.angular_inertia,
-                );
+                // println!(
+                //     "\t[rb2]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
+                //     rb_2.relative_pos,
+                //     rb_2.torque_per_impulse,
+                //     rb_2.linear_inertia,
+                //     rb_2.angular_inertia,
+                // );
 
                 // calculate move
                 contact.rb_1.resolve_penetration(
@@ -526,19 +526,19 @@ impl RigidBodyRef {
         let angular_move_rad = angular_move.magnitude() / self.relative_pos.magnitude();
         if angular_move_rad > ANGULAR_MOVE_LIMIT_RAD {
             let excess = angular_move * (1.0 - (ANGULAR_MOVE_LIMIT_RAD / angular_move_rad));
-            println!(
-                "\t[Penetration resolution] rotation limit hit! Excess: {:?}",
-                excess
-            );
+            // println!(
+            //     "\t[Penetration resolution] rotation limit hit! Excess: {:?}",
+            //     excess
+            // );
             angular_move -= excess;
             linear_move += excess;
         }
         let angular_rot = -angular_move.cross(self.relative_pos) / (self.relative_pos.magnitude2());
 
-        println!(
-            "\t[Penetration resolution] move: {:?}, rotate: {:?}",
-            linear_move, angular_rot
-        );
+        // println!(
+        //     "\t[Penetration resolution] move: {:?}, rotate: {:?}",
+        //     linear_move, angular_rot
+        // );
 
         // apply move
         let guard_1 = self.rigidbody.read().unwrap();

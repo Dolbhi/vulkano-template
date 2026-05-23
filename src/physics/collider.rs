@@ -753,14 +753,14 @@ impl ColliderSystem {
             let (rb_1, o_rb_2) = contact.get_rigidbodies();
 
             for (age, contact) in rb_1.write().unwrap().past_contacts.drain(..) {
-                println!("[Uncaching contacts] age: {:?}", age);
+                // println!("[Uncaching contacts] age: {:?}", age);
                 if let Some(res) = contact.into_contact(age, transform_sys) {
                     cached_contacts.push(res);
                 }
             }
             if let Some(rb_2) = o_rb_2 {
                 for (age, contact) in rb_2.write().unwrap().past_contacts.drain(..) {
-                    println!("[Uncaching contacts] age: {:?}", age);
+                    // println!("[Uncaching contacts] age: {:?}", age);
                     if let Some(res) = contact.into_contact(age, transform_sys) {
                         cached_contacts.push(res);
                     }
