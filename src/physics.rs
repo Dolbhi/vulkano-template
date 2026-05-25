@@ -97,15 +97,15 @@ impl RigidBody {
     }
 
     pub fn update(&mut self, transform: &mut Transform, delta_secs: f32) {
-        println!(
-            "[Info] RB ({:?}) vel: {:?}({:?}), bivel: {:?}({:?}), sleep_timer: {:?}",
-            self.transform,
-            self.velocity,
-            self.velocity.magnitude(),
-            self.bivelocity,
-            self.bivelocity.magnitude(),
-            self.sleep_timer
-        );
+        // println!(
+        //     "[Info] RB ({:?}) vel: {:?}({:?}), bivel: {:?}({:?}), sleep_timer: {:?}",
+        //     self.transform,
+        //     self.velocity,
+        //     self.velocity.magnitude(),
+        //     self.bivelocity,
+        //     self.bivelocity.magnitude(),
+        //     self.sleep_timer
+        // );
 
         // no velocity updates if sleeping
         if self.is_awake() {
@@ -127,6 +127,11 @@ impl RigidBody {
                 *t += self.velocity * delta_secs;
                 *r = geo_alg::bivec_exp((delta_secs / 2.) * self.bivelocity).into_quaternion() * *r;
             });
+            println!(
+                "[Debug] Post phy update model of {:?}: {:?}",
+                self.transform,
+                transform.get_local_model()
+            );
         } else {
             self.velocity = Vector::zero();
             self.bivelocity = Vector::zero();

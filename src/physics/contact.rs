@@ -99,27 +99,27 @@ impl ContactResolver {
                 break;
             }
 
-            // println!(
-            //     "[Penetration resolution start]\n\tpos: {:?},\n\tnormal: {:?},\n\tpen: {:?},\n\tage: {:?},\n\tid: {:?}",
-            //     contact.position, contact.normal, contact.penetration, contact.age, contact.contact_id
-            // );
+            println!(
+                "[Penetration resolution start]\n\tpos: {:?},\n\tnormal: {:?},\n\tpen: {:?},\n\tage: {:?},\n\tid: {:?}",
+                contact.position, contact.normal, contact.penetration, contact.age, contact.contact_id
+            );
 
-            // println!(
-            //     "\t[rb1]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
-            //     contact.rb_1.relative_pos,
-            //     contact.rb_1.torque_per_impulse,
-            //     contact.rb_1.linear_inertia,
-            //     contact.rb_1.angular_inertia,
-            // );
+            println!(
+                "\t[rb1]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
+                contact.rb_1.relative_pos,
+                contact.rb_1.torque_per_impulse,
+                contact.rb_1.linear_inertia,
+                contact.rb_1.angular_inertia,
+            );
 
             if let Some(rb_2) = &contact.rb_2 {
-                // println!(
-                //     "\t[rb2]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
-                //     rb_2.relative_pos,
-                //     rb_2.torque_per_impulse,
-                //     rb_2.linear_inertia,
-                //     rb_2.angular_inertia,
-                // );
+                println!(
+                    "\t[rb2]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
+                    rb_2.relative_pos,
+                    rb_2.torque_per_impulse,
+                    rb_2.linear_inertia,
+                    rb_2.angular_inertia,
+                );
 
                 // calculate move
                 contact.rb_1.resolve_penetration(
@@ -549,6 +549,10 @@ impl RigidBodyRef {
                 *translation += linear_move;
                 *rotation = bivec_exp(angular_rot * 0.5).into_quaternion() * *rotation;
             });
+        // println!(
+        //     "[Debug] Post pen resolve model: {:?}",
+        //     transform_system.get_global_model(&guard_1.transform)
+        // );
 
         // update penetration of contacts on the same rb
         for (i, other_index) in guard_1.contact_refs.iter().enumerate() {

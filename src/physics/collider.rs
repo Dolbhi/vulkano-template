@@ -9,7 +9,7 @@ use super::{
 };
 use crate::game_objects::transform::{TransformID, TransformSystem};
 use bvh::{Bvh, DepthIter, LeafOutsideHierachy};
-use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, MetricSpace, SquareMatrix, Transform, Zero};
+use cgmath::{InnerSpace, Matrix, Matrix4, MetricSpace, SquareMatrix, Zero};
 use core::f32;
 use ray::Ray;
 use std::{
@@ -17,7 +17,7 @@ use std::{
     sync::{Arc, RwLock, Weak},
 };
 
-const CROSS_INDICES: [[usize; 2]; 3] = [[1, 2], [2, 0], [0, 1]];
+// const CROSS_INDICES: [[usize; 2]; 3] = [[1, 2], [2, 0], [0, 1]];
 /// allow resolving velocity of contacts close to penetrating, penetration resolution won't happen if it remains negative
 const CACHED_NEG_DEPTH: f32 = -0.2; // time step dependent
 
@@ -526,7 +526,6 @@ impl ColliderSystem {
             let mut pen_axis_2 = 0;
             let mut ee_elems = (Edge(0), Edge(0));
             // for each unique axis point on 1
-            // TODO: this mostly works, however normals can point wrong with small pen near edges (take the smaller pen contact in some cases?)
             for (p1_i, p1) in points_1.iter().enumerate() {
                 for (p2_i, p2) in points_2.iter().enumerate() {
                     let rough_d_1_2 = p1 - p2;
@@ -540,38 +539,47 @@ impl ColliderSystem {
                             let closest_2 =
                                 p2 + proj_a2.dot(rough_d_1_2) * model_2[e2_i].truncate();
                             let closest_1 = closest_2 + d_1_2;
-                            // check if e2 is closer than e1 to box 1 (is penetrating) AND if new pen is larger than current max pen
+                            // check if e2 is closer than e1 to box 2 (is penetrating) AND if new pen is larger than current max pen
                             if (closest_2 - model_2.w.truncate()).magnitude2()
-                                > (closest_1 - model_2.w.truncate()).magnitude2()
-                                && d_1_2_mag * d_1_2_mag > max_pen_ee_sqr
+                                <= (closest_1 - model_2.w.truncate()).magnitude2()
+                                || d_1_2_mag * d_1_2_mag <= max_pen_ee_sqr
                             {
-                                if (closest_2 - model_2.w.truncate()).magnitude2()
-                                    > (p2 - model_2.w.truncate()).magnitude2()
-                                    || (closest_1 - model_1.w.truncate()).magnitude2()
-                                        > (p1 - model_1.w.truncate()).magnitude2()
-                                {
-                                    continue;
-                                }
-
-                                let t1 = inv_model_1 * closest_2.extend(1.);
-                                let t2 = inv_model_2 * closest_2.extend(1.);
-
-                                if t1.x.abs() > 1. || t1.y.abs() > 1. || t1.z.abs() > 1. {
-                                    continue;
-                                }
-
-                                // println!("[Debug] Closest in 1 local: {:?}", t1);
-                                // println!("[Debug] Closest in 2 local: {:?}", t2);
-
-                                max_pen_ee_sqr = d_1_2_mag * d_1_2_mag;
-                                contact_point_ee = closest_2;
-                                pen_axis_1 = e1_i;
-                                pen_axis_2 = e2_i + 3;
-                                ee_elems = (
-                                    CuboidElement::from_vertex_axis(p1_i as u8, e1_i as u8),
-                                    CuboidElement::from_vertex_axis(p2_i as u8, e2_i as u8),
-                                )
+                                continue;
                             }
+                            // check if closest line points are outside the segment comprising their cuboid edge
+                            if (closest_2 - model_2.w.truncate()).magnitude2()
+                                > (p2 - model_2.w.truncate()).magnitude2()
+                                || (closest_1 - model_1.w.truncate()).magnitude2()
+                                    > (p1 - model_1.w.truncate()).magnitude2()
+                            {
+                                continue;
+                            }
+
+                            let t1 = inv_model_1 * closest_2.extend(1.);
+                            let t22 = inv_model_2 * closest_2.extend(1.);
+
+                            if t1.x.abs() > 1. || t1.y.abs() > 1. || t1.z.abs() > 1. {
+                                continue;
+                            }
+                            // ensure closest points are in the same quadrant of cuboid 2 (prevents "penetration" of opposite edges)
+                            if t1.x.signum() == t22.x.signum()
+                                || t1.y.signum() == t22.y.signum()
+                                || t1.z.signum() == t22.z.signum()
+                            {
+                                continue;
+                            }
+
+                            // println!("[Debug] Closest in 1 local: {:?}", t1);
+                            // println!("[Debug] Closest in 2 local: {:?}", t2);
+
+                            max_pen_ee_sqr = d_1_2_mag * d_1_2_mag;
+                            contact_point_ee = closest_2;
+                            pen_axis_1 = e1_i;
+                            pen_axis_2 = e2_i + 3;
+                            ee_elems = (
+                                CuboidElement::from_vertex_axis(p1_i as u8, e1_i as u8),
+                                CuboidElement::from_vertex_axis(p2_i as u8, e2_i as u8),
+                            )
                         }
                     }
                 }
