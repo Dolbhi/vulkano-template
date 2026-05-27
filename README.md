@@ -56,6 +56,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 
 ### Issues
 - [ ] Crashes when closed after resize?
+- [ ] AABB render object buffer overflows during rapid/erractic collisions
 - [x] Occasional camera jumping while moving
 - [x] Interpolation struggles with curve movements (use smooth camera)
 - [x] Crashes when moving to 2nd monitor with loaded level

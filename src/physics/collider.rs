@@ -536,17 +536,20 @@ impl ColliderSystem {
 
                             // if d_1_2.dot((model_1.w - model_2.w).truncate())
 
+                            // check if new pen is larger than current max pen
+                            if d_1_2_mag * d_1_2_mag <= max_pen_ee_sqr {
+                                continue;
+                            }
+                            // check if closest on 2 is closer than closest on 1 to box 2 (is penetrating)
                             let closest_2 =
                                 p2 + proj_a2.dot(rough_d_1_2) * model_2[e2_i].truncate();
                             let closest_1 = closest_2 + d_1_2;
-                            // check if e2 is closer than e1 to box 2 (is penetrating) AND if new pen is larger than current max pen
                             if (closest_2 - model_2.w.truncate()).magnitude2()
                                 <= (closest_1 - model_2.w.truncate()).magnitude2()
-                                || d_1_2_mag * d_1_2_mag <= max_pen_ee_sqr
                             {
                                 continue;
                             }
-                            // check if closest line points are outside the segment comprising their cuboid edge
+                            // check if closest line points are outside the segment comprising their box edge
                             if (closest_2 - model_2.w.truncate()).magnitude2()
                                 > (p2 - model_2.w.truncate()).magnitude2()
                                 || (closest_1 - model_1.w.truncate()).magnitude2()
@@ -554,17 +557,16 @@ impl ColliderSystem {
                             {
                                 continue;
                             }
-
-                            let t1 = inv_model_1 * closest_2.extend(1.);
-                            let t22 = inv_model_2 * closest_2.extend(1.);
-
-                            if t1.x.abs() > 1. || t1.y.abs() > 1. || t1.z.abs() > 1. {
+                            // ensure closest point on 2 is inside box 1
+                            let t21 = inv_model_1 * closest_2.extend(1.);
+                            if t21.x.abs() > 1. || t21.y.abs() > 1. || t21.z.abs() > 1. {
                                 continue;
                             }
-                            // ensure closest points are in the same quadrant of cuboid 2 (prevents "penetration" of opposite edges)
-                            if t1.x.signum() == t22.x.signum()
-                                || t1.y.signum() == t22.y.signum()
-                                || t1.z.signum() == t22.z.signum()
+                            // ensure closest points are in the same quadrant of box 2 (prevents "penetration" of opposite edges)
+                            let t11 = inv_model_1 * closest_1.extend(1.);
+                            if t21.x.signum() != t11.x.signum()
+                                || t21.y.signum() != t11.y.signum()
+                                || t21.z.signum() != t11.z.signum()
                             {
                                 continue;
                             }

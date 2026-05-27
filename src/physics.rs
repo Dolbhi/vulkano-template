@@ -97,16 +97,6 @@ impl RigidBody {
     }
 
     pub fn update(&mut self, transform: &mut Transform, delta_secs: f32) {
-        // println!(
-        //     "[Info] RB ({:?}) vel: {:?}({:?}), bivel: {:?}({:?}), sleep_timer: {:?}",
-        //     self.transform,
-        //     self.velocity,
-        //     self.velocity.magnitude(),
-        //     self.bivelocity,
-        //     self.bivelocity.magnitude(),
-        //     self.sleep_timer
-        // );
-
         // no velocity updates if sleeping
         if self.is_awake() {
             if self.velocity.magnitude2() < WAKE_VEL_SQR
@@ -127,15 +117,22 @@ impl RigidBody {
                 *t += self.velocity * delta_secs;
                 *r = geo_alg::bivec_exp((delta_secs / 2.) * self.bivelocity).into_quaternion() * *r;
             });
-            println!(
-                "[Debug] Post phy update model of {:?}: {:?}",
-                self.transform,
-                transform.get_local_model()
-            );
         } else {
             self.velocity = Vector::zero();
             self.bivelocity = Vector::zero();
         }
+
+        println!(
+            "[Info] RB ({:?}) post update\n\tpos: {:?}\n\trot: {:?}\n\tvel: {:?}({:?})\n\tbiv: {:?}({:?})\n\tsleep_timer: {:?}",
+            self.transform,
+            transform.get_local_transform().translation,
+            transform.get_local_transform().rotation,
+            self.velocity,
+            self.velocity.magnitude(),
+            self.bivelocity,
+            self.bivelocity.magnitude(),
+            self.sleep_timer
+        );
 
         self.contact_refs.clear();
         if self.caching_contacts {
