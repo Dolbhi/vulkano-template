@@ -4,11 +4,11 @@ use cgmath::{InnerSpace, Matrix3, One, SquareMatrix};
 use std::sync::{atomic::AtomicUsize, Arc, RwLock};
 
 const PEN_RESTITUTION: f32 = 1.; // useless for now
-const MIN_BOUNCE_VEL: f32 = 1.; // time step dependent
+const MIN_BOUNCE_VEL: f32 = 0.2; // time step dependent
 const MIN_CONTACT_VEL: f32 = 0.005; // time step dependent
 const ANGULAR_MOVE_LIMIT_RAD: f32 = 0.5;
 const MAX_CONTACT_AGE: u8 = 3;
-const VELOCITY_ITER_LIMIT: u32 = 100;
+const VELOCITY_ITER_LIMIT: u32 = 500;
 const STATIC_FRICTION_COEFF: f32 = 2.;
 const DYNAMIC_FRICTION_COEFF: f32 = 3.;
 
