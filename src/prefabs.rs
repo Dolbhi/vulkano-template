@@ -279,12 +279,14 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         rigidbody // , TransformTracker("prefab")
     );
 
-    let transform = loader.world.transforms.add_transform(
-        TransformCreateInfo::from([1.9, 5.4, 1.9]).set_rotation(Quaternion::from_axis_angle(
-            [(0.5f32).sqrt(), 0., (0.5f32).sqrt()].into(),
-            Rad(PI / 3.),
-        )),
-    );
+    // let transform = loader.world.transforms.add_transform(
+    //     TransformCreateInfo::from([1.9, 5.4, 1.9]).set_rotation(Quaternion::from_axis_angle(
+    //         [(0.5f32).sqrt(), 0., (0.5f32).sqrt()].into(),
+    //         Rad(PI / 3.),
+    //     )),
+    // );
+
+    let transform = loader.world.transforms.add_transform([0., 7., 0.]);
     let mut rigidbody = RigidBody::new(transform);
     rigidbody.gravity_multiplier = 0.0;
     rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
