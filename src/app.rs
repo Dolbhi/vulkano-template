@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cgmath::{InnerSpace, One, Quaternion, Vector3, Vector4};
+use cgmath::{InnerSpace, Matrix3, One, Quaternion, Vector3, Vector4};
 use legion::*;
 
 // use rand::Rng;
@@ -682,26 +682,57 @@ impl App {
                     .map(|(transform_id, rigidbody)| {
                         // let a = RwLock::new(RigidBody::new(*transform_id));
                         let read = rigidbody.try_read().unwrap();
-                        let pos = transforms
-                            .get_transform(transform_id)
-                            .unwrap()
-                            .get_local_transform()
-                            .translation;
-                        let a = GPUAABB {
-                            min: Into::<[f32; 3]>::into(*pos).into(),
-                            max: Into::<[f32; 3]>::into(pos + read.velocity * 0.2).into(),
-                            color: [1., 0., 0., 1.],
-                        };
-                        let b = GPUAABB {
-                            min: Into::<[f32; 3]>::into(*pos).into(),
-                            max: Into::<[f32; 3]>::into(pos + read.bivelocity * 0.2).into(),
-                            color: [0., 0., 1., 1.],
-                        };
-                        vec![a, b]
+                        let model = transforms.get_global_model(transform_id).unwrap();
+                        let pos = model[3].truncate();
+                        let rotation = Matrix3::from_cols(
+                            model[0].truncate(),
+                            model[1].truncate(),
+                            model[2].truncate(),
+                        );
+
+                        [
+                            [-1., -1., -1.],
+                            [1., -1., -1.],
+                            [-1., 1., -1.],
+                            [-1., -1., 1.],
+                            [-1., 1., 1.],
+                            [1., -1., 1.],
+                            [1., 1., -1.],
+                            [1., 1., 1.],
+                        ]
+                        .map(|c| {
+                            let v: Vector3<f32> = c.into();
+                            let d = rotation * v;
+                            let p = d + pos;
+                            GPUAABB {
+                                min: Into::<[f32; 3]>::into(p).into(),
+                                max: Into::<[f32; 3]>::into(p + read.point_velocity(d) * 0.2)
+                                    .into(),
+                                color: [1., 0., 0., 1.],
+                            }
+                        })
+
+                        // let pos = transforms
+                        //     .get_transform(transform_id)
+                        //     .unwrap()
+                        //     .get_local_transform()
+                        //     .translation;
+                        // let a = GPUAABB {
+                        //     min: Into::<[f32; 3]>::into(*pos).into(),
+                        //     max: Into::<[f32; 3]>::into(pos + read.velocity * 0.2).into(),
+                        //     color: [1., 0., 0., 1.],
+                        // };
+                        // let b = GPUAABB {
+                        //     min: Into::<[f32; 3]>::into(*pos).into(),
+                        //     max: Into::<[f32; 3]>::into(pos + read.bivelocity * 0.2).into(),
+                        //     color: [0., 0., 1., 1.],
+                        // };
+                        // vec![a, b]
                     })
-                    .collect::<Vec<Vec<GPUAABB>>>()
-                    .into_iter()
                     .flatten();
+                // .collect::<Vec<Vec<GPUAABB>>>()
+                // .into_iter()
+                // .flatten();
 
                 frame.update_box_data(bounding_boxes.into_iter(), lines.into_iter());
 
