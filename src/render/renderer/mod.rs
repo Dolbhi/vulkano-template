@@ -1,12 +1,12 @@
 mod deferred_renderer;
 pub mod systems {
-    mod bounding_box_system;
     mod draw_system;
     mod lighting_system;
+    mod line_system;
 
-    pub use bounding_box_system::BoundingBoxSystem;
     pub use draw_system::DrawSystem;
     pub use lighting_system::LightingSystem;
+    pub use line_system::LineSystem;
 }
 
 pub use deferred_renderer::DeferredRenderer;

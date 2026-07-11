@@ -1,4 +1,5 @@
 use std::{
+    default,
     sync::{
         atomic::{AtomicBool, AtomicU64},
         Arc, Mutex, RwLock,
@@ -674,7 +675,35 @@ impl App {
                     }
                 }
 
-                frame.update_box_data(bounding_boxes.into_iter());
+                // lines (currently only vel lines in red and bivel in blue)
+                let mut query = <(&TransformID, &Arc<RwLock<RigidBody>>)>::query();
+                let lines = query
+                    .iter(world)
+                    .map(|(transform_id, rigidbody)| {
+                        // let a = RwLock::new(RigidBody::new(*transform_id));
+                        let read = rigidbody.try_read().unwrap();
+                        let pos = transforms
+                            .get_transform(transform_id)
+                            .unwrap()
+                            .get_local_transform()
+                            .translation;
+                        let a = GPUAABB {
+                            min: Into::<[f32; 3]>::into(*pos).into(),
+                            max: Into::<[f32; 3]>::into(pos + read.velocity * 0.2).into(),
+                            color: [1., 0., 0., 1.],
+                        };
+                        let b = GPUAABB {
+                            min: Into::<[f32; 3]>::into(*pos).into(),
+                            max: Into::<[f32; 3]>::into(pos + read.bivelocity * 0.2).into(),
+                            color: [0., 0., 1., 1.],
+                        };
+                        vec![a, b]
+                    })
+                    .collect::<Vec<Vec<GPUAABB>>>()
+                    .into_iter()
+                    .flatten();
+
+                frame.update_box_data(bounding_boxes.into_iter(), lines.into_iter());
 
                 // point lights
                 let mut point_query = <(&TransformID, &PointLightComponent)>::query();

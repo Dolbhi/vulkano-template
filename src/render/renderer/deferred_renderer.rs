@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use super::{
-    systems::{BoundingBoxSystem, DrawSystem, LightingSystem},
+    systems::{DrawSystem, LightingSystem, LineSystem},
     Renderer,
 };
 use crate::{
@@ -51,7 +51,7 @@ pub struct DeferredRenderer {
     pub lit_colored_system: DrawSystem<ColoredID, Vector4<f32>>,
     pub unlit_colored_system: DrawSystem<ColoredID, Vector4<f32>>,
 
-    pub bounding_box_system: BoundingBoxSystem,
+    pub bounding_box_system: LineSystem,
 
     pub lighting_system: LightingSystem,
 }
@@ -63,6 +63,7 @@ pub struct FrameData {
 
     bounding_box_data: Uniform<[GPUAABB]>,
     last_box_index: Option<usize>,
+    last_line_index: Option<usize>,
 
     point_data: Uniform<[PointLight]>,
     last_point_index: Option<usize>,
@@ -133,7 +134,7 @@ impl DeferredRenderer {
         );
 
         // create bounding box system
-        let bounding_box_system = BoundingBoxSystem::new(
+        let bounding_box_system = LineSystem::new(
             context,
             &Subpass::from(render_pass.clone(), 2).unwrap(),
             &layout_override,
@@ -213,6 +214,7 @@ impl DeferredRenderer {
 
                 bounding_box_data,
                 last_box_index: None,
+                last_line_index: None,
 
                 point_data,
                 last_point_index: None,
@@ -337,6 +339,7 @@ impl Renderer for DeferredRenderer {
             frame.global_data.1.clone().into(),
             frame.bounding_box_data.1.clone().into(),
             frame.last_box_index,
+            frame.last_line_index,
             command_builder,
         );
 
@@ -390,8 +393,18 @@ impl FrameData {
         write_to_storage_buffer(&self.colored_data.0, obj_iter, 0);
     }
 
-    pub fn update_box_data(&mut self, boxes: impl Iterator<Item = GPUAABB>) {
+    pub fn update_box_data(
+        &mut self,
+        boxes: impl Iterator<Item = GPUAABB>,
+        lines: impl Iterator<Item = GPUAABB>,
+    ) {
         self.last_box_index = write_to_storage_buffer(&self.bounding_box_data.0, boxes, 0);
+        let offset = if let Some(off) = self.last_box_index {
+            off + 1
+        } else {
+            0
+        };
+        self.last_line_index = write_to_storage_buffer(&self.bounding_box_data.0, lines, offset);
     }
 
     pub fn update_point_lights(&mut self, point_lights: impl Iterator<Item = PointLight>) {
