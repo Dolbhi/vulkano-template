@@ -123,17 +123,17 @@ impl RigidBody {
             self.bivelocity = Vector::zero();
         }
 
-        println!(
-            "[RB Post Update] ({:?})\n\tpos: {:?}\n\trot: {:?}\n\tvel: {:?}({:?})\n\tbiv: {:?}({:?})\n\tsleep_timer: {:?}",
-            self.transform,
-            transform.get_local_transform().translation,
-            transform.get_local_transform().rotation,
-            self.velocity,
-            self.velocity.magnitude(),
-            self.bivelocity,
-            self.bivelocity.magnitude(),
-            self.sleep_timer
-        );
+        // println!(
+        //     "[RB Post Update] ({:?})\n\tpos: {:?}\n\trot: {:?}\n\tvel: {:?}({:?})\n\tbiv: {:?}({:?})\n\tsleep_timer: {:?}",
+        //     self.transform,
+        //     transform.get_local_transform().translation,
+        //     transform.get_local_transform().rotation,
+        //     self.velocity,
+        //     self.velocity.magnitude(),
+        //     self.bivelocity,
+        //     self.bivelocity.magnitude(),
+        //     self.sleep_timer
+        // );
 
         self.contact_refs.clear();
         if self.caching_contacts {
