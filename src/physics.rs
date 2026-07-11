@@ -63,6 +63,7 @@ pub struct RigidBody {
     pub principle_moi: Vector,
     pub gravity_multiplier: f32,
 
+    /// heap index of contacts this rb is a part of
     pub contact_refs: Vec<Arc<AtomicUsize>>,
     pub past_contacts: Vec<(u8, ContactIdPair)>,
 
@@ -123,7 +124,7 @@ impl RigidBody {
         }
 
         println!(
-            "[Info] RB ({:?}) post update\n\tpos: {:?}\n\trot: {:?}\n\tvel: {:?}({:?})\n\tbiv: {:?}({:?})\n\tsleep_timer: {:?}",
+            "[RB Post Update] ({:?})\n\tpos: {:?}\n\trot: {:?}\n\tvel: {:?}({:?})\n\tbiv: {:?}({:?})\n\tsleep_timer: {:?}",
             self.transform,
             transform.get_local_transform().translation,
             transform.get_local_transform().rotation,
@@ -177,12 +178,8 @@ impl RigidBody {
         }
 
         // println!(
-        //     "[Point impulse]\n\tpoint: {:?},\n\timpulse: {:?},\n\tdelta_v: {:?},\n\tdelta_bv: {:?},\n\tangular_inertia: {:?}",
-        //     point,
-        //     impulse,
-        //     impulse * self.inv_mass,
-        //     delta_bv,
-        //     angular_inertia
+        //     "[Point impulse] ({:?})\n\timpulse: {:?}\n\tnew_v: {:?}\n\tnew_b: {:?}",
+        //     self.transform, impulse, self.velocity, self.bivelocity,
         // );
     }
 

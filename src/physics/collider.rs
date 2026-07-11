@@ -33,6 +33,7 @@ pub struct CuboidCollider {
     // bounding_box: BoundingBox,
 }
 
+/// Note: Probably a useless wrapper around the bvh
 #[derive(Default)]
 pub struct ColliderSystem {
     bounds_tree: Bvh,
@@ -269,7 +270,6 @@ impl Debug for CuboidCollider {
     }
 }
 
-/// Note: Probably a useless wrapper around the bvh
 impl ColliderSystem {
     pub fn new() -> Self {
         Self {
@@ -331,6 +331,7 @@ impl ColliderSystem {
     }
 
     #[allow(clippy::collapsible_else_if)]
+    /// check overlaps in bvh for actual collisions
     pub fn get_contacts(&mut self, transforms: &mut TransformSystem) -> &mut ContactResolver {
         for (mut coll_1, mut coll_2) in self.bounds_tree.get_overlaps() {
             if let Some(rb_1) = &coll_1.rigidbody {
@@ -756,6 +757,7 @@ impl ColliderSystem {
         &mut self.contact_resolver
     }
 
+    /// gather cached contacts of rbs in new contacts and include them to contact resolver
     fn add_cached_contacts(&mut self, transform_sys: &mut TransformSystem) {
         let contacts = self.contact_resolver.get_contacts();
         let mut cached_contacts = Vec::with_capacity(contacts.len());
