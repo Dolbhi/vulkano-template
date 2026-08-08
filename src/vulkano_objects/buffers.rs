@@ -11,7 +11,7 @@ use vulkano::{
     },
     descriptor_set::{
         layout::DescriptorSetLayout, DescriptorBufferInfo, DescriptorSet, DescriptorSetWithOffsets,
-        PersistentDescriptorSet, WriteDescriptorSet,
+        WriteDescriptorSet,
     },
     device::{Device, Queue},
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
@@ -23,7 +23,7 @@ use vulkano::{
 use super::allocators::Allocators;
 
 /// Tuple containing a subbuffer and its corresponding descriptor set
-pub type Uniform<U> = (Subbuffer<U>, Arc<PersistentDescriptorSet>);
+pub type Uniform<U> = (Subbuffer<U>, Arc<DescriptorSet>);
 
 /// Buffers for verticies and indicies, essentially a struct containing mesh data
 #[derive(Debug)]
@@ -139,7 +139,7 @@ pub fn create_device_local_buffer<T: BufferContents, I: ExactSizeIterator<Item =
     .unwrap();
 
     let mut builder = AutoCommandBufferBuilder::primary(
-        &allocators.command_buffer,
+        allocators.command_buffer.clone(),
         queue.queue_family_index(),
         CommandBufferUsage::OneTimeSubmit,
     )
@@ -232,8 +232,8 @@ pub fn create_dynamic_buffers<C: BufferContents>(
     };
 
     // descriptor set is how we interface data between the buffer and the pipeline
-    let descriptor_set = PersistentDescriptorSet::new(
-        &allocators.descriptor_set,
+    let descriptor_set = DescriptorSet::new(
+        allocators.descriptor_set.clone(),
         descriptor_set_layout.clone(),
         [WriteDescriptorSet::buffer_with_range(
             0,
@@ -364,8 +364,8 @@ pub fn create_storage_buffer<T: BufferContents>(
     )
     .unwrap();
 
-    let descriptor_set = PersistentDescriptorSet::new(
-        &allocators.descriptor_set,
+    let descriptor_set = DescriptorSet::new(
+        allocators.descriptor_set.clone(),
         descriptor_set_layout.clone(),
         [WriteDescriptorSet::buffer(0, storage_buffer.clone())],
         [],

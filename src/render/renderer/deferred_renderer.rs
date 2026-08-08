@@ -173,7 +173,7 @@ impl DeferredRenderer {
                 .first_shader()
                 .pipeline
                 .create_descriptor_set(
-                    &context.allocators.descriptor_set,
+                    context.allocators.descriptor_set.clone(),
                     global_buffer.clone(),
                     0,
                 );

@@ -3,7 +3,7 @@ use std::{collections::HashMap, iter::zip, path::Path, sync::Arc};
 use cgmath::Vector4;
 use vulkano::{
     buffer::Subbuffer,
-    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
+    descriptor_set::{DescriptorSet, WriteDescriptorSet},
     image::{sampler::Sampler, view::ImageView},
 };
 
@@ -138,7 +138,7 @@ impl ResourceManager {
         &'a mut self,
         context: &'a Context,
         renderer: &'a mut DeferredRenderer,
-    ) -> ResourceRetriever {
+    ) -> ResourceRetriever<'a> {
         ResourceRetriever {
             loaded_resources: self,
             context,
@@ -487,8 +487,8 @@ fn init_material<T: Clone>(
     descriptor_writes: impl IntoIterator<Item = WriteDescriptorSet>,
 ) -> RenderSubmit<T> {
     shader.add_material(Some(
-        PersistentDescriptorSet::new(
-            &context.allocators.descriptor_set,
+        DescriptorSet::new(
+            context.allocators.descriptor_set.clone(),
             shader
                 .pipeline
                 .layout()

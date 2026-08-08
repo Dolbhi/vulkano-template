@@ -320,7 +320,7 @@ impl Bvh {
         self.root
     }
 
-    pub fn iter(&self) -> DepthIter {
+    pub fn iter(&'_ self) -> DepthIter<'_> {
         if let Some(root) = self.root {
             DepthIter {
                 current: vec![root],

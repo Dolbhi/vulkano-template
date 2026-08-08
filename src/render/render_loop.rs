@@ -3,7 +3,8 @@ use std::vec;
 
 use vulkano::{sync::GpuFuture, Validated, VulkanError};
 
-use winit::event_loop::EventLoop;
+use winit::dpi::PhysicalPosition;
+use winit::event_loop::ActiveEventLoop;
 
 use crate::RENDER_PROFILER;
 
@@ -20,7 +21,7 @@ pub struct RenderLoop {
 }
 
 impl RenderLoop {
-    pub fn new(event_loop: &EventLoop<()>) -> Self {
+    pub fn new(event_loop: &ActiveEventLoop) -> Self {
         let context: Context = Context::initialize(event_loop);
         let fences = vec![None; context.get_image_count()];
 
@@ -143,5 +144,28 @@ impl RenderLoop {
     pub fn handle_window_resize(&mut self) {
         // impacts the next update
         self.window_resized = true;
+    }
+
+    pub fn lock_cursor(&mut self) {
+        let window = &self.context.window;
+        window.set_cursor_visible(false);
+        window
+            .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+            .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
+            .unwrap();
+    }
+    pub fn unlock_cursor(&mut self) {
+        let window = &self.context.window;
+        let window_size = window.inner_size();
+        window
+            .set_cursor_position(PhysicalPosition::new(
+                window_size.width / 2,
+                window_size.height / 2,
+            ))
+            .unwrap();
+        window.set_cursor_visible(true);
+        window
+            .set_cursor_grab(winit::window::CursorGrabMode::None)
+            .unwrap();
     }
 }

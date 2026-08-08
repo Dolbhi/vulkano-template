@@ -8,7 +8,7 @@ use vulkano::{
     descriptor_set::{
         allocator::DescriptorSetAllocator,
         layout::{DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo},
-        PersistentDescriptorSet, WriteDescriptorSet,
+        DescriptorSet, WriteDescriptorSet,
     },
     device::Device,
     pipeline::{
@@ -66,23 +66,20 @@ impl PipelineHandler {
         allocators: &Allocators,
         object_count: usize,
         set: usize,
-    ) -> (Subbuffer<[T]>, Arc<PersistentDescriptorSet>) {
+    ) -> (Subbuffer<[T]>, Arc<DescriptorSet>) {
         let layout = self.layout().set_layouts()[set].clone();
 
         create_storage_buffer(allocators, layout, object_count)
     }
 
     /// Creates descriptor set with single buffer on binding 0
-    pub fn create_descriptor_set<A, T: BufferContents>(
+    pub fn create_descriptor_set<T: BufferContents>(
         &self,
-        allocator: &A,
+        allocator: Arc<dyn DescriptorSetAllocator>,
         buffer: Subbuffer<T>,
         set: usize,
-    ) -> Arc<PersistentDescriptorSet<A::Alloc>>
-    where
-        A: DescriptorSetAllocator + ?Sized,
-    {
-        PersistentDescriptorSet::new(
+    ) -> Arc<DescriptorSet> {
+        DescriptorSet::new(
             allocator,
             self.layout().set_layouts()[set].clone(),
             [WriteDescriptorSet::buffer(0, buffer)],

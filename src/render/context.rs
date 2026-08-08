@@ -7,7 +7,7 @@ use crate::{
 use egui_winit_vulkano::{Gui, GuiConfig};
 use vulkano::{
     command_buffer::{self, AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
-    device::{Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo},
+    device::{Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, Queue, QueueCreateInfo},
     image::{
         view::{ImageView, ImageViewCreateInfo},
         Image,
@@ -25,15 +25,11 @@ use vulkano::{
     },
     Validated, VulkanError,
 };
-use winit::{
-    dpi::LogicalSize,
-    event_loop::EventLoop,
-    window::{Window, WindowBuilder},
-};
+use winit::{dpi::LogicalSize, event_loop::ActiveEventLoop, window::Window};
 
 pub type Fence = FenceSignalFuture<PresentFuture<Box<dyn GpuFuture>>>;
 
-const INIT_WINDOW_SIZE: LogicalSize<f32> = LogicalSize::new(1000.0f32, 600.0);
+const INIT_WINDOW_SIZE: LogicalSize<f64> = LogicalSize::new(1000.0, 600.0);
 
 /// All relevant structs for rendering to a single window including GUI
 ///
@@ -57,15 +53,19 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn initialize(event_loop: &EventLoop<()>) -> Self {
+    pub fn initialize(event_loop: &ActiveEventLoop) -> Self {
         let instance = vulkano_objects::instance::get_instance(event_loop);
 
-        let window = Arc::new(WindowBuilder::new().build(event_loop).unwrap());
+        let window = Arc::new(
+            event_loop
+                .create_window(
+                    Window::default_attributes()
+                        .with_title("Rusty Renderer")
+                        .with_inner_size(INIT_WINDOW_SIZE),
+                )
+                .unwrap(),
+        );
         let surface = Surface::from_window(instance.clone(), window.clone()).unwrap();
-
-        // window settings
-        window.set_title("Rusty Renderer");
-        window.set_inner_size(INIT_WINDOW_SIZE);
 
         let viewport: Viewport = Viewport {
             extent: window.inner_size().into(),
@@ -80,9 +80,9 @@ impl Context {
             khr_swapchain_mutable_format: true,
             ..DeviceExtensions::empty()
         };
-        let device_features = Features {
+        let device_features = DeviceFeatures {
             fill_mode_non_solid: true,
-            ..Features::empty()
+            ..DeviceFeatures::empty()
         };
         let (physical_device, queue_family_index) =
             vulkano_objects::physical_device::select_physical_device(
@@ -230,7 +230,7 @@ impl Context {
 
         // create builder
         let mut builder = command_buffer::AutoCommandBufferBuilder::primary(
-            &self.allocators.command_buffer,
+            self.allocators.command_buffer.clone(),
             self.queue.queue_family_index(),
             command_buffer::CommandBufferUsage::OneTimeSubmit,
         )

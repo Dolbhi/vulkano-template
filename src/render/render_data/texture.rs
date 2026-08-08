@@ -97,7 +97,7 @@ pub fn load_texture(allocators: &Allocators, queue: &Arc<Queue>, path: &Path) ->
 
     // copy to image
     let mut builder = AutoCommandBufferBuilder::primary(
-        &allocators.command_buffer,
+        allocators.command_buffer.clone(),
         queue.queue_family_index(),
         CommandBufferUsage::OneTimeSubmit,
     )

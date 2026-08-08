@@ -29,14 +29,14 @@ pub fn set_style(style: &mut Style) {
 }
 
 pub fn main_menu(ctx: &Context, option_selected: &mut MenuOption) {
-    egui::Area::new("Pause Menu")
+    egui::Area::new("Pause Menu".into())
         .anchor(egui::Align2::CENTER_CENTER, (0., 0.))
         .show(ctx, |ui| {
-            egui::Frame::none()
+            egui::Frame::NONE
                 .fill(Color32::from_gray(50))
                 .inner_margin(20.)
                 .outer_margin(20.)
-                .rounding(5.)
+                .corner_radius(5.)
                 .show(ui, |ui| {
                     ui.allocate_ui_with_layout(
                         (300.0, 500.0).into(),
@@ -78,14 +78,14 @@ pub fn main_menu(ctx: &Context, option_selected: &mut MenuOption) {
 }
 
 pub fn pause_menu(ctx: &Context, option_selected: &mut MenuOption) {
-    egui::Area::new("Pause Menu")
+    egui::Area::new("Pause Menu".into())
         .anchor(egui::Align2::CENTER_CENTER, (0., 0.))
         .show(ctx, |ui| {
-            egui::Frame::none()
+            egui::Frame::NONE
                 .fill(Color32::from_gray(50))
                 .inner_margin(20.)
                 .outer_margin(20.)
-                .rounding(5.)
+                .corner_radius(5.)
                 .show(ui, |ui| {
                     ui.allocate_ui_with_layout(
                         (300.0, 500.0).into(),
@@ -162,18 +162,18 @@ pub fn debug_window(ctx: &Context, bounds_showing: u32) {
 }
 
 pub fn test_area(ctx: &Context) {
-    egui::Area::new("Pause Menu")
+    egui::Area::new("Pause Menu".into())
         .default_pos((500., 300.))
         .movable(true)
         .constrain(true)
         // .default_rect(window_rect)
         // .resizable(true)
         .show(ctx, |ui| {
-            egui::Frame::none()
+            egui::Frame::NONE
                 .fill(Color32::GREEN)
                 .inner_margin(10.)
                 .outer_margin(10.)
-                .rounding(5.)
+                .corner_radius(5.)
                 .show(ui, |ui| {
                     ui.add_sized((100., 100.), egui::Label::new("SIZED BOI"));
                     ui.label("inside frame");

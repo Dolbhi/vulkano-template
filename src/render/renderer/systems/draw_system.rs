@@ -56,7 +56,7 @@ impl<K: Ord, T: Clone> DrawSystem<K, T> {
         layout_overrides: LayoutOverrides,
     ) -> Self {
         let vertex_input_state = VertexFull::per_vertex()
-            .definition(&stages[0].entry_point.info().input_interface) //[Position::per_vertex(), Normal::per_vertex()]
+            .definition(&stages[0].entry_point) //[Position::per_vertex(), Normal::per_vertex()]
             .unwrap();
 
         let layout = layout_overrides.create_layout(context.device.clone(), &stages);
@@ -143,11 +143,11 @@ impl<K: Ord, T: Clone> DrawSystem<K, T> {
     ///
     /// be sure to call `update_object_buffer()` before hand to ensure the subbuffers corresponding to
     /// the descriptor sets are filled with updated data
-    pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
+    pub fn render<A>(
         &mut self,
         object_index: &mut u32,
         sets: impl DescriptorSetsCollection + Clone,
-        command_builder: &mut AutoCommandBufferBuilder<P, A>,
+        command_builder: &mut AutoCommandBufferBuilder<A>,
     ) {
         for pipeline_group in self.shaders.values_mut() {
             pipeline_group.draw_objects(object_index, sets.clone(), command_builder);

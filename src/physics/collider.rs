@@ -307,7 +307,7 @@ impl ColliderSystem {
         self.bounds_tree.remove(target)
     }
 
-    pub fn bounds_iter(&self) -> DepthIter {
+    pub fn bounds_iter(&'_ self) -> DepthIter<'_> {
         self.bounds_tree.iter()
     }
 
@@ -388,7 +388,7 @@ impl ColliderSystem {
             };
 
             let inv_model_1 = model_1.invert().unwrap();
-            let inv_model_2 = model_2.invert().unwrap();
+            // let inv_model_2 = model_2.invert().unwrap();
             // let inv_axes_1: Matrix3<f32> = [
             //     inv_model_1.x.truncate().into(),
             //     inv_model_1.y.truncate().into(),

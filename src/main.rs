@@ -5,7 +5,7 @@ use vulkano_template::app::App;
 
 fn main() {
     let event_loop = EventLoop::new().unwrap(); //.unwrap();
-    let mut app = App::start(&event_loop);
+    let mut app = App::start();
 
-    event_loop.run_app(&mut app);
+    let _ = event_loop.run_app(&mut app);
 }

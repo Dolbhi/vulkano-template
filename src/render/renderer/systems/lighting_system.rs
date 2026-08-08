@@ -3,7 +3,7 @@ use std::sync::Arc;
 use vulkano::{
     buffer::{BufferUsage, Subbuffer},
     command_buffer::AutoCommandBufferBuilder,
-    descriptor_set::{DescriptorSetWithOffsets, PersistentDescriptorSet, WriteDescriptorSet},
+    descriptor_set::{DescriptorSet, DescriptorSetWithOffsets, WriteDescriptorSet},
     pipeline::{
         graphics::vertex_input::{Vertex, VertexDefinition},
         PipelineBindPoint, PipelineShaderStageCreateInfo,
@@ -32,7 +32,7 @@ pub struct LightingSystem {
     // frame_data: Vec<FrameData>,
     screen_vertices: Subbuffer<[Vertex2d]>,
     point_vertices: Subbuffer<[Vertex2d]>,
-    attachments_set: Arc<PersistentDescriptorSet>,
+    attachments_set: Arc<DescriptorSet>,
     ambient_color: [f32; 4],
 }
 
@@ -44,7 +44,7 @@ impl LightingSystem {
         layout_override: &LayoutOverrides,
     ) -> PipelineHandler {
         let vertex_input_state = Vertex2d::per_vertex()
-            .definition(&stages[0].entry_point.info().input_interface)
+            .definition(&stages[0].entry_point)
             .unwrap();
 
         let layout = layout_override.create_layout(context.device.clone(), &stages);
@@ -206,9 +206,9 @@ impl LightingSystem {
         pipeline: &PipelineHandler,
         context: &Context,
         attachments: &FramebufferAttachments,
-    ) -> Arc<PersistentDescriptorSet> {
-        PersistentDescriptorSet::new(
-            &context.allocators.descriptor_set,
+    ) -> Arc<DescriptorSet> {
+        DescriptorSet::new(
+            context.allocators.descriptor_set.clone(),
             pipeline.layout().set_layouts().get(1).unwrap().clone(),
             [
                 WriteDescriptorSet::image_view(0, attachments.0.clone()),
@@ -229,7 +229,7 @@ impl LightingSystem {
         self.ambient_color = ambient_color.into();
     }
 
-    pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
+    pub fn render<A>(
         &mut self,
         // image_i: usize,
         global_set: DescriptorSetWithOffsets,
@@ -237,7 +237,7 @@ impl LightingSystem {
         dir_set: DescriptorSetWithOffsets,
         last_point_index: Option<usize>,
         last_dir_index: Option<usize>,
-        command_builder: &mut AutoCommandBufferBuilder<P, A>,
+        command_builder: &mut AutoCommandBufferBuilder<A>,
     ) {
         // NOTE: descriptor set order: global, attachments, point/direction
 
@@ -257,34 +257,66 @@ impl LightingSystem {
         if let Some(last_index) = last_point_index {
             let pipeline = &self.point_pipeline.pipeline;
             let layout = self.point_pipeline.layout();
-            command_builder
-                .bind_pipeline_graphics(pipeline.clone())
-                .unwrap()
-                .bind_descriptor_sets(
-                    PipelineBindPoint::Graphics,
-                    layout.clone(),
-                    0,
-                    vec![
-                        global_set.clone(),
-                        self.attachments_set.clone().into(),
-                        point_set,
-                    ],
-                )
-                .unwrap()
-                .bind_vertex_buffers(0, self.point_vertices.clone())
-                .unwrap()
-                .draw(
-                    self.point_vertices.len() as u32,
-                    last_index as u32 + 1,
-                    0,
-                    0,
-                )
-                .unwrap();
+            unsafe {
+                command_builder
+                    .bind_pipeline_graphics(pipeline.clone())
+                    .unwrap()
+                    .bind_descriptor_sets(
+                        PipelineBindPoint::Graphics,
+                        layout.clone(),
+                        0,
+                        vec![
+                            global_set.clone(),
+                            self.attachments_set.clone().into(),
+                            point_set,
+                        ],
+                    )
+                    .unwrap()
+                    .bind_vertex_buffers(0, self.point_vertices.clone())
+                    .unwrap()
+                    .draw(
+                        self.point_vertices.len() as u32,
+                        last_index as u32 + 1,
+                        0,
+                        0,
+                    )
+                    .unwrap();
+            }
         }
         // directional lights
         if let Some(last_index) = last_dir_index {
             let pipeline = &self.direction_pipeline.pipeline;
             let layout = self.direction_pipeline.layout();
+            unsafe {
+                command_builder
+                    .bind_pipeline_graphics(pipeline.clone())
+                    .unwrap()
+                    .bind_descriptor_sets(
+                        PipelineBindPoint::Graphics,
+                        layout.clone(),
+                        0,
+                        vec![
+                            global_set.clone(),
+                            self.attachments_set.clone().into(),
+                            dir_set,
+                        ],
+                    )
+                    .unwrap()
+                    .bind_vertex_buffers(0, self.screen_vertices.clone())
+                    .unwrap()
+                    .draw(
+                        self.screen_vertices.len() as u32,
+                        last_index as u32 + 1,
+                        0,
+                        0,
+                    )
+                    .unwrap();
+            }
+        }
+        // ambient light
+        let pipeline = &self.ambient_pipeline.pipeline;
+        let layout = self.ambient_pipeline.layout();
+        unsafe {
             command_builder
                 .bind_pipeline_graphics(pipeline.clone())
                 .unwrap()
@@ -292,47 +324,21 @@ impl LightingSystem {
                     PipelineBindPoint::Graphics,
                     layout.clone(),
                     0,
-                    vec![
-                        global_set.clone(),
-                        self.attachments_set.clone().into(),
-                        dir_set,
-                    ],
+                    vec![global_set.clone(), self.attachments_set.clone().into()],
+                )
+                .unwrap()
+                .push_constants(
+                    layout.clone(),
+                    0,
+                    shaders::GPUAmbientData {
+                        ambient_color: self.ambient_color,
+                    },
                 )
                 .unwrap()
                 .bind_vertex_buffers(0, self.screen_vertices.clone())
                 .unwrap()
-                .draw(
-                    self.screen_vertices.len() as u32,
-                    last_index as u32 + 1,
-                    0,
-                    0,
-                )
+                .draw(self.screen_vertices.len() as u32, 1, 0, 0)
                 .unwrap();
         }
-        // ambient light
-        let pipeline = &self.ambient_pipeline.pipeline;
-        let layout = self.ambient_pipeline.layout();
-        command_builder
-            .bind_pipeline_graphics(pipeline.clone())
-            .unwrap()
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                layout.clone(),
-                0,
-                vec![global_set.clone(), self.attachments_set.clone().into()],
-            )
-            .unwrap()
-            .push_constants(
-                layout.clone(),
-                0,
-                shaders::GPUAmbientData {
-                    ambient_color: self.ambient_color,
-                },
-            )
-            .unwrap()
-            .bind_vertex_buffers(0, self.screen_vertices.clone())
-            .unwrap()
-            .draw(self.screen_vertices.len() as u32, 1, 0, 0)
-            .unwrap();
     }
 }

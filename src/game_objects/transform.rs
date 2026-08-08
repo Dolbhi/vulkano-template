@@ -111,7 +111,7 @@ impl Transform {
         self.global_model = None;
     }
 
-    pub fn get_local_transform(&self) -> TransformView {
+    pub fn get_local_transform(&'_ self) -> TransformView<'_> {
         TransformView {
             translation: &self.translation,
             rotation: &self.rotation,

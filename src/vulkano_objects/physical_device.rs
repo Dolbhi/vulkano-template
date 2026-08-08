@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use vulkano::device::physical::{PhysicalDevice, PhysicalDeviceType};
-use vulkano::device::{DeviceExtensions, Features, QueueFlags};
+use vulkano::device::{DeviceExtensions, DeviceFeatures, QueueFlags};
 use vulkano::instance::Instance;
 use vulkano::swapchain::Surface;
 
@@ -12,7 +12,7 @@ pub fn select_physical_device(
     instance: &Arc<Instance>,
     surface: Arc<Surface>,
     device_extensions: &DeviceExtensions,
-    device_features: &Features,
+    device_features: &DeviceFeatures,
 ) -> (Arc<PhysicalDevice>, u32) {
     instance
         .enumerate_physical_devices()

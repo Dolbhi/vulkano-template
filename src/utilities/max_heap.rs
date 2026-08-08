@@ -207,7 +207,7 @@ impl<K: Ord + Copy, T> MaxHeap<K, T> {
         index * 2 + 1
     }
 
-    pub fn iter(&self) -> HeapIter<K, T> {
+    pub fn iter(&'_ self) -> HeapIter<'_, K, T> {
         HeapIter {
             next_index: 0,
             heap: self,

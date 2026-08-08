@@ -39,7 +39,7 @@ impl LineSystem {
         );
 
         let vertex_input_state = Vertex3d::per_vertex()
-            .definition(&stages[0].entry_point.info().input_interface) //[Position::per_vertex(), Normal::per_vertex()]
+            .definition(&stages[0].entry_point) //[Position::per_vertex(), Normal::per_vertex()]
             .unwrap();
         let layout = layout_overrides.create_layout(context.device.clone(), &stages);
 
@@ -126,7 +126,7 @@ impl LineSystem {
     //     (transform, colour)
     // }
 
-    pub fn render<A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
+    pub fn render<A>(
         &mut self,
         // image_i: usize,
         global_set: DescriptorSetWithOffsets,

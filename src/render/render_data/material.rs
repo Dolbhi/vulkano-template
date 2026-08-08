@@ -6,8 +6,8 @@ use std::{
 
 use cgmath::Matrix4;
 use vulkano::{
-    command_buffer::{allocator::CommandBufferAllocator, AutoCommandBufferBuilder},
-    descriptor_set::{DescriptorSetsCollection, PersistentDescriptorSet},
+    command_buffer::AutoCommandBufferBuilder,
+    descriptor_set::{DescriptorSet, DescriptorSetsCollection},
     pipeline::{PipelineBindPoint, PipelineLayout},
 };
 
@@ -33,7 +33,7 @@ pub type RenderSubmit<T> = Arc<Mutex<Vec<(Arc<MeshBuffers<VertexFull>>, Matrix4<
 
 struct Material<T: Clone> {
     /// DOCTODO: what does descriptor set do?????
-    pub descriptor_set: Option<Arc<PersistentDescriptorSet>>,
+    pub descriptor_set: Option<Arc<DescriptorSet>>,
     pending_objects: RenderSubmit<T>,
     pending_meshes: Vec<Arc<MeshBuffers<VertexFull>>>,
 }
@@ -66,11 +66,11 @@ impl<T: Clone> Shader<T> {
     /// *  `descriptor_sets` - Descriptor sets of buffers containing transform + additional data
     /// (See: [AutoCommandBufferBuilder::bind_descriptor_sets])
     /// *  `command_builder` - i builda da commands
-    pub fn draw_objects<C, A: CommandBufferAllocator>(
+    pub fn draw_objects<A>(
         &mut self,
         object_index: &mut u32,
         descriptor_sets: impl DescriptorSetsCollection,
-        command_builder: &mut AutoCommandBufferBuilder<C, A>,
+        command_builder: &mut AutoCommandBufferBuilder<A>,
         // objects: &mut HashMap<MaterialID, Vec<Arc<RenderObject<T>>>>,
     ) {
         // bind pipeline
@@ -102,15 +102,17 @@ impl<T: Clone> Shader<T> {
                         // New mesh, draw old mesh and bind new one
 
                         // draw desired number of old mesh
-                        command_builder
-                            .draw_indexed(
-                                last_buffer_len as u32,
-                                instance_count,
-                                0,
-                                0,
-                                *object_index,
-                            )
-                            .unwrap();
+                        unsafe {
+                            command_builder
+                                .draw_indexed(
+                                    last_buffer_len as u32,
+                                    instance_count,
+                                    0,
+                                    0,
+                                    *object_index,
+                                )
+                                .unwrap();
+                        }
 
                         // bind new mesh
                         command_builder
@@ -141,9 +143,11 @@ impl<T: Clone> Shader<T> {
             // Draw last mesh
             if instance_count > 0 {
                 // draw
-                command_builder
-                    .draw_indexed(last_buffer_len as u32, instance_count, 0, 0, *object_index)
-                    .unwrap();
+                unsafe {
+                    command_builder
+                        .draw_indexed(last_buffer_len as u32, instance_count, 0, 0, *object_index)
+                        .unwrap();
+                }
                 *object_index += instance_count;
             }
 
@@ -153,7 +157,7 @@ impl<T: Clone> Shader<T> {
     }
 
     /// creates a material and returns a mutex vec for submitting render objects
-    pub fn add_material(&mut self, set: Option<Arc<PersistentDescriptorSet>>) -> RenderSubmit<T> {
+    pub fn add_material(&mut self, set: Option<Arc<DescriptorSet>>) -> RenderSubmit<T> {
         let pending_objects = Arc::new(Mutex::new(vec![]));
         let material = Material {
             descriptor_set: set,
@@ -195,10 +199,10 @@ impl<T: Clone> Shader<T> {
 
 impl<T: Clone> Material<T> {
     /// bind material sets starting from set 2
-    fn bind_sets<L, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
+    fn bind_sets<A>(
         &self,
         layout: &Arc<PipelineLayout>,
-        command_builder: &mut AutoCommandBufferBuilder<L, A>,
+        command_builder: &mut AutoCommandBufferBuilder<A>,
     ) {
         if let Some(set) = &self.descriptor_set {
             command_builder

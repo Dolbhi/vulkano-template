@@ -13,9 +13,7 @@ use legion::*;
 // use rand::Rng;
 use winit::{
     application::ApplicationHandler,
-    dpi::PhysicalPosition,
     event::{DeviceEvent, ElementState, KeyEvent, MouseButton, WindowEvent},
-    event_loop::EventLoop,
     keyboard::{Key, NamedKey},
 };
 
@@ -90,10 +88,14 @@ enum GameState {
     Paused,
 }
 
-pub struct App {
+struct Graphics {
     render_loop: RenderLoop,
     renderer: DeferredRenderer,
     resources: ResourceManager,
+}
+
+pub struct App {
+    graphics: Option<Graphics>,
     world: Arc<Mutex<GameWorld>>,
     camera_rotation: Quaternion<f32>,
     game_thread: GameWorldThread,
@@ -120,33 +122,19 @@ struct GameWorldThread {
 // }
 
 impl App {
-    pub fn start(event_loop: &EventLoop<()>) -> Self {
+    pub fn start() -> Self {
         println!("Welcome to THE RUSTY RENDERER!");
         println!("Press WASD, SPACE and LSHIFT to move and Q to swap materials");
         println!("Press O to spawn a cube at the camera, press I to filter the depth shown");
         println!("Press P to pause the logic loop and = to advance it by 1 frame");
         println!("[TODO] Press F to toggle camera light");
 
-        let init_start_time = Instant::now();
-
-        let render_loop = RenderLoop::new(event_loop);
-        let renderer = DeferredRenderer::new(&render_loop.context);
-        let resources = ResourceManager::new(&render_loop.context);
-
-        render_loop.context.gui.context().style_mut(ui::set_style);
-
-        let render_init_elapse = init_start_time.elapsed().as_millis();
-
         let world = Arc::new(Mutex::new(GameWorld::new()));
         let game_thread = GameWorldThread::new(world.clone());
         game_thread.set_paused(true);
 
-        println!("[Benchmarking] render init: {} ms", render_init_elapse,);
-
         Self {
-            render_loop,
-            renderer,
-            resources,
+            graphics: None,
             inputs: InputState::default(),
             world,
             camera_rotation: Quaternion::one(),
@@ -159,6 +147,11 @@ impl App {
     }
 
     fn load_level(&mut self, id: i32) -> Result<(), String> {
+        let graphics = self
+            .graphics
+            .as_mut()
+            .ok_or_else(|| "Graphics not loaded yet")?;
+
         // let load_start = Instant::now();
 
         // println!(
@@ -178,9 +171,9 @@ impl App {
 
         let world = &mut *self.world.lock().unwrap();
         world.clear();
-        let resources = &mut self
+        let resources = &mut graphics
             .resources
-            .begin_retrieving(&self.render_loop.context, &mut self.renderer);
+            .begin_retrieving(&graphics.render_loop.context, &mut graphics.renderer);
 
         loader(WorldLoader { world, resources });
 
@@ -318,449 +311,455 @@ impl App {
     ///         - Upload all render data
     ///     - Build command buffer and display
     fn update_render(&mut self) {
-        // do render loop
-        let extends = self.render_loop.context.window.inner_size();
-        self.render_loop
-            // render update starts here
-            .update(&mut self.renderer, |renderer, image_i, context| {
-                let GameWorld {
-                    world,
-                    transforms,
-                    colliders,
-                    camera,
-                    fixed_seconds,
-                    last_delta_time,
-                    inputs,
-                    ..
-                } = &mut *self.world.lock().unwrap();
-                transforms.update_interpolation(*last_delta_time);
+        if let Some(graphics) = self.graphics.as_mut() {
+            // do render loop
+            let extends = graphics.render_loop.context.window.inner_size();
+            graphics
+                .render_loop
+                // render update starts here
+                .update(&mut graphics.renderer, |renderer, image_i, context| {
+                    let GameWorld {
+                        world,
+                        transforms,
+                        colliders,
+                        camera,
+                        fixed_seconds,
+                        last_delta_time,
+                        inputs,
+                        ..
+                    } = &mut *self.world.lock().unwrap();
+                    transforms.update_interpolation(*last_delta_time);
 
-                // sync inputs
-                if self.game_state == GameState::Playing {
-                    inputs.movement = self.inputs.get_move();
-                    camera.set_rotation(self.camera_rotation);
+                    // sync inputs
+                    if self.game_state == GameState::Playing {
+                        inputs.movement = self.inputs.get_move();
+                        camera.set_rotation(self.camera_rotation);
 
-                    // allow moving while frozen
-                    if self
-                        .game_thread
-                        .paused
-                        .load(std::sync::atomic::Ordering::Acquire)
-                    {
-                        // move cam
-                        inputs.move_transform(
-                            transforms.get_transform_mut(&camera.transform).unwrap(),
-                            Instant::now()
-                                .duration_since(self.last_frame_time)
-                                .as_secs_f32(),
-                        );
-                    }
-                }
-                camera.sync_transform(transforms);
-
-                // update basic mat swap
-                if self.inputs.q.consume_button_down() {
-                    let mut query = <(&mut MaterialSwapper<()>, &mut RenderObject<()>)>::query();
-
-                    query.for_each_mut(world, |(swapper, render_object)| {
-                        let next_mat = swapper.swap_material();
-                        // println!("Swapped mat: {:?}", next_mat);
-                        render_object.material = next_mat;
-                    });
-                }
-
-                // add random bounds
-                if self.inputs.o.consume_button_down() {
-                    // let mut rng = rand::thread_rng();
-
-                    // let pos: Vector3<f32> = Vector3::new(
-                    //     rng.gen_range(-8.0..8.0),
-                    //     rng.gen_range(-8.0..8.0),
-                    //     rng.gen_range(-8.0..8.0),
-                    // );
-                    // let scale = Vector3::new(
-                    //     rng.gen_range(0.0..2.0),
-                    //     rng.gen_range(0.0..2.0),
-                    //     rng.gen_range(0.0..2.0),
-                    // );
-
-                    // let transform =
-                    //     transforms.add_transform(TransformCreateInfo::from(pos).set_scale(scale));
-
-                    // create unit cube at cam position and rotation
-                    let cam_transform = transforms
-                        .get_transform(&camera.transform)
-                        .unwrap()
-                        .get_local_transform();
-                    let pos = *cam_transform.translation;
-                    let rot = *cam_transform.rotation;
-
-                    let transform =
-                        transforms.add_transform(TransformCreateInfo::from(pos).set_rotation(rot));
-
-                    let mut rigidbody = RigidBody::new(transform);
-                    // rigidbody.gravity_multiplier = 0.0;
-                    rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
-                    let rigidbody = Arc::new(RwLock::new(rigidbody));
-
-                    let collider = CuboidCollider::new(transform, Some(rigidbody.clone()));
-                    let collider = colliders.add(collider, transforms);
-
-                    let mut resource_loader = self.resources.begin_retrieving(context, renderer);
-                    let red_material = resource_loader.load_solid_material([1., 0., 0., 1.], true);
-                    let ro = resource_loader.load_ro(
-                        crate::render::resource_manager::MeshID::Cube,
-                        red_material.0,
-                        true,
-                    );
-
-                    load_object_with_transform!(world, transform, collider, ro, rigidbody);
-                }
-
-                // camera data
-                // let cam_model = transforms.get_slerp_model(&camera.transform).unwrap();
-                let global_data = GPUGlobalData::from_camera(camera, extends);
-
-                // TODO: have `deferred_renderer` provide this method since it defines the RO types
-                // P.S. Could also have a generic method to handle any RO type
-                // P.P.S Could also have a generic method to handle any world queries with iteration???
-                {
-                    // update basic render objects
-                    let mut query = <(&TransformID, &mut RenderObject<()>)>::query();
-                    // println!("==== RENDER OBJECT DATA ====");
-                    for (transform_id, render_object) in query.iter_mut(world) {
-                        render_object.update_and_upload(transform_id, transforms);
-                    }
-
-                    let mut query = <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query();
-                    // println!("==== RENDER COLORED DATA ====");
-                    for (transform_id, render_object) in query.iter_mut(world) {
-                        render_object.update_and_upload(transform_id, transforms);
-                    }
-                }
-
-                // get frame data struct for upload
-                let frame = renderer.prepare_frame(image_i);
-                frame.update_global_data(global_data);
-
-                // bounding box
-                if self.bounds_debug_depth == Some(colliders.tree_depth()) {
-                    self.bounds_debug_depth = None;
-                }
-
-                // currently possible to exceed the bounding box rendering buffer limit with like 12 colliders
-                let mut bounding_boxes: Vec<GPUAABB> =
-                    if let Some(debug_depth) = self.bounds_debug_depth {
-                        colliders
-                            .bounds_iter()
-                            .filter(|(_, depth)| *depth == debug_depth)
-                            .map(|(bounds, depth)| {
-                                let mag = 1. / (depth as f32 + 1.);
-                                let min_cast: [f32; 3] = bounds.min.into();
-                                let max_cast: [f32; 3] = bounds.max.into();
-                                GPUAABB {
-                                    min: min_cast.into(),
-                                    max: max_cast.into(),
-                                    color: [1., mag, mag, 1.],
-                                }
-                            })
-                            .collect()
-
-                        // // show overlaps
-                        // for (coll_1, coll_2) in colliders.get_potential_overlaps() {
-                        //     let bounds_1 = coll_1.get_bounds();
-                        //     let bounds_2 = coll_2.get_bounds();
-
-                        //     let centre = bounds_1.centre();
-                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [0., 1., 0., 1.],
-                        //     });
-
-                        //     let centre = bounds_2.centre();
-                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [1., 1., 0., 1.],
-                        //     });
-                        // }
-                        // // show contacts
-                        // let mut contacts = colliders.get_contacts(transforms);
-                        // for contact in contacts.get_contacts() {
-                        //     let (position, normal, _) = contact.get_debug_info();
-
-                        //     // contact point
-                        //     let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [0., 0., 1., 1.],
-                        //     });
-
-                        //     // normal indicator
-                        //     let min_cast: [f32; 3] =
-                        //         (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
-                        //     let max_cast: [f32; 3] =
-                        //         (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [0., 0., 1., 1.],
-                        //     });
-                        // }
-                        // contacts.clear();
-
-                        // frame.upload_box_data(bounding_boxes.into_iter());
-                    } else {
-                        colliders
-                            .bounds_iter()
-                            .map(|(bounds, depth)| {
-                                let mag = 1. / (depth as f32 + 1.);
-                                let min_cast: [f32; 3] = bounds.min.into();
-                                let max_cast: [f32; 3] = bounds.max.into();
-                                GPUAABB {
-                                    min: min_cast.into(),
-                                    max: max_cast.into(),
-                                    color: [1., mag, mag, 1.],
-                                }
-                            })
-                            .collect()
-
-                        // // show overlaps
-                        // for (coll_1, coll_2) in colliders.get_potential_overlaps() {
-                        //     let bounds_1 = coll_1.get_bounds();
-                        //     let bounds_2 = coll_2.get_bounds();
-
-                        //     let centre = bounds_1.centre();
-                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [0., 1., 0., 1.],
-                        //     });
-
-                        //     let centre = bounds_2.centre();
-                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [1., 1., 0., 1.],
-                        //     });
-                        // }
-                        // // show contacts
-                        // let mut contacts = colliders.get_contacts(transforms);
-                        // for contact in contacts.get_contacts() {
-                        //     let (position, normal, _) = contact.get_debug_info();
-
-                        //     // contact point
-                        //     let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [0., 0., 1., 1.],
-                        //     });
-
-                        //     // normal indicator
-                        //     let min_cast: [f32; 3] =
-                        //         (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
-                        //     let max_cast: [f32; 3] =
-                        //         (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [0., 0., 1., 1.],
-                        //     });
-                        // }
-                        // contacts.clear();
-
-                        // frame.upload_box_data(bounding_boxes.into_iter());
-                    };
-                // show overlaps
-                for (coll_1, coll_2) in colliders.get_potential_overlaps() {
-                    let bounds_1 = coll_1.calc_bounding(transforms);
-                    let bounds_2 = coll_2.calc_bounding(transforms);
-
-                    let centre = bounds_1.centre();
-                    let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                    let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                    bounding_boxes.push(GPUAABB {
-                        min: min_cast.into(),
-                        max: max_cast.into(),
-                        color: [0., 1., 0., 1.],
-                    });
-
-                    let centre = bounds_2.centre();
-                    let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                    let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                    bounding_boxes.push(GPUAABB {
-                        min: min_cast.into(),
-                        max: max_cast.into(),
-                        color: [1., 1., 0., 1.],
-                    });
-                }
-                // show contacts
-                let contacts = colliders.get_last_contacts();
-                for (position, normal, age) in contacts {
-                    // colour
-                    let color = if *age == 0 {
-                        [0., 0., 1., 1.]
-                    } else {
-                        [0., 1., 1., 1.]
-                    };
-
-                    // contact point
-                    let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
-                    let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
-                    bounding_boxes.push(GPUAABB {
-                        min: min_cast.into(),
-                        max: max_cast.into(),
-                        color,
-                    });
-
-                    // normal indicator
-                    let min_cast: [f32; 3] =
-                        (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
-                    let max_cast: [f32; 3] =
-                        (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
-                    bounding_boxes.push(GPUAABB {
-                        min: min_cast.into(),
-                        max: max_cast.into(),
-                        color,
-                    });
-                }
-
-                // raycast
-                let cam_model = transforms.get_global_model(&camera.transform).unwrap();
-                let raycast_result = colliders.raycast(
-                    transforms,
-                    cam_model.w.truncate(),
-                    -cam_model.z.truncate(),
-                    20.,
-                );
-                if let Some((point, coll)) = raycast_result {
-                    let min_cast: [f32; 3] = (point - Vector3::new(0.1, 0.1, 0.1)).into();
-                    let max_cast: [f32; 3] = (point + Vector3::new(0.1, 0.1, 0.1)).into();
-                    bounding_boxes.push(GPUAABB {
-                        min: min_cast.into(),
-                        max: max_cast.into(),
-                        color: [1., 0., 1., 1.],
-                    });
-
-                    if self.inputs.lmb.consume_button_down() {
-                        if let Some(rigidbody) = coll.get_rigidbody() {
-                            let mut model =
-                                transforms.get_global_model(coll.get_transform()).unwrap();
-                            quick_inverse(&mut model);
-                            // let normal = CuboidCollider::point_normal(point, &model).normalize();
-
-                            let rotation = transforms
-                                .get_transform(coll.get_transform())
-                                .unwrap()
-                                .get_local_transform()
-                                .rotation;
-                            let point = point + model.w.truncate();
-                            rigidbody.write().unwrap().apply_impulse(
-                                point,
-                                -1.5 * cam_model.z.truncate().normalize(),
-                                *rotation,
+                        // allow moving while frozen
+                        if self
+                            .game_thread
+                            .paused
+                            .load(std::sync::atomic::Ordering::Acquire)
+                        {
+                            // move cam
+                            inputs.move_transform(
+                                transforms.get_transform_mut(&camera.transform).unwrap(),
+                                Instant::now()
+                                    .duration_since(self.last_frame_time)
+                                    .as_secs_f32(),
                             );
                         }
                     }
-                }
+                    camera.sync_transform(transforms);
 
-                // lines (currently only vel lines in red and bivel in blue)
-                let mut query = <(&TransformID, &Arc<RwLock<RigidBody>>)>::query();
-                let lines = query
-                    .iter(world)
-                    .map(|(transform_id, rigidbody)| {
-                        // let a = RwLock::new(RigidBody::new(*transform_id));
-                        let read = rigidbody.try_read().unwrap();
-                        let model = transforms.get_global_model(transform_id).unwrap();
-                        let pos = model[3].truncate();
-                        let rotation = Matrix3::from_cols(
-                            model[0].truncate(),
-                            model[1].truncate(),
-                            model[2].truncate(),
+                    // update basic mat swap
+                    if self.inputs.q.consume_button_down() {
+                        let mut query =
+                            <(&mut MaterialSwapper<()>, &mut RenderObject<()>)>::query();
+
+                        query.for_each_mut(world, |(swapper, render_object)| {
+                            let next_mat = swapper.swap_material();
+                            // println!("Swapped mat: {:?}", next_mat);
+                            render_object.material = next_mat;
+                        });
+                    }
+
+                    // add random bounds
+                    if self.inputs.o.consume_button_down() {
+                        // let mut rng = rand::thread_rng();
+
+                        // let pos: Vector3<f32> = Vector3::new(
+                        //     rng.gen_range(-8.0..8.0),
+                        //     rng.gen_range(-8.0..8.0),
+                        //     rng.gen_range(-8.0..8.0),
+                        // );
+                        // let scale = Vector3::new(
+                        //     rng.gen_range(0.0..2.0),
+                        //     rng.gen_range(0.0..2.0),
+                        //     rng.gen_range(0.0..2.0),
+                        // );
+
+                        // let transform =
+                        //     transforms.add_transform(TransformCreateInfo::from(pos).set_scale(scale));
+
+                        // create unit cube at cam position and rotation
+                        let cam_transform = transforms
+                            .get_transform(&camera.transform)
+                            .unwrap()
+                            .get_local_transform();
+                        let pos = *cam_transform.translation;
+                        let rot = *cam_transform.rotation;
+
+                        let transform = transforms
+                            .add_transform(TransformCreateInfo::from(pos).set_rotation(rot));
+
+                        let mut rigidbody = RigidBody::new(transform);
+                        // rigidbody.gravity_multiplier = 0.0;
+                        rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
+                        let rigidbody = Arc::new(RwLock::new(rigidbody));
+
+                        let collider = CuboidCollider::new(transform, Some(rigidbody.clone()));
+                        let collider = colliders.add(collider, transforms);
+
+                        let mut resource_loader =
+                            graphics.resources.begin_retrieving(context, renderer);
+                        let red_material =
+                            resource_loader.load_solid_material([1., 0., 0., 1.], true);
+                        let ro = resource_loader.load_ro(
+                            crate::render::resource_manager::MeshID::Cube,
+                            red_material.0,
+                            true,
                         );
 
-                        [
-                            [-1., -1., -1.],
-                            [1., -1., -1.],
-                            [-1., 1., -1.],
-                            [-1., -1., 1.],
-                            [-1., 1., 1.],
-                            [1., -1., 1.],
-                            [1., 1., -1.],
-                            [1., 1., 1.],
-                        ]
-                        .map(|c| {
-                            let v: Vector3<f32> = c.into();
-                            let d = rotation * v;
-                            let p = d + pos;
-                            GPUAABB {
-                                min: Into::<[f32; 3]>::into(p).into(),
-                                max: Into::<[f32; 3]>::into(p + read.point_velocity(d) * 0.2)
-                                    .into(),
-                                color: [1., 0., 0., 1.],
+                        load_object_with_transform!(world, transform, collider, ro, rigidbody);
+                    }
+
+                    // camera data
+                    // let cam_model = transforms.get_slerp_model(&camera.transform).unwrap();
+                    let global_data = GPUGlobalData::from_camera(camera, extends);
+
+                    // TODO: have `deferred_renderer` provide this method since it defines the RO types
+                    // P.S. Could also have a generic method to handle any RO type
+                    // P.P.S Could also have a generic method to handle any world queries with iteration???
+                    {
+                        // update basic render objects
+                        let mut query = <(&TransformID, &mut RenderObject<()>)>::query();
+                        // println!("==== RENDER OBJECT DATA ====");
+                        for (transform_id, render_object) in query.iter_mut(world) {
+                            render_object.update_and_upload(transform_id, transforms);
+                        }
+
+                        let mut query = <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query();
+                        // println!("==== RENDER COLORED DATA ====");
+                        for (transform_id, render_object) in query.iter_mut(world) {
+                            render_object.update_and_upload(transform_id, transforms);
+                        }
+                    }
+
+                    // get frame data struct for upload
+                    let frame = renderer.prepare_frame(image_i);
+                    frame.update_global_data(global_data);
+
+                    // bounding box
+                    if self.bounds_debug_depth == Some(colliders.tree_depth()) {
+                        self.bounds_debug_depth = None;
+                    }
+
+                    // currently possible to exceed the bounding box rendering buffer limit with like 12 colliders
+                    let mut bounding_boxes: Vec<GPUAABB> =
+                        if let Some(debug_depth) = self.bounds_debug_depth {
+                            colliders
+                                .bounds_iter()
+                                .filter(|(_, depth)| *depth == debug_depth)
+                                .map(|(bounds, depth)| {
+                                    let mag = 1. / (depth as f32 + 1.);
+                                    let min_cast: [f32; 3] = bounds.min.into();
+                                    let max_cast: [f32; 3] = bounds.max.into();
+                                    GPUAABB {
+                                        min: min_cast.into(),
+                                        max: max_cast.into(),
+                                        color: [1., mag, mag, 1.],
+                                    }
+                                })
+                                .collect()
+
+                        // // show overlaps
+                        // for (coll_1, coll_2) in colliders.get_potential_overlaps() {
+                        //     let bounds_1 = coll_1.get_bounds();
+                        //     let bounds_2 = coll_2.get_bounds();
+
+                        //     let centre = bounds_1.centre();
+                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [0., 1., 0., 1.],
+                        //     });
+
+                        //     let centre = bounds_2.centre();
+                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [1., 1., 0., 1.],
+                        //     });
+                        // }
+                        // // show contacts
+                        // let mut contacts = colliders.get_contacts(transforms);
+                        // for contact in contacts.get_contacts() {
+                        //     let (position, normal, _) = contact.get_debug_info();
+
+                        //     // contact point
+                        //     let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [0., 0., 1., 1.],
+                        //     });
+
+                        //     // normal indicator
+                        //     let min_cast: [f32; 3] =
+                        //         (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
+                        //     let max_cast: [f32; 3] =
+                        //         (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
+                        //     bounding_boxes.push(GPUAABB {
+                        //         min: min_cast.into(),
+                        //         max: max_cast.into(),
+                        //         color: [0., 0., 1., 1.],
+                        //     });
+                        // }
+                        // contacts.clear();
+
+                        // frame.upload_box_data(bounding_boxes.into_iter());
+                        } else {
+                            colliders
+                                .bounds_iter()
+                                .map(|(bounds, depth)| {
+                                    let mag = 1. / (depth as f32 + 1.);
+                                    let min_cast: [f32; 3] = bounds.min.into();
+                                    let max_cast: [f32; 3] = bounds.max.into();
+                                    GPUAABB {
+                                        min: min_cast.into(),
+                                        max: max_cast.into(),
+                                        color: [1., mag, mag, 1.],
+                                    }
+                                })
+                                .collect()
+
+                            // // show overlaps
+                            // for (coll_1, coll_2) in colliders.get_potential_overlaps() {
+                            //     let bounds_1 = coll_1.get_bounds();
+                            //     let bounds_2 = coll_2.get_bounds();
+
+                            //     let centre = bounds_1.centre();
+                            //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                            //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                            //     bounding_boxes.push(GPUAABB {
+                            //         min: min_cast.into(),
+                            //         max: max_cast.into(),
+                            //         color: [0., 1., 0., 1.],
+                            //     });
+
+                            //     let centre = bounds_2.centre();
+                            //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                            //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                            //     bounding_boxes.push(GPUAABB {
+                            //         min: min_cast.into(),
+                            //         max: max_cast.into(),
+                            //         color: [1., 1., 0., 1.],
+                            //     });
+                            // }
+                            // // show contacts
+                            // let mut contacts = colliders.get_contacts(transforms);
+                            // for contact in contacts.get_contacts() {
+                            //     let (position, normal, _) = contact.get_debug_info();
+
+                            //     // contact point
+                            //     let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
+                            //     let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
+                            //     bounding_boxes.push(GPUAABB {
+                            //         min: min_cast.into(),
+                            //         max: max_cast.into(),
+                            //         color: [0., 0., 1., 1.],
+                            //     });
+
+                            //     // normal indicator
+                            //     let min_cast: [f32; 3] =
+                            //         (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
+                            //     let max_cast: [f32; 3] =
+                            //         (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
+                            //     bounding_boxes.push(GPUAABB {
+                            //         min: min_cast.into(),
+                            //         max: max_cast.into(),
+                            //         color: [0., 0., 1., 1.],
+                            //     });
+                            // }
+                            // contacts.clear();
+
+                            // frame.upload_box_data(bounding_boxes.into_iter());
+                        };
+                    // show overlaps
+                    for (coll_1, coll_2) in colliders.get_potential_overlaps() {
+                        let bounds_1 = coll_1.calc_bounding(transforms);
+                        let bounds_2 = coll_2.calc_bounding(transforms);
+
+                        let centre = bounds_1.centre();
+                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [0., 1., 0., 1.],
+                        });
+
+                        let centre = bounds_2.centre();
+                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [1., 1., 0., 1.],
+                        });
+                    }
+                    // show contacts
+                    let contacts = colliders.get_last_contacts();
+                    for (position, normal, age) in contacts {
+                        // colour
+                        let color = if *age == 0 {
+                            [0., 0., 1., 1.]
+                        } else {
+                            [0., 1., 1., 1.]
+                        };
+
+                        // contact point
+                        let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color,
+                        });
+
+                        // normal indicator
+                        let min_cast: [f32; 3] =
+                            (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
+                        let max_cast: [f32; 3] =
+                            (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color,
+                        });
+                    }
+
+                    // raycast
+                    let cam_model = transforms.get_global_model(&camera.transform).unwrap();
+                    let raycast_result = colliders.raycast(
+                        transforms,
+                        cam_model.w.truncate(),
+                        -cam_model.z.truncate(),
+                        20.,
+                    );
+                    if let Some((point, coll)) = raycast_result {
+                        let min_cast: [f32; 3] = (point - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (point + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [1., 0., 1., 1.],
+                        });
+
+                        if self.inputs.lmb.consume_button_down() {
+                            if let Some(rigidbody) = coll.get_rigidbody() {
+                                let mut model =
+                                    transforms.get_global_model(coll.get_transform()).unwrap();
+                                quick_inverse(&mut model);
+                                // let normal = CuboidCollider::point_normal(point, &model).normalize();
+
+                                let rotation = transforms
+                                    .get_transform(coll.get_transform())
+                                    .unwrap()
+                                    .get_local_transform()
+                                    .rotation;
+                                let point = point + model.w.truncate();
+                                rigidbody.write().unwrap().apply_impulse(
+                                    point,
+                                    -1.5 * cam_model.z.truncate().normalize(),
+                                    *rotation,
+                                );
                             }
+                        }
+                    }
+
+                    // lines (currently only vel lines in red and bivel in blue)
+                    let mut query = <(&TransformID, &Arc<RwLock<RigidBody>>)>::query();
+                    let lines = query
+                        .iter(world)
+                        .map(|(transform_id, rigidbody)| {
+                            // let a = RwLock::new(RigidBody::new(*transform_id));
+                            let read = rigidbody.try_read().unwrap();
+                            let model = transforms.get_global_model(transform_id).unwrap();
+                            let pos = model[3].truncate();
+                            let rotation = Matrix3::from_cols(
+                                model[0].truncate(),
+                                model[1].truncate(),
+                                model[2].truncate(),
+                            );
+
+                            [
+                                [-1., -1., -1.],
+                                [1., -1., -1.],
+                                [-1., 1., -1.],
+                                [-1., -1., 1.],
+                                [-1., 1., 1.],
+                                [1., -1., 1.],
+                                [1., 1., -1.],
+                                [1., 1., 1.],
+                            ]
+                            .map(|c| {
+                                let v: Vector3<f32> = c.into();
+                                let d = rotation * v;
+                                let p = d + pos;
+                                GPUAABB {
+                                    min: Into::<[f32; 3]>::into(p).into(),
+                                    max: Into::<[f32; 3]>::into(p + read.point_velocity(d) * 0.2)
+                                        .into(),
+                                    color: [1., 0., 0., 1.],
+                                }
+                            })
+
+                            // let pos = transforms
+                            //     .get_transform(transform_id)
+                            //     .unwrap()
+                            //     .get_local_transform()
+                            //     .translation;
+                            // let a = GPUAABB {
+                            //     min: Into::<[f32; 3]>::into(*pos).into(),
+                            //     max: Into::<[f32; 3]>::into(pos + read.velocity * 0.2).into(),
+                            //     color: [1., 0., 0., 1.],
+                            // };
+                            // let b = GPUAABB {
+                            //     min: Into::<[f32; 3]>::into(*pos).into(),
+                            //     max: Into::<[f32; 3]>::into(pos + read.bivelocity * 0.2).into(),
+                            //     color: [0., 0., 1., 1.],
+                            // };
+                            // vec![a, b]
                         })
+                        .flatten();
+                    // .collect::<Vec<Vec<GPUAABB>>>()
+                    // .into_iter()
+                    // .flatten();
 
-                        // let pos = transforms
-                        //     .get_transform(transform_id)
-                        //     .unwrap()
-                        //     .get_local_transform()
-                        //     .translation;
-                        // let a = GPUAABB {
-                        //     min: Into::<[f32; 3]>::into(*pos).into(),
-                        //     max: Into::<[f32; 3]>::into(pos + read.velocity * 0.2).into(),
-                        //     color: [1., 0., 0., 1.],
-                        // };
-                        // let b = GPUAABB {
-                        //     min: Into::<[f32; 3]>::into(*pos).into(),
-                        //     max: Into::<[f32; 3]>::into(pos + read.bivelocity * 0.2).into(),
-                        //     color: [0., 0., 1., 1.],
-                        // };
-                        // vec![a, b]
-                    })
-                    .flatten();
-                // .collect::<Vec<Vec<GPUAABB>>>()
-                // .into_iter()
-                // .flatten();
+                    frame.update_box_data(bounding_boxes.into_iter(), lines.into_iter());
 
-                frame.update_box_data(bounding_boxes.into_iter(), lines.into_iter());
+                    // point lights
+                    let mut point_query = <(&TransformID, &PointLightComponent)>::query();
+                    let point_lights = point_query.iter(world).map(|(t, pl)| {
+                        let pos = transforms.get_lerp_model(t).unwrap()[3];
+                        pl.clone().into_light(pos.truncate() / pos.w)
+                    });
+                    frame.update_point_lights(point_lights);
 
-                // point lights
-                let mut point_query = <(&TransformID, &PointLightComponent)>::query();
-                let point_lights = point_query.iter(world).map(|(t, pl)| {
-                    let pos = transforms.get_lerp_model(t).unwrap()[3];
-                    pl.clone().into_light(pos.truncate() / pos.w)
+                    // directional lights
+                    // let mut dl_query = <(&TransformID, &DirectionalLightComponent)>::query();
+                    let angle = *fixed_seconds / 4.;
+                    let direction =
+                        cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
+                    let dir = DirectionLight {
+                        color: [0.5, 0.5, 0., 1.],
+                        direction: direction.extend(1.).into(),
+                    };
+                    frame.update_directional_lights([dir].into_iter());
+
+                    // ambient light
+                    renderer
+                        .lighting_system
+                        .set_ambient_color([0.1, 0.1, 0.1, 1.]);
                 });
-                frame.update_point_lights(point_lights);
-
-                // directional lights
-                // let mut dl_query = <(&TransformID, &DirectionalLightComponent)>::query();
-                let angle = *fixed_seconds / 4.;
-                let direction =
-                    cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
-                let dir = DirectionLight {
-                    color: [0.5, 0.5, 0., 1.],
-                    direction: direction.extend(1.).into(),
-                };
-                frame.update_directional_lights([dir].into_iter());
-
-                // ambient light
-                renderer
-                    .lighting_system
-                    .set_ambient_color([0.1, 0.1, 0.1, 1.]);
-            });
+        }
     }
 
     /// update key state
@@ -791,12 +790,16 @@ impl App {
                     match self.game_state {
                         GameState::Playing => {
                             self.game_state = GameState::Paused;
-                            self.unlock_cursor();
+                            if let Some(graphics) = self.graphics.as_mut() {
+                                graphics.render_loop.unlock_cursor();
+                            };
                             self.game_thread.set_paused(true);
                         }
                         GameState::Paused => {
                             self.game_state = GameState::Playing;
-                            self.lock_cursor();
+                            if let Some(graphics) = self.graphics.as_mut() {
+                                graphics.render_loop.lock_cursor();
+                            };
                             self.game_thread.set_paused(false);
                         }
                         _ => {}
@@ -838,124 +841,119 @@ impl App {
             _ => {}
         }
     }
-
-    fn lock_cursor(&mut self) {
-        let window = &self.render_loop.context.window;
-        window.set_cursor_visible(false);
-        window
-            .set_cursor_grab(winit::window::CursorGrabMode::Confined)
-            .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
-            .unwrap();
-    }
-    fn unlock_cursor(&mut self) {
-        let window = &self.render_loop.context.window;
-        let window_size = window.inner_size();
-        window
-            .set_cursor_position(PhysicalPosition::new(
-                window_size.width / 2,
-                window_size.height / 2,
-            ))
-            .unwrap();
-        window.set_cursor_visible(true);
-        window
-            .set_cursor_grab(winit::window::CursorGrabMode::None)
-            .unwrap();
-    }
 }
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        todo!()
+        if self.graphics.is_none() {
+            let init_start_time = Instant::now();
+
+            let render_loop = RenderLoop::new(event_loop);
+            let renderer = DeferredRenderer::new(&render_loop.context);
+            let resources = ResourceManager::new(&render_loop.context);
+
+            render_loop.context.gui.context().style_mut(ui::set_style);
+
+            let render_init_elapse = init_start_time.elapsed().as_millis();
+            println!("[Benchmarking] render init: {} ms", render_init_elapse,);
+            self.graphics = Some(Graphics {
+                render_loop,
+                renderer,
+                resources,
+            });
+        }
     }
 
     fn window_event(
         &mut self,
         event_loop: &winit::event_loop::ActiveEventLoop,
-        window_id: winit::window::WindowId,
+        _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        self.render_loop.context.gui.update(&event);
-        match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(_) => self.render_loop.handle_window_resize(),
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        logical_key: code,
-                        state,
-                        ..
-                    },
-                ..
-            } => self.handle_keyboard_input(code, state),
-            WindowEvent::MouseInput { state, button, .. } => {
-                if button == MouseButton::Left {
-                    self.inputs.lmb.update_state(state);
-                }
-            }
-            WindowEvent::RedrawRequested => {
-                let update_start = Instant::now();
-                // let duration_from_last_frame = update_start - self.last_frame_time;
-
-                // gui
-                let mut gui_result = MenuOption::None;
-                self.render_loop.context.gui.immediate_ui(|gui| {
-                    let ctx = &gui.context();
-
-                    ui::profiler_window(ctx);
-
-                    // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
-                    match self.game_state {
-                        GameState::MainMenu => ui::main_menu(ctx, &mut gui_result),
-                        GameState::Paused => ui::pause_menu(ctx, &mut gui_result),
-                        _ => {}
-                    };
-                });
-                match gui_result {
-                    ui::MenuOption::None => {}
-                    ui::MenuOption::LoadLevel(i) => match self.load_level(i) {
-                        Ok(()) => {
-                            self.game_state = GameState::Playing;
-                            self.lock_cursor();
-                            self.game_thread.set_paused(true);
-                        }
-                        Err(e) => println!("[Error] {e}"),
-                    },
-                    ui::MenuOption::QuitLevel => {
-                        self.game_state = GameState::MainMenu;
-                        // self.unlock_cursor();
-
-                        let mut world = self.world.lock().unwrap();
-                        world.clear();
+        if let Some(graphics) = self.graphics.as_mut() {
+            graphics.render_loop.context.gui.update(&event);
+            match event {
+                WindowEvent::CloseRequested => event_loop.exit(),
+                WindowEvent::Resized(_) => graphics.render_loop.handle_window_resize(),
+                WindowEvent::KeyboardInput {
+                    event:
+                        KeyEvent {
+                            logical_key: code,
+                            state,
+                            ..
+                        },
+                    ..
+                } => self.handle_keyboard_input(code, state),
+                WindowEvent::MouseInput { state, button, .. } => {
+                    if button == MouseButton::Left {
+                        self.inputs.lmb.update_state(state);
                     }
-                    ui::MenuOption::Quit => event_loop.exit(),
                 }
+                WindowEvent::RedrawRequested => {
+                    let update_start = Instant::now();
+                    // let duration_from_last_frame = update_start - self.last_frame_time;
 
-                // profile logic update
-                unsafe {
-                    let mut profiler = RENDER_PROFILER.take().unwrap();
-                    profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
-                    RENDER_PROFILER = Some(profiler);
+                    // gui
+                    let mut gui_result = MenuOption::None;
+                    graphics.render_loop.context.gui.immediate_ui(|gui| {
+                        let ctx = &gui.context();
+
+                        ui::profiler_window(ctx);
+
+                        // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
+                        match self.game_state {
+                            GameState::MainMenu => ui::main_menu(ctx, &mut gui_result),
+                            GameState::Paused => ui::pause_menu(ctx, &mut gui_result),
+                            _ => {}
+                        };
+                    });
+                    match gui_result {
+                        ui::MenuOption::None => {}
+                        ui::MenuOption::LoadLevel(i) => match self.load_level(i) {
+                            Ok(()) => {
+                                self.game_state = GameState::Playing;
+                                self.graphics.as_mut().unwrap().render_loop.lock_cursor();
+                                self.game_thread.set_paused(true);
+                            }
+                            Err(e) => println!("[Error] {e}"),
+                        },
+                        ui::MenuOption::QuitLevel => {
+                            self.game_state = GameState::MainMenu;
+                            // self.unlock_cursor();
+
+                            let mut world = self.world.lock().unwrap();
+                            world.clear();
+                        }
+                        ui::MenuOption::Quit => event_loop.exit(),
+                    }
+
+                    // profile logic update
+                    unsafe {
+                        let mut profiler = RENDER_PROFILER.take().unwrap();
+                        profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
+                        RENDER_PROFILER = Some(profiler);
+                    }
+
+                    self.update_render();
+
+                    unsafe {
+                        let mut profiler = RENDER_PROFILER.take().unwrap();
+                        profiler.end_frame();
+                        RENDER_PROFILER = Some(profiler);
+                    }
+
+                    self.last_frame_time = update_start;
                 }
-
-                self.update_render();
-
-                unsafe {
-                    let mut profiler = RENDER_PROFILER.take().unwrap();
-                    profiler.end_frame();
-                    RENDER_PROFILER = Some(profiler);
-                }
-
-                self.last_frame_time = update_start;
+                // WindowEvent::MainEventsCleared => self.render_loop.context.window.request_redraw(),
+                _ => (),
             }
-            // WindowEvent::MainEventsCleared => self.render_loop.context.window.request_redraw(),
-            _ => (),
         }
     }
 
     fn device_event(
         &mut self,
-        event_loop: &winit::event_loop::ActiveEventLoop,
-        device_id: winit::event::DeviceId,
+        _event_loop: &winit::event_loop::ActiveEventLoop,
+        _device_id: winit::event::DeviceId,
         event: winit::event::DeviceEvent,
     ) {
         if let DeviceEvent::MouseMotion { delta } = event {
