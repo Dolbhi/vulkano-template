@@ -135,7 +135,7 @@ pub fn profiler_window(ctx: &Context) {
         .resizable(false)
         .default_pos((20.0, 200.0))
         .show(ctx, |ui| {
-            let profiler = unsafe { LOGIC_PROFILER.lock().unwrap() };
+            let profiler = LOGIC_PROFILER.lock().unwrap();
 
             ui.label(RichText::new(profiler.summary()).monospace());
         });

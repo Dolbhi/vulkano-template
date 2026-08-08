@@ -14,7 +14,7 @@ use legion::*;
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, ElementState, KeyEvent, MouseButton, WindowEvent},
-    keyboard::{Key, NamedKey},
+    keyboard::{KeyCode, PhysicalKey},
 };
 
 use crate::{
@@ -763,28 +763,30 @@ impl App {
     }
 
     /// update key state
-    fn handle_keyboard_input(&mut self, key_code: Key, state: ElementState) {
+    fn handle_keyboard_input(&mut self, key_code: PhysicalKey, state: ElementState) {
         // let state = match state {
         //     ElementState::Pressed => Pressed,
         //     ElementState::Released => Released,
         // };
 
-        match key_code.as_ref() {
-            Key::Character("q") => {
+        match key_code {
+            PhysicalKey::Code(KeyCode::KeyQ) => {
                 self.inputs.q.update_state(state);
             }
-            Key::Character("r") => {
+            PhysicalKey::Code(KeyCode::KeyR) => {
                 if self.game_state == GameState::Playing && self.inputs.r.update_state(state) {
                     let _ = self.load_level(self.current_level);
                 }
             }
-            Key::Character("W") => self.inputs.w = state == ElementState::Pressed,
-            Key::Character("A") => self.inputs.a = state == ElementState::Pressed,
-            Key::Character("S") => self.inputs.s = state == ElementState::Pressed,
-            Key::Character("D") => self.inputs.d = state == ElementState::Pressed,
-            Key::Named(NamedKey::Space) => self.inputs.space = state == ElementState::Pressed,
-            Key::Named(NamedKey::Shift) => self.inputs.shift = state == ElementState::Pressed,
-            Key::Named(NamedKey::Escape) => {
+            PhysicalKey::Code(KeyCode::KeyW) => self.inputs.w = state == ElementState::Pressed,
+            PhysicalKey::Code(KeyCode::KeyA) => self.inputs.a = state == ElementState::Pressed,
+            PhysicalKey::Code(KeyCode::KeyS) => self.inputs.s = state == ElementState::Pressed,
+            PhysicalKey::Code(KeyCode::KeyD) => self.inputs.d = state == ElementState::Pressed,
+            PhysicalKey::Code(KeyCode::Space) => self.inputs.space = state == ElementState::Pressed,
+            PhysicalKey::Code(KeyCode::ShiftLeft) => {
+                self.inputs.shift = state == ElementState::Pressed
+            }
+            PhysicalKey::Code(KeyCode::Escape) => {
                 // pause and unpause
                 if self.inputs.escape.update_state(state) {
                     match self.game_state {
@@ -807,7 +809,7 @@ impl App {
                 };
             }
             // pause logic loop
-            Key::Character("P") => {
+            PhysicalKey::Code(KeyCode::KeyP) => {
                 if self.inputs.p.update_state(state) {
                     if self.game_state == GameState::Playing {
                         let paused = self
@@ -818,17 +820,17 @@ impl App {
                     }
                 }
             }
-            Key::Character("=") => {
+            PhysicalKey::Code(KeyCode::Equal) => {
                 // step logic loop
                 if self.inputs.equals.update_state(state) {
                     self.game_thread.step();
                 }
             }
-            Key::Character("O") => {
+            PhysicalKey::Code(KeyCode::KeyO) => {
                 // add bounding box
                 self.inputs.o.update_state(state);
             }
-            Key::Character("I") => {
+            PhysicalKey::Code(KeyCode::KeyI) => {
                 // scroll through depths
                 if self.inputs.i.update_state(state) {
                     if let Some(depth) = self.bounds_debug_depth {
@@ -846,6 +848,8 @@ impl App {
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         if self.graphics.is_none() {
+            // event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+
             let init_start_time = Instant::now();
 
             let render_loop = RenderLoop::new(event_loop);
@@ -878,7 +882,7 @@ impl ApplicationHandler for App {
                 WindowEvent::KeyboardInput {
                     event:
                         KeyEvent {
-                            logical_key: code,
+                            physical_key: code,
                             state,
                             ..
                         },
@@ -890,6 +894,7 @@ impl ApplicationHandler for App {
                     }
                 }
                 WindowEvent::RedrawRequested => {
+                    // println!("{:?}", event_loop.control_flow());
                     let update_start = Instant::now();
                     // let duration_from_last_frame = update_start - self.last_frame_time;
 
@@ -942,6 +947,14 @@ impl ApplicationHandler for App {
                         RENDER_PROFILER = Some(profiler);
                     }
 
+                    self.graphics
+                        .as_mut()
+                        .unwrap()
+                        .render_loop
+                        .context
+                        .window
+                        .request_redraw();
+
                     self.last_frame_time = update_start;
                 }
                 // WindowEvent::MainEventsCleared => self.render_loop.context.window.request_redraw(),
@@ -949,6 +962,10 @@ impl ApplicationHandler for App {
             }
         }
     }
+
+    // fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+    //     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    // }
 
     fn device_event(
         &mut self,

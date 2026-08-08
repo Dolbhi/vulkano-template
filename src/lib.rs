@@ -29,7 +29,7 @@ pub static mut RENDER_PROFILER: Option<Profiler<7, 128>> = Some(Profiler::new([
     "ComBuf building",
     "Execute",
 ]));
-pub static mut LOGIC_PROFILER: Mutex<Profiler<5, 128>> = Mutex::new(Profiler::new([
+pub static LOGIC_PROFILER: Mutex<Profiler<5, 128>> = Mutex::new(Profiler::new([
     "Lock wait",
     "Physics",
     "Colliders",
