@@ -6,15 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-vulkano = "0.34"
-vulkano-shaders = "0.34"
-winit = "0.28"
+vulkano = "0.35.2"
+vulkano-shaders = "0.35.0"
+winit = "0.30.13"
 cgmath = "0.18"
 png = "0.18.1"
 tobj = "4.0.5"
 legion = "0.4"
 crossterm = "0.29"
-egui_winit_vulkano = "0.27"
+egui_winit_vulkano = "0.28.0"
 rand = "0.10.2"
 
 [profile.dev]

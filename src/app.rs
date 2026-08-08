@@ -1,5 +1,4 @@
 use std::{
-    default,
     sync::{
         atomic::{AtomicBool, AtomicU64},
         Arc, Mutex, RwLock,
@@ -13,9 +12,11 @@ use legion::*;
 
 // use rand::Rng;
 use winit::{
+    application::ApplicationHandler,
     dpi::PhysicalPosition,
-    event::{ElementState, Event, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent},
+    event::{DeviceEvent, ElementState, KeyEvent, MouseButton, WindowEvent},
     event_loop::EventLoop,
+    keyboard::{Key, NamedKey},
 };
 
 use crate::{
@@ -203,106 +204,106 @@ impl App {
         Ok(())
     }
 
-    pub fn handle_winit_event(
-        &mut self,
-        event: Event<()>,
-        control_flow: &mut winit::event_loop::ControlFlow,
-    ) {
-        match event {
-            Event::WindowEvent { event, .. } => {
-                if !self.render_loop.context.gui.update(&event) {
-                    match event {
-                        WindowEvent::CloseRequested => control_flow.set_exit(),
-                        WindowEvent::Resized(_) => self.render_loop.handle_window_resize(),
-                        WindowEvent::KeyboardInput {
-                            input:
-                                KeyboardInput {
-                                    virtual_keycode: Some(code),
-                                    state,
-                                    ..
-                                },
-                            ..
-                        } => self.handle_keyboard_input(code, state),
-                        WindowEvent::MouseInput { state, button, .. } => {
-                            if button == MouseButton::Left {
-                                self.inputs.lmb.update_state(state);
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            Event::RedrawRequested(_) => {
-                let update_start = Instant::now();
-                // let duration_from_last_frame = update_start - self.last_frame_time;
+    // pub fn handle_winit_event(
+    //     &mut self,
+    //     event: Event<()>,
+    //     control_flow: &mut winit::event_loop::ControlFlow,
+    // ) {
+    //     match event {
+    //         Event::WindowEvent { event, .. } => {
+    //             if !self.render_loop.context.gui.update(&event) {
+    //                 match event {
+    //                     WindowEvent::CloseRequested => control_flow.set_exit(),
+    //                     WindowEvent::Resized(_) => self.render_loop.handle_window_resize(),
+    //                     WindowEvent::KeyboardInput {
+    //                         input:
+    //                             KeyboardInput {
+    //                                 virtual_keycode: Some(code),
+    //                                 state,
+    //                                 ..
+    //                             },
+    //                         ..
+    //                     } => self.handle_keyboard_input(code, state),
+    //                     WindowEvent::MouseInput { state, button, .. } => {
+    //                         if button == MouseButton::Left {
+    //                             self.inputs.lmb.update_state(state);
+    //                         }
+    //                     }
+    //                     _ => {}
+    //                 }
+    //             }
+    //         }
+    //         Event::RedrawRequested(_) => {
+    //             let update_start = Instant::now();
+    //             // let duration_from_last_frame = update_start - self.last_frame_time;
 
-                // gui
-                let mut gui_result = MenuOption::None;
-                self.render_loop.context.gui.immediate_ui(|gui| {
-                    let ctx = &gui.context();
+    //             // gui
+    //             let mut gui_result = MenuOption::None;
+    //             self.render_loop.context.gui.immediate_ui(|gui| {
+    //                 let ctx = &gui.context();
 
-                    ui::profiler_window(ctx);
+    //                 ui::profiler_window(ctx);
 
-                    // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
-                    match self.game_state {
-                        GameState::MainMenu => ui::main_menu(ctx, &mut gui_result),
-                        GameState::Paused => ui::pause_menu(ctx, &mut gui_result),
-                        _ => {}
-                    };
-                });
-                match gui_result {
-                    ui::MenuOption::None => {}
-                    ui::MenuOption::LoadLevel(i) => match self.load_level(i) {
-                        Ok(()) => {
-                            self.game_state = GameState::Playing;
-                            self.lock_cursor();
-                            self.game_thread.set_paused(true);
-                        }
-                        Err(e) => println!("[Error] {e}"),
-                    },
-                    ui::MenuOption::QuitLevel => {
-                        self.game_state = GameState::MainMenu;
-                        // self.unlock_cursor();
+    //                 // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
+    //                 match self.game_state {
+    //                     GameState::MainMenu => ui::main_menu(ctx, &mut gui_result),
+    //                     GameState::Paused => ui::pause_menu(ctx, &mut gui_result),
+    //                     _ => {}
+    //                 };
+    //             });
+    //             match gui_result {
+    //                 ui::MenuOption::None => {}
+    //                 ui::MenuOption::LoadLevel(i) => match self.load_level(i) {
+    //                     Ok(()) => {
+    //                         self.game_state = GameState::Playing;
+    //                         self.lock_cursor();
+    //                         self.game_thread.set_paused(true);
+    //                     }
+    //                     Err(e) => println!("[Error] {e}"),
+    //                 },
+    //                 ui::MenuOption::QuitLevel => {
+    //                     self.game_state = GameState::MainMenu;
+    //                     // self.unlock_cursor();
 
-                        let mut world = self.world.lock().unwrap();
-                        world.clear();
-                    }
-                    ui::MenuOption::Quit => control_flow.set_exit(),
-                }
+    //                     let mut world = self.world.lock().unwrap();
+    //                     world.clear();
+    //                 }
+    //                 ui::MenuOption::Quit => control_flow.set_exit(),
+    //             }
 
-                // profile logic update
-                unsafe {
-                    let mut profiler = RENDER_PROFILER.take().unwrap();
-                    profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
-                    RENDER_PROFILER = Some(profiler);
-                }
+    //             // profile logic update
+    //             unsafe {
+    //                 let mut profiler = RENDER_PROFILER.take().unwrap();
+    //                 profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
+    //                 RENDER_PROFILER = Some(profiler);
+    //             }
 
-                self.update_render();
+    //             self.update_render();
 
-                unsafe {
-                    let mut profiler = RENDER_PROFILER.take().unwrap();
-                    profiler.end_frame();
-                    RENDER_PROFILER = Some(profiler);
-                }
+    //             unsafe {
+    //                 let mut profiler = RENDER_PROFILER.take().unwrap();
+    //                 profiler.end_frame();
+    //                 RENDER_PROFILER = Some(profiler);
+    //             }
 
-                self.last_frame_time = update_start;
-            }
-            Event::MainEventsCleared => self.render_loop.context.window.request_redraw(),
-            Event::DeviceEvent {
-                event: winit::event::DeviceEvent::MouseMotion { delta },
-                ..
-            } => {
-                if self.game_state == GameState::Playing {
-                    Camera::camera_rotation(
-                        &mut self.camera_rotation,
-                        delta.0 as f32,
-                        delta.1 as f32,
-                    );
-                }
-            }
-            _ => (),
-        }
-    }
+    //             self.last_frame_time = update_start;
+    //         }
+    //         Event::MainEventsCleared => self.render_loop.context.window.request_redraw(),
+    //         Event::DeviceEvent {
+    //             event: winit::event::DeviceEvent::MouseMotion { delta },
+    //             ..
+    //         } => {
+    //             if self.game_state == GameState::Playing {
+    //                 Camera::camera_rotation(
+    //                     &mut self.camera_rotation,
+    //                     delta.0 as f32,
+    //                     delta.1 as f32,
+    //                 );
+    //             }
+    //         }
+    //         _ => (),
+    //     }
+    // }
 
     /// upload render objects and do render loop
     ///
@@ -763,28 +764,28 @@ impl App {
     }
 
     /// update key state
-    fn handle_keyboard_input(&mut self, key_code: VirtualKeyCode, state: ElementState) {
+    fn handle_keyboard_input(&mut self, key_code: Key, state: ElementState) {
         // let state = match state {
         //     ElementState::Pressed => Pressed,
         //     ElementState::Released => Released,
         // };
 
-        match key_code {
-            VirtualKeyCode::Q => {
+        match key_code.as_ref() {
+            Key::Character("q") => {
                 self.inputs.q.update_state(state);
             }
-            VirtualKeyCode::R => {
+            Key::Character("r") => {
                 if self.game_state == GameState::Playing && self.inputs.r.update_state(state) {
                     let _ = self.load_level(self.current_level);
                 }
             }
-            VirtualKeyCode::W => self.inputs.w = state == ElementState::Pressed,
-            VirtualKeyCode::A => self.inputs.a = state == ElementState::Pressed,
-            VirtualKeyCode::S => self.inputs.s = state == ElementState::Pressed,
-            VirtualKeyCode::D => self.inputs.d = state == ElementState::Pressed,
-            VirtualKeyCode::Space => self.inputs.space = state == ElementState::Pressed,
-            VirtualKeyCode::LShift => self.inputs.shift = state == ElementState::Pressed,
-            VirtualKeyCode::Escape => {
+            Key::Character("W") => self.inputs.w = state == ElementState::Pressed,
+            Key::Character("A") => self.inputs.a = state == ElementState::Pressed,
+            Key::Character("S") => self.inputs.s = state == ElementState::Pressed,
+            Key::Character("D") => self.inputs.d = state == ElementState::Pressed,
+            Key::Named(NamedKey::Space) => self.inputs.space = state == ElementState::Pressed,
+            Key::Named(NamedKey::Shift) => self.inputs.shift = state == ElementState::Pressed,
+            Key::Named(NamedKey::Escape) => {
                 // pause and unpause
                 if self.inputs.escape.update_state(state) {
                     match self.game_state {
@@ -802,8 +803,8 @@ impl App {
                     }
                 };
             }
-            VirtualKeyCode::P => {
-                // pause logic loop
+            // pause logic loop
+            Key::Character("P") => {
                 if self.inputs.p.update_state(state) {
                     if self.game_state == GameState::Playing {
                         let paused = self
@@ -814,17 +815,17 @@ impl App {
                     }
                 }
             }
-            VirtualKeyCode::Equals => {
+            Key::Character("=") => {
                 // step logic loop
                 if self.inputs.equals.update_state(state) {
                     self.game_thread.step();
                 }
             }
-            VirtualKeyCode::O => {
+            Key::Character("O") => {
                 // add bounding box
                 self.inputs.o.update_state(state);
             }
-            VirtualKeyCode::I => {
+            Key::Character("I") => {
                 // scroll through depths
                 if self.inputs.i.update_state(state) {
                     if let Some(depth) = self.bounds_debug_depth {
@@ -859,6 +860,109 @@ impl App {
         window
             .set_cursor_grab(winit::window::CursorGrabMode::None)
             .unwrap();
+    }
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        todo!()
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        self.render_loop.context.gui.update(&event);
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::Resized(_) => self.render_loop.handle_window_resize(),
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        logical_key: code,
+                        state,
+                        ..
+                    },
+                ..
+            } => self.handle_keyboard_input(code, state),
+            WindowEvent::MouseInput { state, button, .. } => {
+                if button == MouseButton::Left {
+                    self.inputs.lmb.update_state(state);
+                }
+            }
+            WindowEvent::RedrawRequested => {
+                let update_start = Instant::now();
+                // let duration_from_last_frame = update_start - self.last_frame_time;
+
+                // gui
+                let mut gui_result = MenuOption::None;
+                self.render_loop.context.gui.immediate_ui(|gui| {
+                    let ctx = &gui.context();
+
+                    ui::profiler_window(ctx);
+
+                    // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
+                    match self.game_state {
+                        GameState::MainMenu => ui::main_menu(ctx, &mut gui_result),
+                        GameState::Paused => ui::pause_menu(ctx, &mut gui_result),
+                        _ => {}
+                    };
+                });
+                match gui_result {
+                    ui::MenuOption::None => {}
+                    ui::MenuOption::LoadLevel(i) => match self.load_level(i) {
+                        Ok(()) => {
+                            self.game_state = GameState::Playing;
+                            self.lock_cursor();
+                            self.game_thread.set_paused(true);
+                        }
+                        Err(e) => println!("[Error] {e}"),
+                    },
+                    ui::MenuOption::QuitLevel => {
+                        self.game_state = GameState::MainMenu;
+                        // self.unlock_cursor();
+
+                        let mut world = self.world.lock().unwrap();
+                        world.clear();
+                    }
+                    ui::MenuOption::Quit => event_loop.exit(),
+                }
+
+                // profile logic update
+                unsafe {
+                    let mut profiler = RENDER_PROFILER.take().unwrap();
+                    profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
+                    RENDER_PROFILER = Some(profiler);
+                }
+
+                self.update_render();
+
+                unsafe {
+                    let mut profiler = RENDER_PROFILER.take().unwrap();
+                    profiler.end_frame();
+                    RENDER_PROFILER = Some(profiler);
+                }
+
+                self.last_frame_time = update_start;
+            }
+            // WindowEvent::MainEventsCleared => self.render_loop.context.window.request_redraw(),
+            _ => (),
+        }
+    }
+
+    fn device_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        device_id: winit::event::DeviceId,
+        event: winit::event::DeviceEvent,
+    ) {
+        if let DeviceEvent::MouseMotion { delta } = event {
+            if self.game_state == GameState::Playing {
+                Camera::camera_rotation(&mut self.camera_rotation, delta.0 as f32, delta.1 as f32);
+            }
+        }
     }
 }
 

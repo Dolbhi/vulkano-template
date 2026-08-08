@@ -126,58 +126,60 @@ impl LineSystem {
     //     (transform, colour)
     // }
 
-    pub fn render<P, A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
+    pub fn render<A: vulkano::command_buffer::allocator::CommandBufferAllocator>(
         &mut self,
         // image_i: usize,
         global_set: DescriptorSetWithOffsets,
         box_set: DescriptorSetWithOffsets,
         last_box_index: Option<usize>,
         last_line_index: Option<usize>,
-        command_builder: &mut AutoCommandBufferBuilder<P, A>,
+        command_builder: &mut AutoCommandBufferBuilder<A>,
     ) {
         // bind commands
         let mut first_line_index = 0;
-        if let Some(last_index) = last_box_index {
-            first_line_index = last_index + 1;
-            let pipeline = &self.pipeline.pipeline;
-            let layout = self.pipeline.layout();
-            command_builder
-                .bind_pipeline_graphics(pipeline.clone())
-                .unwrap()
-                .bind_descriptor_sets(
-                    PipelineBindPoint::Graphics,
-                    layout.clone(),
-                    0,
-                    vec![global_set.clone(), box_set.clone()],
-                )
-                .unwrap()
-                .bind_vertex_buffers(0, self.box_mesh.clone())
-                .unwrap()
-                .draw(self.box_mesh.len() as u32, last_index as u32 + 1, 0, 0)
-                .unwrap();
-        }
-        if let Some(last_index) = last_line_index {
-            let pipeline = &self.pipeline.pipeline;
-            let layout = self.pipeline.layout();
-            command_builder
-                .bind_pipeline_graphics(pipeline.clone())
-                .unwrap()
-                .bind_descriptor_sets(
-                    PipelineBindPoint::Graphics,
-                    layout.clone(),
-                    0,
-                    vec![global_set, box_set],
-                )
-                .unwrap()
-                .bind_vertex_buffers(0, self.line_mesh.clone())
-                .unwrap()
-                .draw(
-                    self.line_mesh.len() as u32,
-                    (last_index - first_line_index) as u32 + 1,
-                    0,
-                    first_line_index as u32,
-                )
-                .unwrap();
+        unsafe {
+            if let Some(last_index) = last_box_index {
+                first_line_index = last_index + 1;
+                let pipeline = &self.pipeline.pipeline;
+                let layout = self.pipeline.layout();
+                command_builder
+                    .bind_pipeline_graphics(pipeline.clone())
+                    .unwrap()
+                    .bind_descriptor_sets(
+                        PipelineBindPoint::Graphics,
+                        layout.clone(),
+                        0,
+                        vec![global_set.clone(), box_set.clone()],
+                    )
+                    .unwrap()
+                    .bind_vertex_buffers(0, self.box_mesh.clone())
+                    .unwrap()
+                    .draw(self.box_mesh.len() as u32, last_index as u32 + 1, 0, 0)
+                    .unwrap();
+            }
+            if let Some(last_index) = last_line_index {
+                let pipeline = &self.pipeline.pipeline;
+                let layout = self.pipeline.layout();
+                command_builder
+                    .bind_pipeline_graphics(pipeline.clone())
+                    .unwrap()
+                    .bind_descriptor_sets(
+                        PipelineBindPoint::Graphics,
+                        layout.clone(),
+                        0,
+                        vec![global_set, box_set],
+                    )
+                    .unwrap()
+                    .bind_vertex_buffers(0, self.line_mesh.clone())
+                    .unwrap()
+                    .draw(
+                        self.line_mesh.len() as u32,
+                        (last_index - first_line_index) as u32 + 1,
+                        0,
+                        first_line_index as u32,
+                    )
+                    .unwrap();
+            }
         }
     }
 }
