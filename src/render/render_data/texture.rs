@@ -1,4 +1,4 @@
-use std::{fs::File, path::Path, sync::Arc};
+use std::{fs::File, io::BufReader, path::Path, sync::Arc};
 
 use png::ColorType;
 use vulkano::{
@@ -29,7 +29,7 @@ use crate::vulkano_objects::allocators::Allocators;
 /// load a png texture into a ViewImage
 pub fn load_texture(allocators: &Allocators, queue: &Arc<Queue>, path: &Path) -> Arc<ImageView> {
     // decode png
-    let decoder = png::Decoder::new(File::open(path).unwrap());
+    let decoder = png::Decoder::new(BufReader::new(File::open(path).unwrap()));
     let mut reader = decoder.read_info().unwrap();
     let info = reader.info();
     let extent = [info.width, info.height, 1];

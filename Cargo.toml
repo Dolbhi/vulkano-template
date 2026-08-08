@@ -10,12 +10,12 @@ vulkano = "0.34"
 vulkano-shaders = "0.34"
 winit = "0.28"
 cgmath = "0.18"
-png = "0.17"
-tobj = "4.0"
+png = "0.18.1"
+tobj = "4.0.5"
 legion = "0.4"
-crossterm = "0.27"
+crossterm = "0.29"
 egui_winit_vulkano = "0.27"
-rand = "0.8"
+rand = "0.10.2"
 
 [profile.dev]
 opt-level = 1
