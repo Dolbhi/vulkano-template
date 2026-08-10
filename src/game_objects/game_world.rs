@@ -183,13 +183,11 @@ impl GameWorld {
             println!("[Transform] {}: {:?}", tag, model);
         }
 
-        unsafe {
-            let mut profiler = LOGIC_PROFILER.lock().unwrap();
-            profiler.add_sample(phys_time, 1);
-            profiler.add_sample(coll_time, 2);
-            profiler.add_sample(lerp_time, 3);
-            profiler.add_sample(others_start.elapsed().as_micros() as u32, 4);
-        }
+        let mut profiler = LOGIC_PROFILER.lock().unwrap();
+        profiler.add_sample(phys_time, 1);
+        profiler.add_sample(coll_time, 2);
+        profiler.add_sample(lerp_time, 3);
+        profiler.add_sample(others_start.elapsed().as_micros() as u32, 4);
     }
 
     /// clear the world and transforms and reset the camera

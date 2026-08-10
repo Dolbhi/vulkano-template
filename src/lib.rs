@@ -20,7 +20,7 @@ pub use vertex_data::{Vertex2d, Vertex3d, VertexFull};
 
 use profiler::Profiler;
 
-pub static mut RENDER_PROFILER: Option<Profiler<7, 128>> = Some(Profiler::new([
+pub static RENDER_PROFILER: Mutex<Profiler<7, 128>> = Mutex::new(Profiler::new([
     "GUI and inputs",
     "Pre-render",
     "Frame cleanup",

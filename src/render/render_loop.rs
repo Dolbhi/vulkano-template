@@ -76,7 +76,7 @@ impl RenderLoop {
         }
 
         // [Profiling] Pre-render
-        let mut profiler = unsafe { RENDER_PROFILER.take().unwrap() };
+        let mut profiler = RENDER_PROFILER.try_lock().unwrap();
         profiler.add_sample(now.elapsed().as_micros() as u32, 1);
         let now = std::time::Instant::now();
 
@@ -114,9 +114,10 @@ impl RenderLoop {
 
         // [Profiling] Wait last frame
         profiler.add_sample(now.elapsed().as_micros() as u32, 4);
-        unsafe {
-            RENDER_PROFILER = Some(profiler);
-        }
+        drop(profiler);
+        // unsafe {
+        //     RENDER_PROFILER = Some(profiler);
+        // }
 
         // RENDER
         // println!("[Pre-render state] seconds_passed: {}, image_i: {}, window_resized: {}, recreate_swapchain: {}", seconds_passed, image_i, self.window_resized, self.recreate_swapchain);

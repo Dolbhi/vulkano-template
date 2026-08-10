@@ -122,13 +122,13 @@ pub fn profiler_window(ctx: &Context) {
         .resizable(false)
         .default_pos((20.0, 20.0))
         .show(ctx, |ui| {
-            let profiler = unsafe { RENDER_PROFILER.take().unwrap() };
+            let profiler = RENDER_PROFILER.try_lock().unwrap();
 
             ui.label(RichText::new(profiler.summary()).monospace());
 
-            unsafe {
-                RENDER_PROFILER = Some(profiler);
-            }
+            // unsafe {
+            //     RENDER_PROFILER = Some(profiler);
+            // }
         });
 
     egui::Window::new("Logic")

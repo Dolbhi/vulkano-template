@@ -280,13 +280,13 @@ impl Context {
         // );
         // profiler.add_sample(now.elapsed().as_micros() as u32, 6);
         let exe_time = now.elapsed().as_micros() as u32;
-        unsafe {
-            let mut profiler = RENDER_PROFILER.take().unwrap();
+        {
+            let mut profiler = RENDER_PROFILER.try_lock().unwrap();
 
             profiler.add_sample(combuf_time, 5);
             profiler.add_sample(exe_time, 6);
 
-            RENDER_PROFILER = Some(profiler);
+            // RENDER_PROFILER = Some(profiler);
         }
 
         result

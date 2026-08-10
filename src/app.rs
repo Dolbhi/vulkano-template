@@ -933,18 +933,18 @@ impl ApplicationHandler for App {
                     }
 
                     // profile logic update
-                    unsafe {
-                        let mut profiler = RENDER_PROFILER.take().unwrap();
+                    {
+                        let mut profiler = RENDER_PROFILER.try_lock().unwrap();
                         profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
-                        RENDER_PROFILER = Some(profiler);
+                        // RENDER_PROFILER = Some(profiler);
                     }
 
                     self.update_render();
 
-                    unsafe {
-                        let mut profiler = RENDER_PROFILER.take().unwrap();
+                    {
+                        let mut profiler = RENDER_PROFILER.try_lock().unwrap();
                         profiler.end_frame();
-                        RENDER_PROFILER = Some(profiler);
+                        // RENDER_PROFILER = Some(profiler);
                     }
 
                     self.graphics
@@ -1008,7 +1008,7 @@ impl GameWorldThread {
                     // let lock_wait = update_start.elapsed().as_millis();
 
                     // [Profiling] Lock Wait
-                    unsafe {
+                    {
                         let mut profiler = LOGIC_PROFILER.lock().unwrap();
                         profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
                     }
