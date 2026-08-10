@@ -140,11 +140,11 @@ impl Transform {
 }
 
 impl TransformCreateInfo {
-    pub fn set_parent(mut self, parent: Option<TransformID>) -> Self {
+    pub fn with_parent(mut self, parent: Option<TransformID>) -> Self {
         self.parent = parent;
         self
     }
-    pub fn set_translation(mut self, translation: impl Into<Vector3<f32>>) -> Self {
+    pub fn with_translation(mut self, translation: impl Into<Vector3<f32>>) -> Self {
         self.translation = translation.into();
         self
     }
@@ -152,7 +152,7 @@ impl TransformCreateInfo {
         self.rotation = rotation.into();
         self
     }
-    pub fn set_scale(mut self, scale: impl Into<Vector3<f32>>) -> Self {
+    pub fn with_scale(mut self, scale: impl Into<Vector3<f32>>) -> Self {
         self.scale = scale.into();
         self
     }
@@ -169,7 +169,7 @@ where
     T: Into<Vector3<f32>>,
 {
     fn from(value: T) -> Self {
-        Self::default().set_translation(value)
+        Self::default().with_translation(value)
     }
 }
 // impl From<TransformID> for TransformCreateInfo {

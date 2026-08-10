@@ -23,9 +23,9 @@ use crate::{
         transform::{TransformCreateInfo, TransformID},
         Camera, GameWorld, MaterialSwapper, WorldLoader,
     },
-    load_object_with_transform,
+    load_object,
     physics::{quick_inverse, CuboidCollider, RigidBody},
-    prefabs::{init_phys_test, init_ui_test, init_world},
+    prefabs::{init_char_test, init_phys_test, init_ui_test, init_world},
     render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
     shaders::{DirectionLight, GPUGlobalData, GPUAABB},
     ui::{self, MenuOption},
@@ -164,6 +164,7 @@ impl App {
             0 => init_world,
             1 => init_ui_test,
             2 => init_phys_test,
+            3 => init_char_test,
             _ => {
                 return Err(format!("Tried to load invalid level id: {id}"));
             }
@@ -180,8 +181,8 @@ impl App {
         // camera light, child of the camera
         let camera_light = world.transforms.add_transform(
             TransformCreateInfo::default()
-                .set_parent(Some(world.camera.transform))
-                .set_translation((0., 0., 0.2)), // light pos cannot = cam pos else the light will glitch
+                .with_parent(Some(world.camera.transform))
+                .with_translation((0., 0., 0.2)), // light pos cannot = cam pos else the light will glitch
         );
         world
             .world
@@ -411,7 +412,7 @@ impl App {
                             true,
                         );
 
-                        load_object_with_transform!(world, transform, collider, ro, rigidbody);
+                        load_object!(world, transform, collider, ro, rigidbody);
                     }
 
                     // camera data
@@ -936,7 +937,6 @@ impl ApplicationHandler for App {
                     {
                         let mut profiler = RENDER_PROFILER.try_lock().unwrap();
                         profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
-                        // RENDER_PROFILER = Some(profiler);
                     }
 
                     self.update_render();
@@ -944,7 +944,6 @@ impl ApplicationHandler for App {
                     {
                         let mut profiler = RENDER_PROFILER.try_lock().unwrap();
                         profiler.end_frame();
-                        // RENDER_PROFILER = Some(profiler);
                     }
 
                     self.graphics

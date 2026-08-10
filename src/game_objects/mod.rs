@@ -52,6 +52,7 @@ impl<T: Clone> MaterialSwapper<T> {
 }
 
 impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
+    /// create a game object with just a transform and a render object components
     pub fn quick_ro(
         &mut self,
         transform: impl Into<TransformCreateInfo>,
@@ -60,7 +61,8 @@ impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
         lit: bool,
     ) -> (TransformID, legion::Entity) {
         let ro = self.resources.load_ro(mesh, material, lit);
-        self.add_1_comp(transform, ro)
+        crate::load_transform_and_object!(self.world, transform, ro)
+        // self.add_1_comp(transform, ro)
     }
 
     pub fn add_1_comp<T>(
@@ -106,17 +108,21 @@ impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
     }
 }
 
+/// create a new transform and load a new object with it
 #[macro_export]
-macro_rules! load_object {
+macro_rules! load_transform_and_object {
     ($game_world:expr, $transform:expr, $($comp:expr),+) => {
-        let id = $game_world.transforms.add_transform($transform);
-        (id, $game_world.push((id, $($comp),+)))
+        {
+            let id = $game_world.transforms.add_transform($transform);
+            (id, $game_world.world.push((id, $($comp),+)))
+        }
     };
 }
 
+/// load a new object with an arbitrary number of components
 #[macro_export]
-macro_rules! load_object_with_transform {
-    ($world:expr, $transform:expr, $($comp:expr),+) => {
-        $world.push(($transform, $($comp),+))
+macro_rules! load_object {
+    ($world:expr, $($comp:expr),+) => {
+        $world.push(($($comp),+))
     };
 }
