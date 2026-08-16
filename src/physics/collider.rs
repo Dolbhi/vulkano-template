@@ -421,6 +421,7 @@ impl ColliderSystem {
             for p2_i in 0..4 {
                 let p2_min = points_2_1[p2_i];
                 let p2_max = points_2_1[7 - p2_i];
+                // unnormalised ray
                 let ray = Ray {
                     origin: p2_min,
                     direction: p2_max - p2_min,

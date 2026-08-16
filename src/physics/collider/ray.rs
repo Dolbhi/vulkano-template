@@ -55,17 +55,20 @@ impl Ray {
         // self.distance *= scale;
     }
 
-    /// convert distance to point on ray
+    /// convert distance returned by intersection dectection to point on ray
     pub fn calc_point(&self, distance: f32) -> Vector {
         self.origin + self.direction * distance
     }
 
+    /// translate origin by distance * self.direction, reduce self.distance accordingly
     pub fn advance(&mut self, distance: f32) {
         self.origin += self.direction * distance;
         self.distance -= distance;
     }
 
     /// Gives distance to intercept point on cuboid
+    ///
+    /// see also: `box_intersection`
     pub fn cuboid_intersection(&self, inv_cuboid_model: &Matrix4<f32>) -> Option<f32> {
         let mut cub_space_ray = self.clone();
         cub_space_ray.transform_model(inv_cuboid_model);
@@ -93,6 +96,8 @@ impl Ray {
     }
 
     /// only gives result on valid intersect and only returns distance to entering intersect
+    ///
+    /// multiply returned distance by ray.direction to get ray displacement (see also: `calc_point`)
     pub fn box_intersection(&self, bounds: &BoundingBox) -> Option<f32> {
         let (close, far) = self.box_intersection_raw(bounds);
 
