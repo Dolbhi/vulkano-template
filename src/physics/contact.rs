@@ -33,7 +33,7 @@ pub struct Contact {
     rb_1: RigidBodyRef,
     rb_2: Option<RigidBodyRef>,
 
-    /// should point towards rb_2 if points are closing
+    /// from rb_1's pov, should point towards rb_2 if points are closing
     target_delta_velocity: Vector,
 
     contact_id: ContactIdPair,

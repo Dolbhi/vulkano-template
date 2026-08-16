@@ -644,7 +644,8 @@ impl App {
                         // });
 
                         let min: [f32; 3] = (position.clone()).into();
-                        let max: [f32; 3] = (position + normal * *penetration).into();
+                        // normal points out from rb_1, position is on rb_1, so rb_2's pen point is opposite from normal dir
+                        let max: [f32; 3] = (position - normal * *penetration).into();
 
                         coll_lines.push(GPUAABB {
                             min: min.into(),
