@@ -551,6 +551,7 @@ impl Node {
         }
     }
 
+    /// currently unused
     fn raycast(
         &self,
         ray: &Ray,
