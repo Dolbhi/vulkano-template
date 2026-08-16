@@ -119,6 +119,7 @@ impl Ray {
         }
     }
 
+    /// self.distance is unused here
     pub fn box_intersection_raw(&self, bounds: &BoundingBox) -> (f32, f32) {
         let mut closest = f32::NEG_INFINITY;
         let mut furthest = f32::INFINITY;

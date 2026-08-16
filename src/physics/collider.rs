@@ -13,6 +13,7 @@ use cgmath::{InnerSpace, Matrix, Matrix4, MetricSpace, SquareMatrix, Zero};
 use core::f32;
 use ray::Ray;
 use std::{
+    f32::EPSILON,
     fmt::Debug,
     sync::{Arc, RwLock, Weak},
 };
@@ -355,12 +356,12 @@ impl ColliderSystem {
             let model_1 = transforms.get_global_model(&coll_1.transform).unwrap(); // impl func to try get model without mut
             let model_2 = transforms.get_global_model(&coll_2.transform).unwrap();
 
-            // if model_1.w.w != 1.0 || model_2.w.w != 1.0 {
-            //     println!(
-            //         "models not normalised, w1: {}, w2: {}",
-            //         model_1.w.w, model_2.w.w
-            //     );
-            // }
+            if (model_1.w.w - 1.).abs() > EPSILON || (model_2.w.w - 1.).abs() > EPSILON {
+                println!(
+                    "[ERROR] models not normalised, w1: {}, w2: {}",
+                    model_1.w.w, model_2.w.w
+                );
+            }
 
             // seperating axis
             let dist_1_2 = (model_1.w - model_2.w).truncate(); // might need to normalise
@@ -388,23 +389,22 @@ impl ColliderSystem {
             };
 
             let inv_model_1 = model_1.invert().unwrap();
-            // let inv_model_2 = model_2.invert().unwrap();
+            let inv_model_2 = model_2.invert().unwrap();
             // let inv_axes_1: Matrix3<f32> = [
             //     inv_model_1.x.truncate().into(),
             //     inv_model_1.y.truncate().into(),
             //     inv_model_1.z.truncate().into(),
             // ]
             // .into();
-            let model_1_sqr = [
+            let axes_1_sqr = [
                 model_1.x.magnitude2(),
                 model_1.y.magnitude2(),
                 model_1.z.magnitude2(),
             ];
 
             let model_2_1 = inv_model_1 * model_2;
+            let model_1_2 = inv_model_2 * model_1;
             let axes_2_1 = [model_2_1.x, model_2_1.y, model_2_1.z].map(|v| v.truncate());
-            let axes_2_1_inv = axes_2_1.map(|v| v / v.magnitude2());
-            let pos_2_1 = model_2_1.w.truncate();
             let axes_2_sqr = [0, 1, 2].map(|i| model_2[i].magnitude2());
 
             let unit_bounds = BoundingBox {
@@ -419,30 +419,32 @@ impl ColliderSystem {
             // p-f contacts
             let points_2_1 = CUBE_VERTICES.map(|v| (model_2_1 * v.extend(1.)).truncate());
             for p2_i in 0..4 {
-                let p2_min = points_2_1[p2_i];
-                let p2_max = points_2_1[7 - p2_i];
+                // opposite corners a and b forming the cubiod diagonal
+                let diagonal_2_min_1 = points_2_1[p2_i];
+                let diagonal_2_max_1 = points_2_1[7 - p2_i];
                 // unnormalised ray
                 let ray = Ray {
-                    origin: p2_min,
-                    direction: p2_max - p2_min,
+                    origin: diagonal_2_min_1,
+                    direction: diagonal_2_max_1 - diagonal_2_min_1,
                     distance: 1.,
                 };
                 let (close, far) = ray.box_intersection_raw(&unit_bounds);
 
+                // manual intersection check with distance 1
                 if close <= far && far >= 0. && close <= 1. {
-                    let min_depth = far; // min point pen into far face
-                    let max_depth = 1. - close; // max point pen into close face
+                    let min_depth = far; // p2 min point pen into far face
+                    let max_depth = 1. - close; // p2 max point pen into close face
 
                     // use smaller depth
                     if min_depth > max_depth {
-                        let p1 = ray.calc_point(close);
-                        let a1_i = CuboidElement::closest_face(p1);
-                        let d_local = 1. - p2_max[a1_i as usize].abs(); // should be +ve i swear
-                        let depth_sqr = d_local * d_local * model_1_sqr[a1_i as usize];
+                        let p1_1 = ray.calc_point(close);
+                        let a1_i = CuboidElement::closest_face(p1_1);
+                        let d_local = 1. - diagonal_2_max_1[a1_i as usize].abs(); // should be +ve i swear
+                        let depth_sqr = d_local * d_local * axes_1_sqr[a1_i as usize];
 
                         if depth_sqr > max_pen_pf_sqr {
                             max_pen_pf_sqr = depth_sqr;
-                            contact_point_pf = p2_max;
+                            contact_point_pf = diagonal_2_max_1;
                             pen_axis = a1_i + 1;
                             pf_elems = (Face(a1_i), Vertex(7 - p2_i as u8));
                             // use max index for p2
@@ -450,12 +452,12 @@ impl ColliderSystem {
                     } else {
                         let p1 = ray.calc_point(far);
                         let a1_i = CuboidElement::closest_face(p1);
-                        let d_local = 1. - p2_min[a1_i as usize].abs(); // should be +ve i swear
-                        let depth_sqr = d_local * d_local * model_1_sqr[a1_i as usize];
+                        let d_local = 1. - diagonal_2_min_1[a1_i as usize].abs(); // should be +ve i swear
+                        let depth_sqr = d_local * d_local * axes_1_sqr[a1_i as usize];
 
                         if depth_sqr > max_pen_pf_sqr {
                             max_pen_pf_sqr = depth_sqr;
-                            contact_point_pf = p2_min;
+                            contact_point_pf = diagonal_2_min_1;
                             pen_axis = a1_i + 1;
                             pf_elems = (Face(a1_i), Vertex(p2_i as u8));
                         }
@@ -463,13 +465,16 @@ impl ColliderSystem {
                 }
             }
             // f-p contacts
-            let points_1 = CUBE_VERTICES.map(|v| v - pos_2_1);
+            // let points_1 = CUBE_VERTICES.map(|v| v - pos_2_1);
+            let points_1_2 = CUBE_VERTICES.map(|v| (model_1_2 * v.extend(1.)).truncate());
             for p1_i in 0..4 {
-                let p1_min: Vector = axes_2_1_inv.map(|a| points_1[p1_i].dot(a)).into();
-                let p1_max: Vector = axes_2_1_inv.map(|a| points_1[7 - p1_i].dot(a)).into();
+                // let p1_min: Vector = axes_2_1_inv.map(|a| points_1_2[p1_i].dot(a)).into();
+                // let p1_max: Vector = axes_2_1_inv.map(|a| points_1_2[7 - p1_i].dot(a)).into();
+                let p1_min_2 = points_1_2[p1_i];
+                let p1_max_2 = points_1_2[7 - p1_i];
                 let ray = Ray {
-                    origin: p1_min,
-                    direction: p1_max - p1_min,
+                    origin: p1_min_2,
+                    direction: p1_max_2 - p1_min_2,
                     distance: 1.,
                 };
                 let (close, far) = ray.box_intersection_raw(&unit_bounds);
@@ -482,7 +487,7 @@ impl ColliderSystem {
                     if min_depth > max_depth {
                         let p2 = ray.calc_point(close);
                         let a2_i = CuboidElement::closest_face(p2);
-                        let d_local = 1. - p1_max[a2_i as usize].abs(); // should be +ve i swear
+                        let d_local = 1. - p1_max_2[a2_i as usize].abs(); // should be +ve i swear
                         let depth_sqr = d_local * d_local * axes_2_sqr[a2_i as usize];
 
                         if depth_sqr > max_pen_pf_sqr {
@@ -495,7 +500,7 @@ impl ColliderSystem {
                     } else {
                         let p2 = ray.calc_point(far);
                         let a2_i = CuboidElement::closest_face(p2);
-                        let d_local = 1. - p1_min[a2_i as usize].abs(); // should be +ve i swear
+                        let d_local = 1. - p1_min_2[a2_i as usize].abs(); // should be +ve i swear
                         let depth_sqr = d_local * d_local * axes_2_sqr[a2_i as usize];
 
                         if depth_sqr > max_pen_pf_sqr {
@@ -945,6 +950,7 @@ impl CuboidElement {
     //     edge >> 3
     // }
 
+    /// returns axis index perpenduclar to the face the given point is closest to
     fn closest_face(point: Vector) -> u8 {
         let mut max = point.x.abs();
         let mut axis = 0;
