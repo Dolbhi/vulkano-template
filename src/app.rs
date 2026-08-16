@@ -21,7 +21,7 @@ use crate::{
     game_objects::{
         light::PointLightComponent,
         transform::{TransformCreateInfo, TransformID},
-        Camera, GameWorld, MaterialSwapper, WorldLoader,
+        Camera, GameWorld, Inputs, MaterialSwapper, WorldLoader,
     },
     load_object,
     physics::{quick_inverse, CuboidCollider, RigidBody},
@@ -38,6 +38,8 @@ struct ButtonState {
     button_down: bool,
 }
 
+/// Input state is stored either as a simple bool indicating if currently press
+/// or as a ButtonState (mainly for rising edge detection)
 #[derive(Default)]
 struct InputState {
     a: bool,
@@ -46,6 +48,7 @@ struct InputState {
     d: bool,
     space: bool,
     shift: bool,
+    ctrl: bool,
 
     q: ButtonState,
     r: ButtonState,
@@ -57,8 +60,8 @@ struct InputState {
     equals: ButtonState,
 }
 
-impl InputState {
-    fn get_move(&self) -> Vector3<f32> {
+impl Into<Inputs> for &InputState {
+    fn into(self) -> Inputs {
         let mut movement = <Vector3<f32> as cgmath::Zero>::zero();
         if self.w {
             movement.z -= 1.; // forward
@@ -76,7 +79,10 @@ impl InputState {
             movement.y -= 1.;
         }
 
-        movement
+        Inputs {
+            movement,
+            slow: self.ctrl,
+        }
     }
 }
 
@@ -333,7 +339,8 @@ impl App {
 
                     // sync inputs
                     if self.game_state == GameState::Playing {
-                        inputs.movement = self.inputs.get_move();
+                        *inputs = (&self.inputs).into();
+                        // inputs.movement = self.inputs.get_move();
                         camera.set_rotation(self.camera_rotation);
 
                         // allow moving while frozen
@@ -607,7 +614,8 @@ impl App {
                     }
                     // show contacts
                     let contacts = colliders.get_last_contacts();
-                    for (position, normal, age) in contacts {
+                    let mut coll_lines = vec![];
+                    for (position, normal, age, penetration) in contacts {
                         // colour
                         let color = if *age == 0 {
                             [0., 0., 1., 1.]
@@ -616,8 +624,8 @@ impl App {
                         };
 
                         // contact point
-                        let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
-                        let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
+                        let min_cast: [f32; 3] = (position - Vector3::new(0.03, 0.03, 0.03)).into();
+                        let max_cast: [f32; 3] = (position + Vector3::new(0.03, 0.03, 0.03)).into();
                         bounding_boxes.push(GPUAABB {
                             min: min_cast.into(),
                             max: max_cast.into(),
@@ -625,13 +633,22 @@ impl App {
                         });
 
                         // normal indicator
-                        let min_cast: [f32; 3] =
-                            (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
-                        let max_cast: [f32; 3] =
-                            (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
+                        // let min_cast: [f32; 3] =
+                        //     (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
+                        // let max_cast: [f32; 3] =
+                        //     (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
+                        // bounding_boxes.push(GPUAABB {
+                        //     min: min_cast.into(),
+                        //     max: max_cast.into(),
+                        //     color,
+                        // });
+
+                        let min: [f32; 3] = (position.clone()).into();
+                        let max: [f32; 3] = (position + normal * *penetration).into();
+
+                        coll_lines.push(GPUAABB {
+                            min: min.into(),
+                            max: max.into(),
                             color,
                         });
                     }
@@ -729,7 +746,8 @@ impl App {
                             // };
                             // vec![a, b]
                         })
-                        .flatten();
+                        .flatten()
+                        .chain(coll_lines);
                     // .collect::<Vec<Vec<GPUAABB>>>()
                     // .into_iter()
                     // .flatten();
@@ -786,6 +804,9 @@ impl App {
             PhysicalKey::Code(KeyCode::Space) => self.inputs.space = state == ElementState::Pressed,
             PhysicalKey::Code(KeyCode::ShiftLeft) => {
                 self.inputs.shift = state == ElementState::Pressed
+            }
+            PhysicalKey::Code(KeyCode::ControlLeft) => {
+                self.inputs.ctrl = state == ElementState::Pressed
             }
             PhysicalKey::Code(KeyCode::Escape) => {
                 // pause and unpause

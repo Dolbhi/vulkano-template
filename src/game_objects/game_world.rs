@@ -14,15 +14,18 @@ use super::{
 use legion::*;
 
 const CAM_SPEED: f32 = 6.;
+const SLOW_COEFF: f32 = 0.1;
 
 pub struct Inputs {
     pub movement: Vector3<f32>,
+    pub slow: bool,
 }
 
 impl Default for Inputs {
     fn default() -> Self {
         Self {
             movement: Vector3::zero(),
+            slow: false,
         }
     }
 }
@@ -51,6 +54,10 @@ impl Inputs {
         }
 
         final_move.y = self.movement.y;
+
+        if self.slow {
+            final_move *= SLOW_COEFF;
+        }
 
         // apply movement
         transform.set_translation(view.translation + final_move * CAM_SPEED * seconds_passed);

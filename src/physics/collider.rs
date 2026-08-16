@@ -314,7 +314,7 @@ impl ColliderSystem {
     pub fn get_potential_overlaps(&self) -> Vec<(&Arc<CuboidCollider>, &Arc<CuboidCollider>)> {
         self.bounds_tree.get_overlaps()
     }
-    pub fn get_last_contacts(&self) -> &Vec<(Vector, Vector, u8)> {
+    pub fn get_last_contacts(&self) -> &Vec<(Vector, Vector, u8, f32)> {
         &self.contact_resolver.past_contacts
     }
 

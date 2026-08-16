@@ -19,7 +19,7 @@ pub struct ContactResolver {
     pending_contacts: MaxHeap<OrdF32, Contact>,
     settled_contacts: Vec<(Arc<AtomicUsize>, Contact)>,
 
-    pub past_contacts: Vec<(Vector, Vector, u8)>,
+    pub past_contacts: Vec<(Vector, Vector, u8, f32)>,
 }
 
 pub struct Contact {
@@ -101,27 +101,27 @@ impl ContactResolver {
                 break;
             }
 
-            // println!(
-            //     "[Penetration resolution start]\n\tpos: {:?},\n\tnormal: {:?},\n\tpen: {:?},\n\tage: {:?},\n\tid: {:?}",
-            //     contact.position, contact.normal, contact.penetration, contact.age, contact.contact_id
-            // );
+            println!(
+                "[Penetration resolution start]\n\tpos: {:?},\n\tnormal: {:?},\n\tpen: {:?},\n\tage: {:?},\n\tid: {:?}",
+                contact.position, contact.normal, contact.penetration, contact.age, contact.contact_id
+            );
 
-            // println!(
-            //     "\t[rb1]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
-            //     contact.rb_1.relative_pos,
-            //     contact.rb_1.torque_per_impulse,
-            //     contact.rb_1.linear_inertia,
-            //     contact.rb_1.angular_inertia,
-            // );
+            println!(
+                "\t[rb1]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
+                contact.rb_1.relative_pos,
+                contact.rb_1.torque_per_impulse,
+                contact.rb_1.linear_inertia,
+                contact.rb_1.angular_inertia,
+            );
 
             if let Some(rb_2) = &contact.rb_2 {
-                // println!(
-                //     "\t[rb2]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
-                //     rb_2.relative_pos,
-                //     rb_2.torque_per_impulse,
-                //     rb_2.linear_inertia,
-                //     rb_2.angular_inertia,
-                // );
+                println!(
+                    "\t[rb2]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
+                    rb_2.relative_pos,
+                    rb_2.torque_per_impulse,
+                    rb_2.linear_inertia,
+                    rb_2.angular_inertia,
+                );
 
                 // calculate move
                 contact.rb_1.resolve_penetration(
@@ -162,19 +162,19 @@ impl ContactResolver {
             }
             iters += 1;
 
-            println!(
-                "~~~ Velocity resolution iter {:?} ~~~\n\tpos: {:?},\n\tnormal: {:?},\n\tvel: {:?},\n\tage: {:?}",
-                iters, contact.position, contact.normal, contact.target_delta_velocity, contact.age
-            );
+            // println!(
+            //     "~~~ Velocity resolution iter {:?} ~~~\n\tpos: {:?},\n\tnormal: {:?},\n\tvel: {:?},\n\tage: {:?}",
+            //     iters, contact.position, contact.normal, contact.target_delta_velocity, contact.age
+            // );
 
-            println!(
-                "[rb1]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
-                contact.rb_1.point_vel,
-                contact.rb_1.torque_per_impulse,
-                contact.rb_1.linear_inertia,
-                contact.rb_1.angular_inertia,
-                contact.rb_1.relative_pos
-            );
+            // println!(
+            //     "[rb1]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
+            //     contact.rb_1.point_vel,
+            //     contact.rb_1.torque_per_impulse,
+            //     contact.rb_1.linear_inertia,
+            //     contact.rb_1.angular_inertia,
+            //     contact.rb_1.relative_pos
+            // );
 
             let impulse = contact.inv_total_inertia * contact.target_delta_velocity;
             // println!("\tStatic impulse: {:?}", impulse);
@@ -228,14 +228,14 @@ impl ContactResolver {
                     &mut self.pending_contacts,
                 );
 
-                println!(
-                    "[rb2]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
-                    rb_2.point_vel,
-                    rb_2.torque_per_impulse,
-                    rb_2.linear_inertia,
-                    rb_2.angular_inertia,
-                    rb_2.relative_pos
-                );
+                // println!(
+                //     "[rb2]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
+                //     rb_2.point_vel,
+                //     rb_2.torque_per_impulse,
+                //     rb_2.linear_inertia,
+                //     rb_2.angular_inertia,
+                //     rb_2.relative_pos
+                // );
                 rb_2.apply_velocity_resolution(impulse, &mut self.pending_contacts);
             // contact.normal,
             } else {
@@ -292,8 +292,12 @@ impl ContactResolver {
 
         // add to past contacts
         for (_, contact) in self.settled_contacts.drain(..) {
-            self.past_contacts
-                .push((contact.position, contact.normal, contact.age));
+            self.past_contacts.push((
+                contact.position,
+                contact.normal,
+                contact.age,
+                contact.penetration,
+            ));
 
             let mut rb_1 = contact.rb_1.rigidbody.write().unwrap();
             if contact.age + 1 < MAX_CONTACT_AGE {
