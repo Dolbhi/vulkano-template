@@ -333,6 +333,8 @@ impl ColliderSystem {
 
     #[allow(clippy::collapsible_else_if)]
     /// check overlaps in bvh for actual collisions
+    ///
+    /// TODO: point-face collisions can still have normals in the wrong direction
     pub fn get_contacts(&mut self, transforms: &mut TransformSystem) -> &mut ContactResolver {
         for (mut coll_1, mut coll_2) in self.bounds_tree.get_overlaps() {
             if let Some(rb_1) = &coll_1.rigidbody {
@@ -404,7 +406,7 @@ impl ColliderSystem {
 
             let model_2_1 = inv_model_1 * model_2;
             let model_1_2 = inv_model_2 * model_1;
-            let axes_2_1 = [model_2_1.x, model_2_1.y, model_2_1.z].map(|v| v.truncate());
+            // let axes_2_1 = [model_2_1.x, model_2_1.y, model_2_1.z].map(|v| v.truncate());
             let axes_2_sqr = [0, 1, 2].map(|i| model_2[i].magnitude2());
 
             let unit_bounds = BoundingBox {
@@ -439,37 +441,34 @@ impl ColliderSystem {
                     if min_depth > max_depth {
                         let p1_1 = ray.calc_point(close);
                         let a1_i = CuboidElement::closest_face(p1_1);
-                        let d_local = 1. - diagonal_2_max_1[a1_i as usize].abs(); // should be +ve i swear
-                        let depth_sqr = d_local * d_local * axes_1_sqr[a1_i as usize];
+                        let d_1 = 1. - diagonal_2_max_1[a1_i as usize].abs(); // should be +ve i swear
+                        let depth_sqr = d_1 * d_1 * axes_1_sqr[a1_i as usize];
 
                         if depth_sqr > max_pen_pf_sqr {
                             max_pen_pf_sqr = depth_sqr;
                             contact_point_pf = diagonal_2_max_1;
-                            pen_axis = a1_i + 1;
+                            pen_axis = a1_i;
                             pf_elems = (Face(a1_i), Vertex(7 - p2_i as u8));
                             // use max index for p2
                         }
                     } else {
-                        let p1 = ray.calc_point(far);
-                        let a1_i = CuboidElement::closest_face(p1);
-                        let d_local = 1. - diagonal_2_min_1[a1_i as usize].abs(); // should be +ve i swear
-                        let depth_sqr = d_local * d_local * axes_1_sqr[a1_i as usize];
+                        let p1_1 = ray.calc_point(far);
+                        let a1_i = CuboidElement::closest_face(p1_1);
+                        let d_1 = 1. - diagonal_2_min_1[a1_i as usize].abs(); // should be +ve i swear
+                        let depth_sqr = d_1 * d_1 * axes_1_sqr[a1_i as usize];
 
                         if depth_sqr > max_pen_pf_sqr {
                             max_pen_pf_sqr = depth_sqr;
                             contact_point_pf = diagonal_2_min_1;
-                            pen_axis = a1_i + 1;
+                            pen_axis = a1_i;
                             pf_elems = (Face(a1_i), Vertex(p2_i as u8));
                         }
                     }
                 }
             }
             // f-p contacts
-            // let points_1 = CUBE_VERTICES.map(|v| v - pos_2_1);
             let points_1_2 = CUBE_VERTICES.map(|v| (model_1_2 * v.extend(1.)).truncate());
             for p1_i in 0..4 {
-                // let p1_min: Vector = axes_2_1_inv.map(|a| points_1_2[p1_i].dot(a)).into();
-                // let p1_max: Vector = axes_2_1_inv.map(|a| points_1_2[7 - p1_i].dot(a)).into();
                 let p1_min_2 = points_1_2[p1_i];
                 let p1_max_2 = points_1_2[7 - p1_i];
                 let ray = Ray {
@@ -485,15 +484,15 @@ impl ColliderSystem {
 
                     // use smaller depth
                     if min_depth > max_depth {
-                        let p2 = ray.calc_point(close);
-                        let a2_i = CuboidElement::closest_face(p2);
-                        let d_local = 1. - p1_max_2[a2_i as usize].abs(); // should be +ve i swear
-                        let depth_sqr = d_local * d_local * axes_2_sqr[a2_i as usize];
+                        let p2_2 = ray.calc_point(close);
+                        let a2_i = CuboidElement::closest_face(p2_2);
+                        let d_2 = 1. - p1_max_2[a2_i as usize].abs(); // should be +ve i swear
+                        let depth_sqr = d_2 * d_2 * axes_2_sqr[a2_i as usize];
 
                         if depth_sqr > max_pen_pf_sqr {
                             max_pen_pf_sqr = depth_sqr;
                             contact_point_pf = CUBE_VERTICES[7 - p1_i];
-                            pen_axis = a2_i + 4;
+                            pen_axis = a2_i + 3;
                             pf_elems = (Vertex(7 - p1_i as u8), Face(a2_i));
                             // use max index for p2
                         }
@@ -506,7 +505,7 @@ impl ColliderSystem {
                         if depth_sqr > max_pen_pf_sqr {
                             max_pen_pf_sqr = depth_sqr;
                             contact_point_pf = CUBE_VERTICES[p1_i];
-                            pen_axis = a2_i + 4;
+                            pen_axis = a2_i + 3;
                             pf_elems = (Vertex(p1_i as u8), Face(a2_i));
                         }
                     }
@@ -702,7 +701,7 @@ impl ColliderSystem {
                 continue;
             }
             if max_pen_pf_sqr >= max_pen_ee_sqr {
-                let normal = axes[pen_axis as usize - 1];
+                let normal = axes[pen_axis as usize];
                 // pen_axis.signum() as f32 * axes[pen_axis.unsigned_abs() as usize - 1];
                 // println!("pf collision normal: {:?}", normal);
                 let point = model_1 * contact_point_pf.extend(1.);
@@ -950,7 +949,7 @@ impl CuboidElement {
     //     edge >> 3
     // }
 
-    /// returns axis index perpenduclar to the face the given point is closest to
+    /// returns axis index perpendicular to the face the given point is closest to
     fn closest_face(point: Vector) -> u8 {
         let mut max = point.x.abs();
         let mut axis = 0;
