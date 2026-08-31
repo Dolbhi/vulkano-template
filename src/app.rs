@@ -34,9 +34,9 @@ use crate::{
 
 #[derive(Clone)]
 pub struct ButtonState {
-    last_state: ElementState,
+    was_pressed: bool,
     /// true if last input update changed button state from released to pressed
-    button_down: bool,
+    just_pressed: bool,
 }
 
 /// Input state is stored either as a simple bool indicating if currently press
@@ -1098,22 +1098,23 @@ impl InputState {
 impl ButtonState {
     fn new() -> Self {
         Self {
-            last_state: ElementState::Released,
-            button_down: false,
+            was_pressed: false,
+            just_pressed: false,
         }
     }
 
+    /// Updates state and return new just_pressed
     fn update_state(&mut self, state: ElementState) -> bool {
-        self.button_down =
-            state == ElementState::Pressed && self.last_state == ElementState::Released;
-        self.last_state = state;
-        self.button_down
+        let pressed = state == ElementState::Pressed;
+        self.just_pressed = pressed && !self.was_pressed;
+        self.was_pressed = pressed;
+        self.just_pressed
     }
 
     /// get button_down and reset it (kinda like an Option::take() actually)
     fn consume_button_down(&mut self) -> bool {
-        if self.button_down {
-            self.button_down = false;
+        if self.just_pressed {
+            self.just_pressed = false;
             true
         } else {
             false
