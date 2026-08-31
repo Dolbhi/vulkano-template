@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cgmath::{InnerSpace, Matrix3, One, Quaternion, Rotation, Vector3, Vector4, Zero};
+use cgmath::{InnerSpace, Matrix3, One, Quaternion, Vector3, Vector4};
 use legion::*;
 
 // use rand::Rng;
@@ -20,9 +20,10 @@ use winit::{
 use crate::{
     game_objects::{
         light::PointLightComponent,
-        transform::{Transform, TransformCreateInfo, TransformID},
+        transform::{TransformCreateInfo, TransformID},
         Camera, GameWorld, MaterialSwapper, WorldLoader,
     },
+    input::InputState,
     load_object,
     physics::{quick_inverse, CuboidCollider, RigidBody},
     prefabs::{init_char_test, init_phys_test, init_ui_test, init_world},
@@ -31,35 +32,6 @@ use crate::{
     ui::{self, MenuOption},
     LOGIC_PROFILER, RENDER_PROFILER,
 };
-
-#[derive(Clone)]
-pub struct ButtonState {
-    was_pressed: bool,
-    /// true if last input update changed button state from released to pressed
-    just_pressed: bool,
-}
-
-/// Input state is stored either as a simple bool indicating if currently press
-/// or as a ButtonState (mainly for rising edge detection)
-#[derive(Default, Clone)]
-pub struct InputState {
-    a: bool,
-    w: bool,
-    s: bool,
-    d: bool,
-    space: bool,
-    shift: bool,
-    ctrl: bool,
-
-    q: ButtonState,
-    r: ButtonState,
-    i: ButtonState,
-    o: ButtonState,
-    p: ButtonState,
-    lmb: ButtonState,
-    escape: ButtonState,
-    equals: ButtonState,
-}
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
 enum GameState {
@@ -537,29 +509,16 @@ impl App {
         //     ElementState::Released => Released,
         // };
 
-        match key_code {
-            PhysicalKey::Code(KeyCode::KeyQ) => {
-                self.inputs.q.update_state(state);
-            }
-            PhysicalKey::Code(KeyCode::KeyR) => {
-                if self.game_state == GameState::Playing && self.inputs.r.update_state(state) {
-                    let _ = self.load_level(self.current_level);
+        if self.inputs.handle_keyboard_input(key_code, state) {
+            // Special input effects that can occur immediately
+            match key_code {
+                PhysicalKey::Code(KeyCode::KeyR) => {
+                    if self.game_state == GameState::Playing {
+                        let _ = self.load_level(self.current_level);
+                    }
                 }
-            }
-            PhysicalKey::Code(KeyCode::KeyW) => self.inputs.w = state == ElementState::Pressed,
-            PhysicalKey::Code(KeyCode::KeyA) => self.inputs.a = state == ElementState::Pressed,
-            PhysicalKey::Code(KeyCode::KeyS) => self.inputs.s = state == ElementState::Pressed,
-            PhysicalKey::Code(KeyCode::KeyD) => self.inputs.d = state == ElementState::Pressed,
-            PhysicalKey::Code(KeyCode::Space) => self.inputs.space = state == ElementState::Pressed,
-            PhysicalKey::Code(KeyCode::ShiftLeft) => {
-                self.inputs.shift = state == ElementState::Pressed
-            }
-            PhysicalKey::Code(KeyCode::ControlLeft) => {
-                self.inputs.ctrl = state == ElementState::Pressed
-            }
-            PhysicalKey::Code(KeyCode::Escape) => {
-                // pause and unpause
-                if self.inputs.escape.update_state(state) {
+                PhysicalKey::Code(KeyCode::Escape) => {
+                    // pause and unpause
                     match self.game_state {
                         GameState::Playing => {
                             self.game_state = GameState::Paused;
@@ -576,12 +535,10 @@ impl App {
                             self.game_thread.set_paused(false);
                         }
                         _ => {}
-                    }
-                };
-            }
-            // pause logic loop
-            PhysicalKey::Code(KeyCode::KeyP) => {
-                if self.inputs.p.update_state(state) {
+                    };
+                }
+                // pause logic loop
+                PhysicalKey::Code(KeyCode::KeyP) => {
                     if self.game_state == GameState::Playing {
                         let paused = self
                             .game_thread
@@ -590,28 +547,20 @@ impl App {
                         self.game_thread.set_paused(!paused);
                     }
                 }
-            }
-            PhysicalKey::Code(KeyCode::Equal) => {
-                // step logic loop
-                if self.inputs.equals.update_state(state) {
+                PhysicalKey::Code(KeyCode::Equal) => {
+                    // step logic loop
                     self.game_thread.step();
                 }
-            }
-            PhysicalKey::Code(KeyCode::KeyO) => {
-                // add bounding box
-                self.inputs.o.update_state(state);
-            }
-            PhysicalKey::Code(KeyCode::KeyI) => {
-                // scroll through depths
-                if self.inputs.i.update_state(state) {
+                PhysicalKey::Code(KeyCode::KeyI) => {
+                    // scroll through depths
                     if let Some(depth) = self.bounds_debug_depth {
                         self.bounds_debug_depth = Some(depth + 1);
                     } else {
                         self.bounds_debug_depth = Some(0);
                     }
                 }
+                _ => {}
             }
-            _ => {}
         }
     }
 }
@@ -832,88 +781,5 @@ impl GameWorldThread {
     fn set_delta_time(&self, micros: u64) {
         self.delta_micros
             .store(micros, std::sync::atomic::Ordering::Relaxed);
-    }
-}
-
-impl InputState {
-    /// FPS movement
-    pub fn move_transform(
-        &self,
-        transform: &mut Transform,
-        seconds_passed: f32,
-        speed: f32,
-        slow_coeff: f32,
-    ) {
-        let mut movement = Vector3::zero();
-        let mut y_movement = 0.;
-        if self.w {
-            movement.z -= 1.; // forward
-        } else if self.s {
-            movement.z += 1.; // backwards
-        }
-        if self.a {
-            movement.x -= 1.; // left
-        } else if self.d {
-            movement.x += 1.; // right
-        }
-        if self.space {
-            y_movement += 1.;
-        } else if self.shift {
-            y_movement -= 1.;
-        }
-
-        let view = transform.get_local_transform();
-        movement.y = 0.;
-
-        movement = view.rotation.rotate_vector(movement);
-        movement.y = 0.;
-        if !movement.is_zero() {
-            movement = movement.normalize();
-        }
-
-        movement.y = y_movement;
-
-        if self.ctrl {
-            movement *= slow_coeff;
-        }
-
-        // apply movement
-        transform.set_translation(view.translation + movement * speed * seconds_passed);
-    }
-}
-
-impl ButtonState {
-    fn new() -> Self {
-        Self {
-            was_pressed: false,
-            just_pressed: false,
-        }
-    }
-
-    /// Updates state and return new just_pressed
-    fn update_state(&mut self, state: ElementState) -> bool {
-        let pressed = state == ElementState::Pressed;
-        self.just_pressed = pressed && !self.was_pressed;
-        self.was_pressed = pressed;
-        self.just_pressed
-    }
-
-    pub fn get_just_pressed(&self) -> bool {
-        self.just_pressed
-    }
-
-    /// get button_down and reset it (kinda like an Option::take() actually)
-    pub fn consume_button_down(&mut self) -> bool {
-        if self.just_pressed {
-            self.just_pressed = false;
-            true
-        } else {
-            false
-        }
-    }
-}
-impl Default for ButtonState {
-    fn default() -> Self {
-        Self::new()
     }
 }

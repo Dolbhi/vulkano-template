@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use cgmath::{Quaternion, Rotation3};
 
 use crate::{
-    app::InputState,
+    input::InputState,
     physics::{ColliderSystem, LeafInHierachy, RigidBody},
     LOGIC_PROFILER,
 };

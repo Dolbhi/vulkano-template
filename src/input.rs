@@ -33,22 +33,25 @@ pub struct ButtonState {
     just_pressed: bool,
 }
 
+/// Macro for creating the InputState struct, provide tuples of input names and the corresponding key code, followed by non keyboard input names
+///
+/// Automatically generate function for updating keyboard inputs, other inputs must be updated some other way
 #[macro_export]
 macro_rules! create_input_struct {
-    {$(($name:ident, $code:pat)),+,$($name_2:ident),*} => {
+    {$(($key_name:ident, $code:pat)),+,$($other_name:ident),*} => {
         /// Input state is stored as a ButtonState (for rising edge detection)
         #[derive(Default, Clone)]
         pub struct InputState {
-            $(pub $name: ButtonState),+,
-            $(pub $name_2: ButtonState),*
+            $(pub $key_name: ButtonState),+,
+            $(pub $other_name: ButtonState),*
         }
 
         impl InputState {
-            /// update key state
-            pub fn handle_keyboard_input(&mut self, key_code: PhysicalKey, state: ElementState) {
+            /// update key state, returns true if the key was just pressed (state changed from released to pressed after this func call)
+            pub fn handle_keyboard_input(&mut self, key_code: PhysicalKey, state: ElementState) -> bool {
                 match key_code {
-                    $(PhysicalKey::Code($code) => {self.$name.update_state(state);},)+
-                    _ => {}
+                    $(PhysicalKey::Code($code) => self.$key_name.update_state(state),)+
+                    _ => false
                 }
             }
         }
@@ -111,13 +114,16 @@ impl ButtonState {
     }
 
     /// Updates state and return new just_pressed
-    fn update_state(&mut self, state: ElementState) -> bool {
+    pub fn update_state(&mut self, state: ElementState) -> bool {
         let pressed = state == ElementState::Pressed;
         self.just_pressed = pressed && !self.was_pressed;
         self.was_pressed = pressed;
         self.just_pressed
     }
 
+    pub fn get_was_pressed(&self) -> bool {
+        self.was_pressed
+    }
     pub fn get_just_pressed(&self) -> bool {
         self.just_pressed
     }
