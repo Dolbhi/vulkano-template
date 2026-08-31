@@ -95,13 +95,6 @@ struct GameWorldThread {
     paused: Arc<AtomicBool>,
 }
 
-// struct GameDataLoader<'a> {
-//     global_data: GPUGlobalData,
-//     ambient_light: [f32; 4],
-//     world: &'a mut World,
-//     transforms: &'a mut TransformSystem,
-// }
-
 impl App {
     pub fn start() -> Self {
         println!("Welcome to THE RUSTY RENDERER!");
@@ -178,107 +171,6 @@ impl App {
 
         Ok(())
     }
-
-    // pub fn handle_winit_event(
-    //     &mut self,
-    //     event: Event<()>,
-    //     control_flow: &mut winit::event_loop::ControlFlow,
-    // ) {
-    //     match event {
-    //         Event::WindowEvent { event, .. } => {
-    //             if !self.render_loop.context.gui.update(&event) {
-    //                 match event {
-    //                     WindowEvent::CloseRequested => control_flow.set_exit(),
-    //                     WindowEvent::Resized(_) => self.render_loop.handle_window_resize(),
-    //                     WindowEvent::KeyboardInput {
-    //                         input:
-    //                             KeyboardInput {
-    //                                 virtual_keycode: Some(code),
-    //                                 state,
-    //                                 ..
-    //                             },
-    //                         ..
-    //                     } => self.handle_keyboard_input(code, state),
-    //                     WindowEvent::MouseInput { state, button, .. } => {
-    //                         if button == MouseButton::Left {
-    //                             self.inputs.lmb.update_state(state);
-    //                         }
-    //                     }
-    //                     _ => {}
-    //                 }
-    //             }
-    //         }
-    //         Event::RedrawRequested(_) => {
-    //             let update_start = Instant::now();
-    //             // let duration_from_last_frame = update_start - self.last_frame_time;
-
-    //             // gui
-    //             let mut gui_result = MenuOption::None;
-    //             self.render_loop.context.gui.immediate_ui(|gui| {
-    //                 let ctx = &gui.context();
-
-    //                 ui::profiler_window(ctx);
-
-    //                 // let window_rect = Rect::from_center_size((500., 300.).into(), Vec2::splat(200.));
-    //                 match self.game_state {
-    //                     GameState::MainMenu => ui::main_menu(ctx, &mut gui_result),
-    //                     GameState::Paused => ui::pause_menu(ctx, &mut gui_result),
-    //                     _ => {}
-    //                 };
-    //             });
-    //             match gui_result {
-    //                 ui::MenuOption::None => {}
-    //                 ui::MenuOption::LoadLevel(i) => match self.load_level(i) {
-    //                     Ok(()) => {
-    //                         self.game_state = GameState::Playing;
-    //                         self.lock_cursor();
-    //                         self.game_thread.set_paused(true);
-    //                     }
-    //                     Err(e) => println!("[Error] {e}"),
-    //                 },
-    //                 ui::MenuOption::QuitLevel => {
-    //                     self.game_state = GameState::MainMenu;
-    //                     // self.unlock_cursor();
-
-    //                     let mut world = self.world.lock().unwrap();
-    //                     world.clear();
-    //                 }
-    //                 ui::MenuOption::Quit => control_flow.set_exit(),
-    //             }
-
-    //             // profile logic update
-    //             unsafe {
-    //                 let mut profiler = RENDER_PROFILER.take().unwrap();
-    //                 profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
-    //                 RENDER_PROFILER = Some(profiler);
-    //             }
-
-    //             self.update_render();
-
-    //             unsafe {
-    //                 let mut profiler = RENDER_PROFILER.take().unwrap();
-    //                 profiler.end_frame();
-    //                 RENDER_PROFILER = Some(profiler);
-    //             }
-
-    //             self.last_frame_time = update_start;
-    //         }
-    //         Event::MainEventsCleared => self.render_loop.context.window.request_redraw(),
-    //         Event::DeviceEvent {
-    //             event: winit::event::DeviceEvent::MouseMotion { delta },
-    //             ..
-    //         } => {
-    //             if self.game_state == GameState::Playing {
-    //                 Camera::camera_rotation(
-    //                     &mut self.camera_rotation,
-    //                     delta.0 as f32,
-    //                     delta.1 as f32,
-    //                 );
-    //             }
-    //         }
-    //         _ => (),
-    //     }
-    // }
 
     /// upload render objects and do render loop
     ///
@@ -358,33 +250,7 @@ impl App {
                         load_object!(world, transform, collider, ro, rigidbody);
                     }
 
-                    // camera data
-                    // let cam_model = transforms.get_slerp_model(&camera.transform).unwrap();
-                    let global_data = GPUGlobalData::from_camera(camera, extends);
-
-                    // TODO: have `deferred_renderer` provide this method since it defines the RO types
-                    // P.S. Could also have a generic method to handle any RO type
-                    // P.P.S Could also have a generic method to handle any world queries with iteration???
-                    {
-                        // update basic render objects
-                        let mut query = <(&TransformID, &mut RenderObject<()>)>::query();
-                        // println!("==== RENDER OBJECT DATA ====");
-                        for (transform_id, render_object) in query.iter_mut(world) {
-                            render_object.update_and_upload(transform_id, transforms);
-                        }
-
-                        let mut query = <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query();
-                        // println!("==== RENDER COLORED DATA ====");
-                        for (transform_id, render_object) in query.iter_mut(world) {
-                            render_object.update_and_upload(transform_id, transforms);
-                        }
-                    }
-
-                    // get frame data struct for upload
-                    let frame = renderer.prepare_frame(image_i);
-                    frame.update_global_data(global_data);
-
-                    // bounding box
+                    // gather debug bounding boxes to draw
                     if self.bounds_debug_depth == Some(colliders.tree_depth()) {
                         self.bounds_debug_depth = None;
                     }
@@ -406,58 +272,6 @@ impl App {
                                     }
                                 })
                                 .collect()
-
-                        // // show overlaps
-                        // for (coll_1, coll_2) in colliders.get_potential_overlaps() {
-                        //     let bounds_1 = coll_1.get_bounds();
-                        //     let bounds_2 = coll_2.get_bounds();
-
-                        //     let centre = bounds_1.centre();
-                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [0., 1., 0., 1.],
-                        //     });
-
-                        //     let centre = bounds_2.centre();
-                        //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [1., 1., 0., 1.],
-                        //     });
-                        // }
-                        // // show contacts
-                        // let mut contacts = colliders.get_contacts(transforms);
-                        // for contact in contacts.get_contacts() {
-                        //     let (position, normal, _) = contact.get_debug_info();
-
-                        //     // contact point
-                        //     let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [0., 0., 1., 1.],
-                        //     });
-
-                        //     // normal indicator
-                        //     let min_cast: [f32; 3] =
-                        //         (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
-                        //     let max_cast: [f32; 3] =
-                        //         (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
-                        //     bounding_boxes.push(GPUAABB {
-                        //         min: min_cast.into(),
-                        //         max: max_cast.into(),
-                        //         color: [0., 0., 1., 1.],
-                        //     });
-                        // }
-                        // contacts.clear();
-
-                        // frame.upload_box_data(bounding_boxes.into_iter());
                         } else {
                             colliders
                                 .bounds_iter()
@@ -472,58 +286,6 @@ impl App {
                                     }
                                 })
                                 .collect()
-
-                            // // show overlaps
-                            // for (coll_1, coll_2) in colliders.get_potential_overlaps() {
-                            //     let bounds_1 = coll_1.get_bounds();
-                            //     let bounds_2 = coll_2.get_bounds();
-
-                            //     let centre = bounds_1.centre();
-                            //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                            //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                            //     bounding_boxes.push(GPUAABB {
-                            //         min: min_cast.into(),
-                            //         max: max_cast.into(),
-                            //         color: [0., 1., 0., 1.],
-                            //     });
-
-                            //     let centre = bounds_2.centre();
-                            //     let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                            //     let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                            //     bounding_boxes.push(GPUAABB {
-                            //         min: min_cast.into(),
-                            //         max: max_cast.into(),
-                            //         color: [1., 1., 0., 1.],
-                            //     });
-                            // }
-                            // // show contacts
-                            // let mut contacts = colliders.get_contacts(transforms);
-                            // for contact in contacts.get_contacts() {
-                            //     let (position, normal, _) = contact.get_debug_info();
-
-                            //     // contact point
-                            //     let min_cast: [f32; 3] = (position - Vector3::new(0.1, 0.1, 0.1)).into();
-                            //     let max_cast: [f32; 3] = (position + Vector3::new(0.1, 0.1, 0.1)).into();
-                            //     bounding_boxes.push(GPUAABB {
-                            //         min: min_cast.into(),
-                            //         max: max_cast.into(),
-                            //         color: [0., 0., 1., 1.],
-                            //     });
-
-                            //     // normal indicator
-                            //     let min_cast: [f32; 3] =
-                            //         (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
-                            //     let max_cast: [f32; 3] =
-                            //         (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
-                            //     bounding_boxes.push(GPUAABB {
-                            //         min: min_cast.into(),
-                            //         max: max_cast.into(),
-                            //         color: [0., 0., 1., 1.],
-                            //     });
-                            // }
-                            // contacts.clear();
-
-                            // frame.upload_box_data(bounding_boxes.into_iter());
                         };
                     // show overlaps
                     for (coll_1, coll_2) in colliders.get_potential_overlaps() {
@@ -653,6 +415,30 @@ impl App {
                         }
                     }
                     camera.sync_transform(transforms);
+
+
+                    //  Render uploads
+                    // TODO: have `deferred_renderer` provide this method since it defines the RO types
+                    // P.S. Could also have a generic method to handle any RO type
+                    // P.P.S Could also have a generic method to handle any world queries with iteration???
+                    {
+                        // update basic render objects
+                        let mut query = <(&TransformID, &mut RenderObject<()>)>::query();
+                        // println!("==== RENDER OBJECT DATA ====");
+                        for (transform_id, render_object) in query.iter_mut(world) {
+                            render_object.update_and_upload(transform_id, transforms);
+                        }
+
+                        let mut query = <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query();
+                        // println!("==== RENDER COLORED DATA ====");
+                        for (transform_id, render_object) in query.iter_mut(world) {
+                            render_object.update_and_upload(transform_id, transforms);
+                        }
+                    }
+
+                    // get frame data struct for upload
+                    let frame = renderer.prepare_frame(image_i);
+                    frame.update_global_data(GPUGlobalData::from_camera(camera, extends));
 
                     // lines (currently only vel lines in red and bivel in blue)
                     let mut query = <(&TransformID, &Arc<RwLock<RigidBody>>)>::query();
@@ -1111,8 +897,12 @@ impl ButtonState {
         self.just_pressed
     }
 
+    pub fn get_just_pressed(&self) -> bool {
+        self.just_pressed
+    }
+
     /// get button_down and reset it (kinda like an Option::take() actually)
-    fn consume_button_down(&mut self) -> bool {
+    pub fn consume_button_down(&mut self) -> bool {
         if self.just_pressed {
             self.just_pressed = false;
             true
