@@ -349,7 +349,7 @@ impl App {
                         });
                     }
 
-                    // add random bounds
+                    // add new cube
                     if self.inputs.o.consume_button_down() {
                         // let mut rng = rand::thread_rng();
 
