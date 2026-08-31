@@ -312,31 +312,6 @@ impl App {
                     } = &mut *self.world.lock().unwrap();
                     transforms.update_interpolation(*last_delta_time);
 
-                    // sync inputs
-                    if self.game_state == GameState::Playing {
-                        *inputs = self.inputs.clone();
-                        // inputs.movement = self.inputs.get_move();
-                        camera.set_rotation(self.camera_rotation);
-
-                        // allow moving while frozen
-                        if self
-                            .game_thread
-                            .paused
-                            .load(std::sync::atomic::Ordering::Acquire)
-                        {
-                            // move cam
-                            inputs.move_transform(
-                                transforms.get_transform_mut(&camera.transform).unwrap(),
-                                Instant::now()
-                                    .duration_since(self.last_frame_time)
-                                    .as_secs_f32(),
-                                6.,
-                                0.1,
-                            );
-                        }
-                    }
-                    camera.sync_transform(transforms);
-
                     // update basic mat swap
                     if self.inputs.q.consume_button_down() {
                         let mut query =
@@ -351,22 +326,6 @@ impl App {
 
                     // add new cube
                     if self.inputs.o.consume_button_down() {
-                        // let mut rng = rand::thread_rng();
-
-                        // let pos: Vector3<f32> = Vector3::new(
-                        //     rng.gen_range(-8.0..8.0),
-                        //     rng.gen_range(-8.0..8.0),
-                        //     rng.gen_range(-8.0..8.0),
-                        // );
-                        // let scale = Vector3::new(
-                        //     rng.gen_range(0.0..2.0),
-                        //     rng.gen_range(0.0..2.0),
-                        //     rng.gen_range(0.0..2.0),
-                        // );
-
-                        // let transform =
-                        //     transforms.add_transform(TransformCreateInfo::from(pos).set_scale(scale));
-
                         // create unit cube at cam position and rotation
                         let cam_transform = transforms
                             .get_transform(&camera.transform)
@@ -669,6 +628,31 @@ impl App {
                             }
                         }
                     }
+
+                    // send inputs to game world
+                    if self.game_state == GameState::Playing {
+                        *inputs = self.inputs.clone();
+                        // inputs.movement = self.inputs.get_move();
+                        camera.set_rotation(self.camera_rotation);
+
+                        // allow moving while frozen
+                        if self
+                            .game_thread
+                            .paused
+                            .load(std::sync::atomic::Ordering::Acquire)
+                        {
+                            // move cam
+                            inputs.move_transform(
+                                transforms.get_transform_mut(&camera.transform).unwrap(),
+                                Instant::now()
+                                    .duration_since(self.last_frame_time)
+                                    .as_secs_f32(),
+                                6.,
+                                0.1,
+                            );
+                        }
+                    }
+                    camera.sync_transform(transforms);
 
                     // lines (currently only vel lines in red and bivel in blue)
                     let mut query = <(&TransformID, &Arc<RwLock<RigidBody>>)>::query();
