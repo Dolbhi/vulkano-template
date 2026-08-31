@@ -250,108 +250,6 @@ impl App {
                         load_object!(world, transform, collider, ro, rigidbody);
                     }
 
-                    // gather debug bounding boxes to draw
-                    if self.bounds_debug_depth == Some(colliders.tree_depth()) {
-                        self.bounds_debug_depth = None;
-                    }
-
-                    // currently possible to exceed the bounding box rendering buffer limit with like 12 colliders
-                    let mut bounding_boxes: Vec<GPUAABB> =
-                        if let Some(debug_depth) = self.bounds_debug_depth {
-                            colliders
-                                .bounds_iter()
-                                .filter(|(_, depth)| *depth == debug_depth)
-                                .map(|(bounds, depth)| {
-                                    let mag = 1. / (depth as f32 + 1.);
-                                    let min_cast: [f32; 3] = bounds.min.into();
-                                    let max_cast: [f32; 3] = bounds.max.into();
-                                    GPUAABB {
-                                        min: min_cast.into(),
-                                        max: max_cast.into(),
-                                        color: [1., mag, mag, 1.],
-                                    }
-                                })
-                                .collect()
-                        } else {
-                            colliders
-                                .bounds_iter()
-                                .map(|(bounds, depth)| {
-                                    let mag = 1. / (depth as f32 + 1.);
-                                    let min_cast: [f32; 3] = bounds.min.into();
-                                    let max_cast: [f32; 3] = bounds.max.into();
-                                    GPUAABB {
-                                        min: min_cast.into(),
-                                        max: max_cast.into(),
-                                        color: [1., mag, mag, 1.],
-                                    }
-                                })
-                                .collect()
-                        };
-                    // show overlaps
-                    for (coll_1, coll_2) in colliders.get_potential_overlaps() {
-                        let bounds_1 = coll_1.calc_bounding(transforms);
-                        let bounds_2 = coll_2.calc_bounding(transforms);
-
-                        let centre = bounds_1.centre();
-                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [0., 1., 0., 1.],
-                        });
-
-                        let centre = bounds_2.centre();
-                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
-                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [1., 1., 0., 1.],
-                        });
-                    }
-                    // show contacts
-                    let contacts = colliders.get_last_contacts();
-                    let mut coll_lines = vec![];
-                    for (position, normal, age, penetration) in contacts {
-                        // colour
-                        let color = if *age == 0 {
-                            [0., 0., 1., 1.]
-                        } else {
-                            [0., 1., 1., 1.]
-                        };
-
-                        // contact point
-                        let min_cast: [f32; 3] = (position - Vector3::new(0.03, 0.03, 0.03)).into();
-                        let max_cast: [f32; 3] = (position + Vector3::new(0.03, 0.03, 0.03)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color,
-                        });
-
-                        // normal indicator
-                        // let min_cast: [f32; 3] =
-                        //     (position + normal - Vector3::new(0.05, 0.05, 0.05)).into();
-                        // let max_cast: [f32; 3] =
-                        //     (position + normal + Vector3::new(0.05, 0.05, 0.05)).into();
-                        // bounding_boxes.push(GPUAABB {
-                        //     min: min_cast.into(),
-                        //     max: max_cast.into(),
-                        //     color,
-                        // });
-
-                        let min: [f32; 3] = (position.clone()).into();
-                        // normal points out from rb_1, position is on rb_1, so rb_2's pen point is opposite from normal dir
-                        let max: [f32; 3] = (position - normal * *penetration).into();
-
-                        coll_lines.push(GPUAABB {
-                            min: min.into(),
-                            max: max.into(),
-                            color,
-                        });
-                    }
-
                     // raycast
                     let cam_model = transforms.get_global_model(&camera.transform).unwrap();
                     let raycast_result = colliders.raycast(
@@ -360,14 +258,11 @@ impl App {
                         -cam_model.z.truncate(),
                         20.,
                     );
+                    let mut raycast_data = None;
                     if let Some((point, coll)) = raycast_result {
                         let min_cast: [f32; 3] = (point - Vector3::new(0.1, 0.1, 0.1)).into();
                         let max_cast: [f32; 3] = (point + Vector3::new(0.1, 0.1, 0.1)).into();
-                        bounding_boxes.push(GPUAABB {
-                            min: min_cast.into(),
-                            max: max_cast.into(),
-                            color: [1., 0., 1., 1.],
-                        });
+                        raycast_data = Some((min_cast, max_cast));
 
                         if self.inputs.lmb.consume_button_down() {
                             if let Some(rigidbody) = coll.get_rigidbody() {
@@ -416,7 +311,6 @@ impl App {
                     }
                     camera.sync_transform(transforms);
 
-
                     //  Render uploads
                     // TODO: have `deferred_renderer` provide this method since it defines the RO types
                     // P.S. Could also have a generic method to handle any RO type
@@ -439,6 +333,107 @@ impl App {
                     // get frame data struct for upload
                     let frame = renderer.prepare_frame(image_i);
                     frame.update_global_data(GPUGlobalData::from_camera(camera, extends));
+
+                    // gather debug bounding boxes to draw
+                    if self.bounds_debug_depth == Some(colliders.tree_depth()) {
+                        self.bounds_debug_depth = None;
+                    }
+
+                    // currently possible to exceed the bounding box rendering buffer limit with like 12 colliders
+                    let mut bounding_boxes: Vec<GPUAABB> =
+                        if let Some(debug_depth) = self.bounds_debug_depth {
+                            colliders
+                                .bounds_iter()
+                                .filter(|(_, depth)| *depth == debug_depth)
+                                .map(|(bounds, depth)| {
+                                    let mag = 1. / (depth as f32 + 1.);
+                                    let min_cast: [f32; 3] = bounds.min.into();
+                                    let max_cast: [f32; 3] = bounds.max.into();
+                                    GPUAABB {
+                                        min: min_cast.into(),
+                                        max: max_cast.into(),
+                                        color: [1., mag, mag, 1.],
+                                    }
+                                })
+                                .collect()
+                        } else {
+                            colliders
+                                .bounds_iter()
+                                .map(|(bounds, depth)| {
+                                    let mag = 1. / (depth as f32 + 1.);
+                                    let min_cast: [f32; 3] = bounds.min.into();
+                                    let max_cast: [f32; 3] = bounds.max.into();
+                                    GPUAABB {
+                                        min: min_cast.into(),
+                                        max: max_cast.into(),
+                                        color: [1., mag, mag, 1.],
+                                    }
+                                })
+                                .collect()
+                        };
+                    if let Some((min, max)) = raycast_data {
+                        bounding_boxes.insert(
+                            bounding_boxes.len(),
+                            GPUAABB {
+                                min: min.into(),
+                                max: max.into(),
+                                color: [1., 0., 1., 1.],
+                            },
+                        );
+                    }
+                    // show overlaps
+                    for (coll_1, coll_2) in colliders.get_potential_overlaps() {
+                        let bounds_1 = coll_1.calc_bounding(transforms);
+                        let bounds_2 = coll_2.calc_bounding(transforms);
+
+                        let centre = bounds_1.centre();
+                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [0., 1., 0., 1.],
+                        });
+
+                        let centre = bounds_2.centre();
+                        let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
+                        let max_cast: [f32; 3] = (centre + Vector3::new(0.1, 0.1, 0.1)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color: [1., 1., 0., 1.],
+                        });
+                    }
+                    // show contacts
+                    let contacts = colliders.get_last_contacts();
+                    let mut coll_lines = vec![];
+                    for (position, normal, age, penetration) in contacts {
+                        // colour
+                        let color = if *age == 0 {
+                            [0., 0., 1., 1.]
+                        } else {
+                            [0., 1., 1., 1.]
+                        };
+
+                        // contact point
+                        let min_cast: [f32; 3] = (position - Vector3::new(0.03, 0.03, 0.03)).into();
+                        let max_cast: [f32; 3] = (position + Vector3::new(0.03, 0.03, 0.03)).into();
+                        bounding_boxes.push(GPUAABB {
+                            min: min_cast.into(),
+                            max: max_cast.into(),
+                            color,
+                        });
+
+                        let min: [f32; 3] = (position.clone()).into();
+                        // normal points out from rb_1, position is on rb_1, so rb_2's pen point is opposite from normal dir
+                        let max: [f32; 3] = (position - normal * *penetration).into();
+
+                        coll_lines.push(GPUAABB {
+                            min: min.into(),
+                            max: max.into(),
+                            color,
+                        });
+                    }
 
                     // lines (currently only vel lines in red and bivel in blue)
                     let mut query = <(&TransformID, &Arc<RwLock<RigidBody>>)>::query();
