@@ -5,7 +5,7 @@ pub mod transform;
 pub mod utility;
 
 pub use camera::Camera;
-pub use game_world::{GameWorld, Inputs};
+pub use game_world::GameWorld;
 
 use cgmath::{Rad, Vector3};
 

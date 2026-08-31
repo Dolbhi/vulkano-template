@@ -1,68 +1,21 @@
 use std::sync::{Arc, RwLock};
 
-use cgmath::{InnerSpace, Quaternion, Rotation, Rotation3, Vector3, Zero};
+use cgmath::{Quaternion, Rotation3};
 
 use crate::{
+    app::InputState,
     physics::{ColliderSystem, LeafInHierachy, RigidBody},
     LOGIC_PROFILER,
 };
 
 use super::{
-    transform::{Transform, TransformID, TransformSystem},
+    transform::{TransformID, TransformSystem},
     Camera, Rotate, TransformTracker,
 };
 use legion::*;
 
-const CAM_SPEED: f32 = 6.;
-const SLOW_COEFF: f32 = 0.1;
-
-pub struct Inputs {
-    pub movement: Vector3<f32>,
-    pub slow: bool,
-}
-
-impl Default for Inputs {
-    fn default() -> Self {
-        Self {
-            movement: Vector3::zero(),
-            slow: false,
-        }
-    }
-}
-impl Inputs {
-    pub fn move_transform(&self, transform: &mut Transform, seconds_passed: f32) {
-        let view = transform.get_local_transform();
-
-        let mut final_move = self.movement;
-        final_move.y = 0.;
-
-        // if self.w == Pressed {
-        //     movement.z -= 1.; // forward
-        // } else if self.s == Pressed {
-        //     movement.z += 1.; // backwards
-        // }
-        // if self.a == Pressed {
-        //     movement.x -= 1.; // left
-        // } else if self.d == Pressed {
-        //     movement.x += 1.; // right
-        // }
-
-        final_move = view.rotation.rotate_vector(final_move);
-        final_move.y = 0.;
-        if final_move != Vector3::zero() {
-            final_move = final_move.normalize();
-        }
-
-        final_move.y = self.movement.y;
-
-        if self.slow {
-            final_move *= SLOW_COEFF;
-        }
-
-        // apply movement
-        transform.set_translation(view.translation + final_move * CAM_SPEED * seconds_passed);
-    }
-}
+pub const CAM_SPEED: f32 = 6.;
+pub const SLOW_COEFF: f32 = 0.1;
 
 /// stores game data and handles logic updates
 pub struct GameWorld {
@@ -72,7 +25,7 @@ pub struct GameWorld {
     pub camera: Camera,
     pub fixed_seconds: f32,
     pub last_delta_time: f32,
-    pub inputs: Inputs,
+    pub inputs: InputState,
 }
 
 impl GameWorld {
@@ -92,7 +45,7 @@ impl GameWorld {
             camera,
             fixed_seconds: 0.,
             last_delta_time: 0.,
-            inputs: Inputs::default(),
+            inputs: InputState::default(),
         }
     }
 
@@ -172,6 +125,8 @@ impl GameWorld {
                 .get_transform_mut(&self.camera.transform)
                 .unwrap(),
             seconds_passed,
+            CAM_SPEED,
+            SLOW_COEFF,
         );
 
         // update rotate

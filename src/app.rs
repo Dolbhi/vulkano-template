@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cgmath::{InnerSpace, Matrix3, One, Quaternion, Vector3, Vector4};
+use cgmath::{InnerSpace, Matrix3, One, Quaternion, Rotation, Vector3, Vector4, Zero};
 use legion::*;
 
 // use rand::Rng;
@@ -20,8 +20,8 @@ use winit::{
 use crate::{
     game_objects::{
         light::PointLightComponent,
-        transform::{TransformCreateInfo, TransformID},
-        Camera, GameWorld, Inputs, MaterialSwapper, WorldLoader,
+        transform::{Transform, TransformCreateInfo, TransformID},
+        Camera, GameWorld, MaterialSwapper, WorldLoader,
     },
     load_object,
     physics::{quick_inverse, CuboidCollider, RigidBody},
@@ -32,7 +32,8 @@ use crate::{
     LOGIC_PROFILER, RENDER_PROFILER,
 };
 
-struct ButtonState {
+#[derive(Clone)]
+pub struct ButtonState {
     last_state: ElementState,
     /// true if last input update changed button state from released to pressed
     button_down: bool,
@@ -40,8 +41,8 @@ struct ButtonState {
 
 /// Input state is stored either as a simple bool indicating if currently press
 /// or as a ButtonState (mainly for rising edge detection)
-#[derive(Default)]
-struct InputState {
+#[derive(Default, Clone)]
+pub struct InputState {
     a: bool,
     w: bool,
     s: bool,
@@ -58,32 +59,6 @@ struct InputState {
     lmb: ButtonState,
     escape: ButtonState,
     equals: ButtonState,
-}
-
-impl Into<Inputs> for &InputState {
-    fn into(self) -> Inputs {
-        let mut movement = <Vector3<f32> as cgmath::Zero>::zero();
-        if self.w {
-            movement.z -= 1.; // forward
-        } else if self.s {
-            movement.z += 1.; // backwards
-        }
-        if self.a {
-            movement.x -= 1.; // left
-        } else if self.d {
-            movement.x += 1.; // right
-        }
-        if self.space {
-            movement.y += 1.;
-        } else if self.shift {
-            movement.y -= 1.;
-        }
-
-        Inputs {
-            movement,
-            slow: self.ctrl,
-        }
-    }
 }
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
@@ -339,7 +314,7 @@ impl App {
 
                     // sync inputs
                     if self.game_state == GameState::Playing {
-                        *inputs = (&self.inputs).into();
+                        *inputs = self.inputs.clone();
                         // inputs.movement = self.inputs.get_move();
                         camera.set_rotation(self.camera_rotation);
 
@@ -355,6 +330,8 @@ impl App {
                                 Instant::now()
                                     .duration_since(self.last_frame_time)
                                     .as_secs_f32(),
+                                6.,
+                                0.1,
                             );
                         }
                     }
@@ -1084,6 +1061,53 @@ impl GameWorldThread {
     fn set_delta_time(&self, micros: u64) {
         self.delta_micros
             .store(micros, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+impl InputState {
+    /// FPS movement
+    pub fn move_transform(
+        &self,
+        transform: &mut Transform,
+        seconds_passed: f32,
+        speed: f32,
+        slow_coeff: f32,
+    ) {
+        let mut movement = Vector3::zero();
+        let mut y_movement = 0.;
+        if self.w {
+            movement.z -= 1.; // forward
+        } else if self.s {
+            movement.z += 1.; // backwards
+        }
+        if self.a {
+            movement.x -= 1.; // left
+        } else if self.d {
+            movement.x += 1.; // right
+        }
+        if self.space {
+            y_movement += 1.;
+        } else if self.shift {
+            y_movement -= 1.;
+        }
+
+        let view = transform.get_local_transform();
+        movement.y = 0.;
+
+        movement = view.rotation.rotate_vector(movement);
+        movement.y = 0.;
+        if !movement.is_zero() {
+            movement = movement.normalize();
+        }
+
+        movement.y = y_movement;
+
+        if self.ctrl {
+            movement *= slow_coeff;
+        }
+
+        // apply movement
+        transform.set_translation(view.translation + movement * speed * seconds_passed);
     }
 }
 
