@@ -8,7 +8,7 @@ use super::{
     matrix_truncate, RigidBody, Vector,
 };
 use crate::game_objects::transform::{TransformID, TransformSystem};
-use bvh::{Bvh, DepthIter, LeafOutsideHierachy};
+use bvh::{BoundaryVolumeHierachy, DepthIter, LeafOutsideHierachy};
 use cgmath::{InnerSpace, Matrix, Matrix4, MetricSpace, SquareMatrix, Zero};
 use core::f32;
 use ray::Ray;
@@ -37,7 +37,7 @@ pub struct CuboidCollider {
 /// Note: Probably a useless wrapper around the bvh
 #[derive(Default)]
 pub struct ColliderSystem {
-    bounds_tree: Bvh,
+    bounds_tree: BoundaryVolumeHierachy,
     contact_resolver: ContactResolver,
 }
 
@@ -274,7 +274,7 @@ impl Debug for CuboidCollider {
 impl ColliderSystem {
     pub fn new() -> Self {
         Self {
-            bounds_tree: Bvh::new(),
+            bounds_tree: BoundaryVolumeHierachy::new(),
             contact_resolver: ContactResolver::new(),
         }
     }
@@ -296,10 +296,11 @@ impl ColliderSystem {
         collider: CuboidCollider,
         transforms: &mut TransformSystem,
     ) -> LeafInHierachy {
-        self.bounds_tree.insert(Bvh::register_collider(
-            collider.calc_bounding(transforms),
-            Arc::new(collider),
-        ))
+        self.bounds_tree
+            .insert(BoundaryVolumeHierachy::register_collider(
+                collider.calc_bounding(transforms),
+                Arc::new(collider),
+            ))
     }
     pub fn remove(
         &mut self,

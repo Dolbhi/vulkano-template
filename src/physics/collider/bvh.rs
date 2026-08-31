@@ -9,7 +9,7 @@ use std::{
 };
 
 #[derive(Default)]
-pub struct Bvh {
+pub struct BoundaryVolumeHierachy {
     root: Option<NonNull<Node>>,
     /// number of leafs (excluding those outside hierachy)
     size: usize,
@@ -40,7 +40,7 @@ struct BranchLinks {
 /// the NonNull node should only be dereferenced when provided with a &mut BVH matching the second element
 pub struct LeafInHierachy {
     leaf: NonNull<Node>,
-    hierachy: *const Bvh,
+    hierachy: *const BoundaryVolumeHierachy,
 }
 pub struct LeafOutsideHierachy {
     leaf: NonNull<Node>,
@@ -50,12 +50,12 @@ pub struct LeafOutsideHierachy {
 pub struct DepthIter<'a> {
     current: Vec<NonNull<Node>>,
     next: Vec<NonNull<Node>>,
-    lifetime: PhantomData<&'a Bvh>,
+    lifetime: PhantomData<&'a BoundaryVolumeHierachy>,
 }
 
-impl Bvh {
+impl BoundaryVolumeHierachy {
     pub fn new() -> Self {
-        Bvh {
+        BoundaryVolumeHierachy {
             root: None,
             size: 0,
         }
@@ -348,10 +348,10 @@ impl Bvh {
 
 //     }
 // }
-unsafe impl Send for Bvh {}
-unsafe impl Sync for Bvh {}
+unsafe impl Send for BoundaryVolumeHierachy {}
+unsafe impl Sync for BoundaryVolumeHierachy {}
 
-impl Drop for Bvh {
+impl Drop for BoundaryVolumeHierachy {
     fn drop(&mut self) {
         // manually drop each node
         if let Some(mut root) = self.root {
@@ -703,7 +703,7 @@ impl LeafInHierachy {
     }
 }
 impl LeafOutsideHierachy {
-    fn convert(self, hierachy: *const Bvh) -> LeafInHierachy {
+    fn convert(self, hierachy: *const BoundaryVolumeHierachy) -> LeafInHierachy {
         let x = ManuallyDrop::new(self);
         LeafInHierachy {
             leaf: x.leaf,
@@ -754,7 +754,7 @@ impl Drop for LeafOutsideHierachy {
     }
 }
 
-impl<'a> IntoIterator for &'a Bvh {
+impl<'a> IntoIterator for &'a BoundaryVolumeHierachy {
     type IntoIter = DepthIter<'a>;
     type Item = (BoundingBox, usize);
 
@@ -808,7 +808,7 @@ mod tree_tests {
 
     use crate::{game_objects::transform::TransformSystem, physics::collider::CuboidCollider};
 
-    use super::{BranchLinks, Bvh, Node, NodeContent};
+    use super::{BoundaryVolumeHierachy, BranchLinks, Node, NodeContent};
 
     fn validate_tree(
         child: &Node,
@@ -927,7 +927,7 @@ mod tree_tests {
     #[test]
     fn insert_test() {
         let mut trans = TransformSystem::new();
-        let mut tree = Bvh::new();
+        let mut tree = BoundaryVolumeHierachy::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -938,21 +938,21 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        let a = Bvh::register_collider(
+        let a = BoundaryVolumeHierachy::register_collider(
             crap_box,
             Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
             }),
         );
-        let b = Bvh::register_collider(
+        let b = BoundaryVolumeHierachy::register_collider(
             box_2,
             Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
             }),
         );
-        let c = Bvh::register_collider(
+        let c = BoundaryVolumeHierachy::register_collider(
             box_2,
             Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
@@ -971,7 +971,7 @@ mod tree_tests {
     #[test]
     fn remove_test() {
         let mut trans = TransformSystem::new();
-        let mut tree = Bvh::new();
+        let mut tree = BoundaryVolumeHierachy::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -982,21 +982,21 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        let a = Bvh::register_collider(
+        let a = BoundaryVolumeHierachy::register_collider(
             crap_box,
             Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
             }),
         );
-        let b = Bvh::register_collider(
+        let b = BoundaryVolumeHierachy::register_collider(
             box_2,
             Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
                 rigidbody: None,
             }),
         );
-        let c = Bvh::register_collider(
+        let c = BoundaryVolumeHierachy::register_collider(
             box_2,
             Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
@@ -1017,7 +1017,7 @@ mod tree_tests {
     #[test]
     fn big_tree() {
         let mut trans = TransformSystem::new();
-        let mut tree = Bvh::new();
+        let mut tree = BoundaryVolumeHierachy::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -1047,7 +1047,7 @@ mod tree_tests {
         for bounding_box in [
             crap_box, box_2, box_3, box_4, crap_box, box_5, box_6, box_2, box_4, box_6,
         ] {
-            let leaf = Bvh::register_collider(
+            let leaf = BoundaryVolumeHierachy::register_collider(
                 bounding_box,
                 Arc::new(CuboidCollider {
                     transform: trans.next().unwrap(),
@@ -1066,7 +1066,7 @@ mod tree_tests {
     #[test]
     fn big_remove() {
         let mut trans = TransformSystem::new();
-        let mut tree = Bvh::new();
+        let mut tree = BoundaryVolumeHierachy::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -1093,7 +1093,7 @@ mod tree_tests {
             min: (2.0, -5.0, 5.0).into(),
         };
 
-        let leaf = Bvh::register_collider(
+        let leaf = BoundaryVolumeHierachy::register_collider(
             box_6,
             Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
@@ -1105,7 +1105,7 @@ mod tree_tests {
         for bounding_box in [
             crap_box, box_2, box_3, box_4, crap_box, box_5, box_6, box_2, box_4, box_6,
         ] {
-            let leaf = Bvh::register_collider(
+            let leaf = BoundaryVolumeHierachy::register_collider(
                 bounding_box,
                 Arc::new(CuboidCollider {
                     transform: trans.next().unwrap(),
@@ -1118,7 +1118,7 @@ mod tree_tests {
             // }
         }
 
-        let leaf = Bvh::register_collider(
+        let leaf = BoundaryVolumeHierachy::register_collider(
             box_2,
             Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
@@ -1137,7 +1137,7 @@ mod tree_tests {
     #[test]
     fn remove_branch_root() {
         let mut trans = TransformSystem::new();
-        let mut tree = Bvh::new();
+        let mut tree = BoundaryVolumeHierachy::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
@@ -1148,7 +1148,7 @@ mod tree_tests {
             min: (1.0, 1.0, 1.0).into(),
         };
 
-        let a = Bvh::register_collider(
+        let a = BoundaryVolumeHierachy::register_collider(
             crap_box,
             Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
@@ -1156,7 +1156,7 @@ mod tree_tests {
             }),
         );
         tree.insert(a);
-        let b = Bvh::register_collider(
+        let b = BoundaryVolumeHierachy::register_collider(
             box_2,
             Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
@@ -1173,13 +1173,13 @@ mod tree_tests {
     #[test]
     fn remove_leaf_root() {
         let mut trans = TransformSystem::new();
-        let mut tree = Bvh::new();
+        let mut tree = BoundaryVolumeHierachy::new();
 
         let crap_box = super::BoundingBox {
             max: (1.0, 1.0, 1.0).into(),
             min: (0.0, 0.0, 0.0).into(),
         };
-        let remove = Bvh::register_collider(
+        let remove = BoundaryVolumeHierachy::register_collider(
             crap_box,
             Arc::new(CuboidCollider {
                 transform: trans.next().unwrap(),
