@@ -7,7 +7,7 @@ use crate::{
     game_objects::transform::{Transform, TransformID},
     utilities::math::skew,
 };
-use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, Quaternion, SquareMatrix, Vector3, Zero};
+use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, SquareMatrix, Vector3, Zero};
 use collider::ContactIdPair;
 pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy};
 use std::{
@@ -198,32 +198,6 @@ impl RigidBody {
     }
 
     /// inverse moment of inertia about an axis (and other stuff), calculated via black magic
-    pub fn angular_vel_per_impulse(
-        &self,
-        torque_per_impulse: Vector,
-        rotation: Quaternion<f32>,
-    ) -> f32 {
-        let tpi_squared = torque_per_impulse.magnitude2();
-        if tpi_squared.is_zero() {
-            return 0.;
-        }
-
-        // let world_sam = rotation * self.sqrt_angular_mass;
-        // (tpi_squared * tpi_squared) / torque_per_impulse.cross(world_sam).magnitude2()
-        let local_torque = rotation.conjugate() * torque_per_impulse;
-        let moi = local_torque.dot(
-            (
-                local_torque[0] * (self.principle_moi[0]),
-                local_torque[1] * (self.principle_moi[1]),
-                local_torque[2] * (self.principle_moi[2]),
-            )
-                .into(),
-        );
-        (tpi_squared * tpi_squared) / moi
-        // 6.
-    }
-
-    /// inverse moment of inertia about an axis (and other stuff), calculated via black magic
     pub fn va_per_i(&self, point: Vector, rotation: Matrix3<f32>) -> Matrix3<f32> {
         let point_squared = point.magnitude2();
         if point_squared.is_zero() {
@@ -309,26 +283,26 @@ mod physics_tests {
 
         println!("WHATS THE VECTOR {:?}", rb.principle_moi);
 
-        println!(
-            "(1,0,0): {:?}",
-            rb.angular_vel_per_impulse((1., 0., 0.).into(), (1., 0., 0., 0.).into())
-        );
-        println!(
-            "(1,0,1): {:?}",
-            rb.angular_vel_per_impulse((1., 0., 1.).into(), (1., 0., 0., 0.).into())
-        );
-        println!(
-            "(1,0,-1): {:?}",
-            rb.angular_vel_per_impulse((1., 0., -1.).into(), (1., 0., 0., 0.).into())
-        );
-        println!(
-            "(-1,0,1): {:?}",
-            rb.angular_vel_per_impulse((-1., 0., 1.).into(), (1., 0., 0., 0.).into())
-        );
-        println!(
-            "(-1,0,-1): {:?}",
-            rb.angular_vel_per_impulse((-1., 0., -1.).into(), (1., 0., 0., 0.).into())
-        );
+        // println!(
+        //     "(1,0,0): {:?}",
+        //     rb.angular_vel_per_impulse((1., 0., 0.).into(), (1., 0., 0., 0.).into())
+        // );
+        // println!(
+        //     "(1,0,1): {:?}",
+        //     rb.angular_vel_per_impulse((1., 0., 1.).into(), (1., 0., 0., 0.).into())
+        // );
+        // println!(
+        //     "(1,0,-1): {:?}",
+        //     rb.angular_vel_per_impulse((1., 0., -1.).into(), (1., 0., 0., 0.).into())
+        // );
+        // println!(
+        //     "(-1,0,1): {:?}",
+        //     rb.angular_vel_per_impulse((-1., 0., 1.).into(), (1., 0., 0., 0.).into())
+        // );
+        // println!(
+        //     "(-1,0,-1): {:?}",
+        //     rb.angular_vel_per_impulse((-1., 0., -1.).into(), (1., 0., 0., 0.).into())
+        // );
 
         println!(
             "(1,0,0): {:?}",
