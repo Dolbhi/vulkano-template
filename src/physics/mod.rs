@@ -197,7 +197,9 @@ impl RigidBody {
         self.principle_moi = scale.map(|c| c * c) / (self.inv_mass * 12.);
     }
 
-    /// inverse moment of inertia about an axis (and other stuff), calculated via black magic
+    /// rotational acceleration per impulse at a point (does not include linear acceleration)
+    /// 
+    /// skew * rot * inv_moi * rot^T * -skew
     pub fn va_per_i(&self, point: Vector, rotation: Matrix3<f32>) -> Matrix3<f32> {
         let point_squared = point.magnitude2();
         if point_squared.is_zero() {
@@ -210,10 +212,13 @@ impl RigidBody {
             y: t.y / self.principle_moi.y,
             z: t.z / self.principle_moi.z,
         };
+        // skew * rot * inv_moi * rot^T * -skew
         result * t.transpose()
     }
 
-    /// inverse moment of inertia about an axis (and other stuff), calculated via black magic
+    /// angular velocity per impulse at a point
+    /// 
+    /// rot * inv_moi * rot^T * skew
     pub fn w_per_i(&self, point: Vector, rotation: Matrix3<f32>) -> Matrix3<f32> {
         let point_squared = point.magnitude2();
         if point_squared.is_zero() {
@@ -222,6 +227,7 @@ impl RigidBody {
 
         let inv_moi = Matrix3::from_diagonal(self.principle_moi.map(|c| 1. / c));
 
+        // rot * inv_moi * rot^T * skew
         rotation * inv_moi * rotation.transpose() * skew(point)
     }
 
