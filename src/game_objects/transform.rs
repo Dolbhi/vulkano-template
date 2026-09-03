@@ -57,7 +57,7 @@ impl TransformID {
 
 /// Only orthogonal transformations (scaling, rotation, translation, in that order)
 /// 
-/// models are calculated lazily, only when using the relevent get models
+/// models are calculated lazily, only when using the relevent get models, entry w.w should always be 1
 impl Transform {
     fn new(val: TransformCreateInfo) -> Self {
         Self {

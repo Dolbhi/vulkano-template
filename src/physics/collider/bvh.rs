@@ -36,7 +36,8 @@ struct BranchLinks {
     right: NonNull<Node>,
 }
 
-/// unique external reference, return to bvh to remove the corresponding leaf node
+/// Unique external reference, used for updating the bounds, return to bvh to remove the corresponding leaf node
+/// 
 /// the NonNull node should only be dereferenced when provided with a &mut BVH matching the second element
 pub struct LeafInHierachy {
     leaf: NonNull<Node>,
@@ -259,6 +260,8 @@ impl BoundaryVolumeHierachy {
     }
 
     /// remove and reinsert leaf with new bounds
+    /// 
+    /// Weird calc_bounds closure is USELESS, could just pass transformsys instead
     pub fn recalculate_bounds<F>(
         &mut self,
         leaf_ref: &mut LeafInHierachy,

@@ -53,7 +53,9 @@ pub fn matrix_truncate(model: &Matrix4<f32>) -> Matrix3<f32> {
     Matrix3::from_cols(model.x.truncate(), model.y.truncate(), model.z.truncate())
 }
 
+/// Has to be attached to a root transform
 pub struct RigidBody {
+    /// Must be a root transform
     pub transform: TransformID,
     pub velocity: Vector,
     pub bivelocity: Vector,
@@ -79,6 +81,7 @@ pub struct RigidBody {
     pub sleep_timer: u8,
 }
 impl RigidBody {
+    /// Transform must be a root transform
     pub fn new(transform: TransformID) -> Self {
         RigidBody {
             transform,

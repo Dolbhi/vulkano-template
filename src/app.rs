@@ -208,7 +208,7 @@ impl App {
                         let rigidbody = Arc::new(RwLock::new(rigidbody));
 
                         let collider = CuboidCollider::new(transform, Some(rigidbody.clone()));
-                        let collider = colliders.add(collider, transforms);
+                        let inserted_collider = colliders.add(collider, transforms);
 
                         let mut resource_loader =
                             graphics.resources.begin_retrieving(context, renderer);
@@ -220,7 +220,7 @@ impl App {
                             true,
                         );
 
-                        load_object!(world, transform, collider, ro, rigidbody);
+                        load_object!(world, transform, inserted_collider, ro, rigidbody);
                     }
 
                     // raycast
@@ -512,13 +512,14 @@ impl App {
         if self.inputs.handle_keyboard_input(key_code, state) {
             // Special input effects that can occur immediately
             match key_code {
+                // reset level
                 PhysicalKey::Code(KeyCode::KeyR) => {
                     if self.game_state == GameState::Playing {
                         let _ = self.load_level(self.current_level);
                     }
                 }
+                // pause and unpause menu
                 PhysicalKey::Code(KeyCode::Escape) => {
-                    // pause and unpause
                     match self.game_state {
                         GameState::Playing => {
                             self.game_state = GameState::Paused;
@@ -547,12 +548,12 @@ impl App {
                         self.game_thread.set_paused(!paused);
                     }
                 }
+                // step logic loop
                 PhysicalKey::Code(KeyCode::Equal) => {
-                    // step logic loop
                     self.game_thread.step();
                 }
+                // scroll through debug bounds depths
                 PhysicalKey::Code(KeyCode::KeyI) => {
-                    // scroll through depths
                     if let Some(depth) = self.bounds_debug_depth {
                         self.bounds_debug_depth = Some(depth + 1);
                     } else {

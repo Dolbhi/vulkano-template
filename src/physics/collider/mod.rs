@@ -283,7 +283,7 @@ impl ColliderSystem {
         self.bounds_tree.depth()
     }
 
-    // removed update and reinsert given collider
+    /// Remove, update and reinsert given collider
     pub fn update(&mut self, target: &mut LeafInHierachy, transforms: &mut TransformSystem) {
         self.bounds_tree
             .recalculate_bounds(target, |collider| collider.calc_bounding(transforms))
