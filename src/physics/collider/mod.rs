@@ -774,6 +774,7 @@ impl ColliderSystem {
                 // println!("[Uncaching contacts] age: {:?}", age);
                 if let Some(res) = contact.into_contact(age, transform_sys) {
                     cached_contacts.push(res);
+                    // TODO: check if cached contacts are properly being uncached when they should
                 }
             }
             if let Some(rb_2) = o_rb_2 {
@@ -845,6 +846,7 @@ impl PartialEq for ContactIdPair {
 }
 
 impl ContactIdPair {
+    /// Fails if any of the colliders were dropped from the collider system or the colliders are too far apart
     fn into_contact(
         self,
         age: u8,

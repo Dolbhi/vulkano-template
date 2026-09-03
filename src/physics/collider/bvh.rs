@@ -25,6 +25,7 @@ pub struct Node {
 
 enum NodeContent {
     Branch(NonNull<BranchLinks>),
+    /// This is an arc so that pass colliders can be cached
     Leaf(Arc<CuboidCollider>),
     /// only used for empty root
     None,
