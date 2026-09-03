@@ -16,7 +16,8 @@ pub struct Transform {
     rotation: Quaternion<f32>,
     scale: Vector3<f32>,
     last_model: Option<Matrix4<f32>>,
-    pub phys_modified: bool,
+    /// Indicates if it has modifications not yet passed to the collider system
+    pub needs_coll_update: bool,
 }
 
 pub struct TransformCreateInfo {
@@ -69,7 +70,7 @@ impl Transform {
             rotation: val.rotation,
             scale: val.scale,
             last_model: None,
-            phys_modified: true,
+            needs_coll_update: true,
         }
     }
 
@@ -88,30 +89,13 @@ impl Transform {
         }
     }
 
-    /// update global model of self if needed and return global model
-    fn get_global_model(&mut self, parent_global: &Matrix4<f32>) -> Matrix4<f32> {
-        match self.global_model {
-            Some(model) => model,
-            None => {
-                let new_global = *parent_global * self.get_local_model();
-                self.global_model = Some(new_global);
-                new_global
-            }
-        }
-    }
-
-    // pub fn is_dirty(&self) -> bool {
-    //     self.global_model.is_none()
-    // }
-
     /// modify translation, rotation and scale through a closure.
     pub fn mutate(
         &mut self,
         modification: impl FnOnce(&mut Vector3<f32>, &mut Quaternion<f32>, &mut Vector3<f32>),
     ) {
         modification(&mut self.translation, &mut self.rotation, &mut self.scale);
-        self.local_model = None;
-        self.global_model = None;
+        self.dirty();
     }
 
     pub fn get_local_transform(&'_ self) -> TransformView<'_> {
@@ -124,21 +108,36 @@ impl Transform {
 
     pub fn set_translation(&mut self, translation: impl Into<Vector3<f32>>) -> &mut Self {
         self.translation = translation.into();
-        self.local_model = None;
-        self.global_model = None;
+        self.dirty();
         self
     }
     pub fn set_rotation(&mut self, rotation: impl Into<Quaternion<f32>>) -> &mut Self {
         self.rotation = rotation.into();
-        self.local_model = None;
-        self.global_model = None;
+        self.dirty();
         self
     }
     pub fn set_scale(&mut self, scale: impl Into<Vector3<f32>>) -> &mut Self {
         self.scale = scale.into();
+        self.dirty();
+        self
+    }
+
+    /// update global model of self if needed and return global model
+    fn get_global_model(&mut self, parent_global: &Matrix4<f32>) -> Matrix4<f32> {
+        match self.global_model {
+            Some(model) => model,
+            None => {
+                let new_global = *parent_global * self.get_local_model();
+                self.global_model = Some(new_global);
+                new_global
+            }
+        }
+    }
+
+    fn dirty(&mut self) {
         self.local_model = None;
         self.global_model = None;
-        self
+        self.needs_coll_update = true;
     }
 }
 
@@ -310,7 +309,7 @@ impl TransformSystem {
             .get_mut(id)
             .ok_or(TransformError::IDNotFound)?;
         transform.global_model = None;
-        transform.phys_modified = true;
+        transform.needs_coll_update = true;
 
         for child in transform.children.clone() {
             self.set_dirty(&child)?;
@@ -393,9 +392,9 @@ impl TransformSystem {
         self.transforms.get_mut(id)
     }
 
-    pub fn reset_phys_modified(&mut self, id: &TransformID) {
+    pub fn reset_coll_update(&mut self, id: &TransformID) {
         if let Some(t) = self.get_transform_mut(id) {
-            t.phys_modified = false;
+            t.needs_coll_update = false;
         }
     }
 }

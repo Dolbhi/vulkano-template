@@ -85,9 +85,9 @@ impl GameWorld {
         // println!("frame start");
         for (id, collider) in query.iter_mut(&mut self.world) {
             if let Some(transform) = self.transforms.get_transform(id) {
-                if transform.phys_modified {
+                if transform.needs_coll_update {
                     self.colliders.update(collider, &mut self.transforms);
-                    self.transforms.reset_phys_modified(id);
+                    self.transforms.reset_coll_update(id);
                 }
             }
         }
