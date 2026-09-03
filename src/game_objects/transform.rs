@@ -55,6 +55,9 @@ impl TransformID {
     }
 }
 
+/// Only orthogonal transformations (scaling, rotation, translation, in that order)
+/// 
+/// models are calculated lazily, only when using the relevent get models
 impl Transform {
     fn new(val: TransformCreateInfo) -> Self {
         Self {
@@ -86,7 +89,7 @@ impl Transform {
     }
 
     /// update global model of self if needed and return global model
-    fn clean(&mut self, parent_global: &Matrix4<f32>) -> Matrix4<f32> {
+    fn get_global_model(&mut self, parent_global: &Matrix4<f32>) -> Matrix4<f32> {
         match self.global_model {
             Some(model) => model,
             None => {
@@ -97,9 +100,9 @@ impl Transform {
         }
     }
 
-    pub fn is_dirty(&self) -> bool {
-        self.global_model.is_none()
-    }
+    // pub fn is_dirty(&self) -> bool {
+    //     self.global_model.is_none()
+    // }
 
     /// modify translation, rotation and scale through a closure.
     pub fn mutate(
@@ -220,7 +223,7 @@ impl TransformSystem {
                 None => Matrix4::identity(),
             };
 
-            self.transforms.get_mut(id).unwrap().clean(&parent_model)
+            self.transforms.get_mut(id).unwrap().get_global_model(&parent_model)
         }))
     }
     // pub fn get_parent_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
@@ -301,7 +304,7 @@ impl TransformSystem {
     /// Flag the global model of the corresponding transform and all its children as dirty
     ///
     /// Dirty models are recalculated when they are next retrived
-    fn dirty(&mut self, id: &TransformID) -> Result<(), TransformError> {
+    fn set_dirty(&mut self, id: &TransformID) -> Result<(), TransformError> {
         let transform = self
             .transforms
             .get_mut(id)
@@ -310,7 +313,7 @@ impl TransformSystem {
         transform.phys_modified = true;
 
         for child in transform.children.clone() {
-            self.dirty(&child)?;
+            self.set_dirty(&child)?;
         }
 
         Ok(())
@@ -353,7 +356,7 @@ impl TransformSystem {
             .ok_or(TransformError::IDNotFound)?;
         let old_parent = child_trans.parent;
         child_trans.parent = parent;
-        let _ = self.dirty(child);
+        let _ = self.set_dirty(child);
 
         // update old parent
         match old_parent {
@@ -386,7 +389,7 @@ impl TransformSystem {
     }
     /// Get mutable reference to the corresponding transform, automatically sets transform and its children to dirty
     pub fn get_transform_mut(&mut self, id: &TransformID) -> Option<&mut Transform> {
-        self.dirty(id).ok()?;
+        self.set_dirty(id).ok()?;
         self.transforms.get_mut(id)
     }
 
