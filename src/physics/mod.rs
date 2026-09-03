@@ -58,6 +58,9 @@ pub struct RigidBody {
     pub velocity: Vector,
     pub bivelocity: Vector,
 
+    /// Centre of mass position as an offset from the attached transform position in local space 
+    pub centre_of_mass: Vector,
+
     pub inv_mass: f32,
     /// sqrt of masses at unit distance on principle axes
     pub principle_moi: Vector,
@@ -81,6 +84,8 @@ impl RigidBody {
             transform,
             velocity: Vector::zero(),
             bivelocity: Vector::zero(),
+
+            centre_of_mass: Vector::zero(),
 
             inv_mass: 1.,
             principle_moi: (1., 1., 1.).into(),
@@ -156,7 +161,7 @@ impl RigidBody {
 
     pub fn apply_impulse(
         &mut self,
-        point: Vector,
+        rel_point: Vector,
         impulse: Vector,
         rotation: impl Into<Matrix3<f32>>,
     ) {
@@ -167,7 +172,7 @@ impl RigidBody {
         // let angular_inertia = self.angular_vel_per_impulse(torque_per_impulse, rotation);
         // self.bivelocity += impulse_mag * torque_per_impulse * angular_inertia;
 
-        let angular_inertia = self.w_per_i(point, rotation.into());
+        let angular_inertia = self.w_per_i(rel_point, rotation.into());
         let delta_bv = angular_inertia * impulse;
         self.bivelocity += delta_bv;
 
@@ -183,8 +188,17 @@ impl RigidBody {
         // );
     }
 
-    pub fn point_velocity(&self, point: Vector) -> Vector {
-        self.velocity + self.bivelocity.cross(point)
+    pub fn apply_impulse_global(
+        &mut self,
+        point: Vector,
+        impulse: Vector,
+        transform: &mut Transform,
+    ) {
+        todo!()
+    }
+
+    pub fn point_velocity(&self, rel_point: Vector) -> Vector {
+        self.velocity + self.bivelocity.cross(rel_point)
     }
 
     /// Set principle axis masses assuming object is a cuboid of constant density, taking object scale into account
@@ -200,13 +214,13 @@ impl RigidBody {
     /// rotational acceleration per impulse at a point (does not include linear acceleration)
     /// 
     /// skew * rot * inv_moi * rot^T * -skew
-    pub fn va_per_i(&self, point: Vector, rotation: Matrix3<f32>) -> Matrix3<f32> {
-        let point_squared = point.magnitude2();
+    pub fn va_per_i(&self, rel_point: Vector, rotation: Matrix3<f32>) -> Matrix3<f32> {
+        let point_squared = rel_point.magnitude2();
         if point_squared.is_zero() {
             return Matrix3::zero();
         }
 
-        let t = skew(point) * rotation;
+        let t = skew(rel_point) * rotation;
         let result = Matrix3 {
             x: t.x / self.principle_moi.x,
             y: t.y / self.principle_moi.y,
@@ -219,8 +233,8 @@ impl RigidBody {
     /// angular velocity per impulse at a point
     /// 
     /// rot * inv_moi * rot^T * skew
-    pub fn w_per_i(&self, point: Vector, rotation: Matrix3<f32>) -> Matrix3<f32> {
-        let point_squared = point.magnitude2();
+    pub fn w_per_i(&self, rel_point: Vector, rotation: Matrix3<f32>) -> Matrix3<f32> {
+        let point_squared = rel_point.magnitude2();
         if point_squared.is_zero() {
             return Matrix3::zero();
         }
@@ -228,7 +242,7 @@ impl RigidBody {
         let inv_moi = Matrix3::from_diagonal(self.principle_moi.map(|c| 1. / c));
 
         // rot * inv_moi * rot^T * skew
-        rotation * inv_moi * rotation.transpose() * skew(point)
+        rotation * inv_moi * rotation.transpose() * skew(rel_point)
     }
 
     pub fn set_old_velocity(&mut self) {
