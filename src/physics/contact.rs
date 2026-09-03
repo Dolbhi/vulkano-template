@@ -600,7 +600,7 @@ impl RigidBodyRef {
     ) {
         // apply move
         let mut guard_1 = self.rigidbody.write().unwrap();
-        guard_1.apply_impulse(self.relative_pos, impulse, self.rotation);
+        guard_1.apply_impulse_rel(self.relative_pos, impulse, self.rotation);
         // guard_1.velocity += linear_accel;
         // guard_1.bivelocity += angular_accel;
 

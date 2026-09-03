@@ -4,8 +4,7 @@ mod geo_alg;
 // mod geo_alg_com;
 
 use crate::{
-    game_objects::transform::{Transform, TransformID},
-    utilities::math::skew,
+    game_objects::transform::{Transform, TransformID, TransformSystem}, utilities::math::skew,
 };
 use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, SquareMatrix, Vector3, Zero};
 use collider::ContactIdPair;
@@ -55,13 +54,10 @@ pub fn matrix_truncate(model: &Matrix4<f32>) -> Matrix3<f32> {
 
 /// Has to be attached to a root transform
 pub struct RigidBody {
-    /// Must be a root transform
+    /// Must be a root transform, is considered the centre of mass
     pub transform: TransformID,
     pub velocity: Vector,
     pub bivelocity: Vector,
-
-    /// Centre of mass position as an offset from the attached transform position in local space 
-    pub centre_of_mass: Vector,
 
     pub inv_mass: f32,
     /// sqrt of masses at unit distance on principle axes
@@ -87,8 +83,6 @@ impl RigidBody {
             transform,
             velocity: Vector::zero(),
             bivelocity: Vector::zero(),
-
-            centre_of_mass: Vector::zero(),
 
             inv_mass: 1.,
             principle_moi: (1., 1., 1.).into(),
@@ -162,7 +156,7 @@ impl RigidBody {
         self.sleep_timer != 0
     }
 
-    pub fn apply_impulse(
+    pub fn apply_impulse_rel(
         &mut self,
         rel_point: Vector,
         impulse: Vector,
@@ -195,9 +189,11 @@ impl RigidBody {
         &mut self,
         point: Vector,
         impulse: Vector,
-        transform: &mut Transform,
-    ) {
-        todo!()
+        transform: &mut TransformSystem,
+    ) -> Result<(),()> {
+        let transform_view = transform.get_transform(&self.transform).ok_or(())?.get_local_transform();
+        self.apply_impulse_rel(point - transform_view.translation, impulse, *transform_view.rotation);
+        Ok(())
     }
 
     pub fn point_velocity(&self, rel_point: Vector) -> Vector {

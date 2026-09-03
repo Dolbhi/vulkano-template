@@ -250,7 +250,7 @@ impl App {
                                     .get_local_transform()
                                     .rotation;
                                 let point = point + model.w.truncate();
-                                rigidbody.write().unwrap().apply_impulse(
+                                rigidbody.write().unwrap().apply_impulse_rel(
                                     point,
                                     -1.5 * cam_model.z.truncate().normalize(),
                                     *rotation,
