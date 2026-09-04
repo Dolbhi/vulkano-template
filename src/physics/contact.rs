@@ -4,8 +4,8 @@ use cgmath::{InnerSpace, Matrix3, One, SquareMatrix};
 use std::sync::{atomic::AtomicUsize, Arc, RwLock};
 
 const PEN_RESTITUTION: f32 = 1.; // useless for now
-const MIN_BOUNCE_VEL: f32 = 0.2; // time step dependent
-const MIN_CONTACT_VEL: f32 = 0.005; // time step dependent
+const MIN_BOUNCE_VEL: f32 = 0.5; // time step dependent
+const MIN_CONTACT_VEL: f32 = 0.001; // time step dependent
 const ANGULAR_MOVE_LIMIT_RAD: f32 = 0.5;
 const MAX_CONTACT_AGE: u8 = 3;
 const VELOCITY_ITER_LIMIT: u32 = 500;
@@ -35,6 +35,7 @@ pub struct Contact {
 
     /// from rb_1's pov, should point towards rb_2 if points are closing
     target_delta_velocity: Vector,
+    closing_velocity: Vector,
 
     contact_id: ContactIdPair,
 
@@ -101,27 +102,26 @@ impl ContactResolver {
                 break;
             }
 
-            println!(
-                "[Penetration resolution start]\n\tpos: {:?},\n\tnormal: {:?},\n\tpen: {:?},\n\tage: {:?},\n\tid: {:?}",
-                contact.position, contact.normal, contact.penetration, contact.age, contact.contact_id
-            );
-
-            println!(
-                "\t[rb1]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
-                contact.rb_1.relative_pos,
-                contact.rb_1.torque_per_impulse,
-                contact.rb_1.linear_inertia,
-                contact.rb_1.angular_inertia,
-            );
+            // println!(
+            //     "[Penetration resolution start]\n\tpos: {:?},\n\tnormal: {:?},\n\tpen: {:?},\n\tage: {:?},\n\tid: {:?}",
+            //     contact.position, contact.normal, contact.penetration, contact.age, contact.contact_id
+            // );
+            // println!(
+            //     "\t[rb1]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
+            //     contact.rb_1.relative_pos,
+            //     contact.rb_1.torque_per_impulse,
+            //     contact.rb_1.linear_inertia,
+            //     contact.rb_1.angular_inertia,
+            // );
 
             if let Some(rb_2) = &contact.rb_2 {
-                println!(
-                    "\t[rb2]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
-                    rb_2.relative_pos,
-                    rb_2.torque_per_impulse,
-                    rb_2.linear_inertia,
-                    rb_2.angular_inertia,
-                );
+                // println!(
+                //     "\t[rb2]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
+                //     rb_2.relative_pos,
+                //     rb_2.torque_per_impulse,
+                //     rb_2.linear_inertia,
+                //     rb_2.angular_inertia,
+                // );
 
                 // calculate move
                 contact.rb_1.resolve_penetration(
@@ -162,19 +162,18 @@ impl ContactResolver {
             }
             iters += 1;
 
-            // println!(
-            //     "~~~ Velocity resolution iter {:?} ~~~\n\tpos: {:?},\n\tnormal: {:?},\n\tvel: {:?},\n\tage: {:?}",
-            //     iters, contact.position, contact.normal, contact.target_delta_velocity, contact.age
-            // );
-
-            // println!(
-            //     "[rb1]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
-            //     contact.rb_1.point_vel,
-            //     contact.rb_1.torque_per_impulse,
-            //     contact.rb_1.linear_inertia,
-            //     contact.rb_1.angular_inertia,
-            //     contact.rb_1.relative_pos
-            // );
+            println!(
+                "~~~ Velocity resolution iter {:?} ~~~\n\tpos: {:?},\n\tnormal: {:?},\n\ttgt_dv: {:?},\n\tage: {:?}",
+                iters, contact.position, contact.normal, contact.target_delta_velocity, contact.age
+            );
+            println!(
+                "[rb1]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
+                contact.rb_1.point_vel,
+                contact.rb_1.torque_per_impulse,
+                contact.rb_1.linear_inertia,
+                contact.rb_1.angular_inertia,
+                contact.rb_1.relative_pos
+            );
 
             let impulse = contact.inv_total_inertia * contact.target_delta_velocity;
             // println!("\tStatic impulse: {:?}", impulse);
@@ -184,8 +183,6 @@ impl ContactResolver {
             let impulse = if impulse.magnitude2() - impulse_r2
                 > contact.static_fric * impulse_r2
             {
-                // required friction too high
-
                 // calc impluse for zero friction
                 let normal_vel = contact.target_delta_velocity.dot(contact.normal);
                 let smooth_impulse = contact.inv_normal_inertia * normal_vel;
@@ -194,7 +191,7 @@ impl ContactResolver {
                     (contact.target_delta_velocity.magnitude2() - (normal_vel * normal_vel)).sqrt();
                 let coeff = contact.dynamic_fric * tangent_vel * delta_seconds;
 
-                // get normal and tangent components of static impulse
+                // get magnitude of normal and tangent components of static impulse
                 let static_normal = impulse.dot(contact.normal);
                 let static_tangent = (impulse.magnitude2() - static_normal * static_normal).sqrt();
 
@@ -204,7 +201,9 @@ impl ContactResolver {
                 } else {
                     x.clamp(0., 1.)
                 };
-                (1. - x) * smooth_impulse * contact.normal + x * impulse
+                let final_impulse = (1. - x) * smooth_impulse * contact.normal + x * impulse;
+                println!("[debug] Using dynamic friction ({:?}) ({:?}) => ({:?})", smooth_impulse * contact.normal, impulse, final_impulse);
+                final_impulse
 
                 // // TODO: combine with if statement below so rb_2 is only unwrapped once
                 // let velocity_diff = if let Some(rb_2) = &contact.rb_2 {
@@ -216,6 +215,7 @@ impl ContactResolver {
                 // impulse_r * contact.normal
                 //     + v_f * DYNAMIC_FRICTION_COEFF * impulse_r.abs() * delta_seconds
             } else {
+                println!("[debug] Using static friction ({:?})", impulse);
                 impulse
             };
             // println!("\tfinal impulse: {:?}", impulse);
@@ -228,14 +228,14 @@ impl ContactResolver {
                     &mut self.pending_contacts,
                 );
 
-                // println!(
-                //     "[rb2]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
-                //     rb_2.point_vel,
-                //     rb_2.torque_per_impulse,
-                //     rb_2.linear_inertia,
-                //     rb_2.angular_inertia,
-                //     rb_2.relative_pos
-                // );
+                println!(
+                    "[rb2]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
+                    rb_2.point_vel,
+                    rb_2.torque_per_impulse,
+                    rb_2.linear_inertia,
+                    rb_2.angular_inertia,
+                    rb_2.relative_pos
+                );
                 rb_2.apply_velocity_resolution(impulse, &mut self.pending_contacts);
             // contact.normal,
             } else {
@@ -251,24 +251,26 @@ impl ContactResolver {
             // calculate new target_delta_vel for this contact and re-add it
             let guard_1 = contact.rb_1.rigidbody.read().unwrap();
             // let old_rel_vel = contact.rb_1.point_vel;
-            let new_rel_vel = guard_1.point_velocity(contact.rb_1.relative_pos);
+            let point_vel_1 = guard_1.point_velocity(contact.rb_1.relative_pos);
             // println!("\t[rb1] new_point_vel: {:?}", new_rel_vel);
-            contact.rb_1.point_vel = new_rel_vel;
+            contact.rb_1.point_vel = point_vel_1;
             // contact.target_delta_velocity += new_rel_vel - old_rel_vel;
-            contact.target_delta_velocity = new_rel_vel;
+            contact.closing_velocity = point_vel_1;
+            contact.target_delta_velocity = point_vel_1;
             drop(guard_1);
 
             if let Some(rb_2) = &mut contact.rb_2 {
                 let guard_2 = rb_2.rigidbody.read().unwrap();
                 // let old_rel_vel = rb_2.point_vel;
-                let new_rel_vel = guard_2.point_velocity(rb_2.relative_pos);
+                let point_vel_2 = guard_2.point_velocity(rb_2.relative_pos);
                 // println!("\t[rb2] new_point_vel: {:?}", new_rel_vel);
-                rb_2.point_vel = new_rel_vel;
+                rb_2.point_vel = point_vel_2;
                 // contact.target_delta_velocity -= new_rel_vel - old_rel_vel;
-                contact.target_delta_velocity -= new_rel_vel;
+                contact.closing_velocity -= point_vel_2;
+                contact.target_delta_velocity -= point_vel_2;
             }
-            contact.target_delta_velocity =
-                contact.target_delta_velocity.dot(contact.normal) * contact.normal;
+            // contact.target_delta_velocity =
+            //     contact.target_delta_velocity.dot(contact.normal) * contact.normal;
             // println!(
             //     "\t[Velocity final results] new target vel: {:?}",
             //     contact.target_delta_velocity
@@ -377,7 +379,7 @@ impl Contact {
             rb_guard_1.remove_cached_contact(&contact_id);
         }
 
-        let (total_inertia, target_delta_velocity, rb_2) = if let Some(rb_2) = rb_2 {
+        let (total_inertia, target_delta_velocity, closing_velocity, rb_2) = if let Some(rb_2) = rb_2 {
             // aquire rb 2 data
             let mut rb_guard_2 = rb_2.write().unwrap();
             let transform_2 = transform_sys
@@ -397,7 +399,7 @@ impl Contact {
                 rb_guard_1.wake();
             }
 
-            let inv_mass = rb_guard_2.inv_mass;
+            let linear_inertia = rb_guard_2.inv_mass;
             // n x r
             let torque_per_impulse = normal.cross(relative_pos);
             // let angular_inertia =
@@ -420,7 +422,7 @@ impl Contact {
                 rotation,
                 point_vel: point_vel_2,
                 torque_per_impulse,
-                linear_inertia: inv_mass,
+                linear_inertia,
                 angular_inertia,
             };
 
@@ -439,14 +441,15 @@ impl Contact {
             let old_normal_velocity = old_closing_velocity.dot(normal) * normal;
             // let delta_velocity = closing_velocity - old_closing_velocity;
             // let tangent_delta_velocity = delta_velocity - delta_velocity.dot(normal) * normal;
-            let target_delta_velocity = closing_velocity + restituition * old_normal_velocity; // + tangent_delta_velocity;
+            let target_delta_velocity = closing_velocity + restituition * closing_velocity.dot(normal) * normal;
+            // let target_delta_velocity = closing_velocity + restituition * old_normal_velocity; // + tangent_delta_velocity;
 
             //                                        ^cancels out the current velocity
             //                                                           ^bounce using only old velocity
             //                                                                                                ^cancels tangent velocity next frame
 
             let total_inertia = total_inertia_1 + total_inertia_2;
-            (total_inertia, target_delta_velocity, Some(rb_2))
+            (total_inertia, target_delta_velocity, closing_velocity, Some(rb_2))
         } else {
             let restituition = if point_vel_1.dot(normal) < MIN_BOUNCE_VEL {
                 0.0
@@ -456,12 +459,13 @@ impl Contact {
             let old_normal_velocity = old_vel_1.dot(normal) * normal;
             // let delta_velocity = point_vel_1 - old_vel_1;
             // let tangent_delta_velocity = delta_velocity - delta_velocity.dot(normal) * normal;
-            let target_delta_velocity = point_vel_1 + restituition * old_normal_velocity; // + tangent_delta_velocity;
+            let target_delta_velocity = point_vel_1 + restituition * point_vel_1.dot(normal) * normal;
+            // let target_delta_velocity = point_vel_1 + restituition * old_normal_velocity; // + tangent_delta_velocity;
 
             //                                        ^cancels out the current velocity
             //                                                      ^bounce using only old velocity
             //                                                                                           ^cancels tangent velocity next frame
-            (total_inertia_1, target_delta_velocity, None)
+            (total_inertia_1, target_delta_velocity, point_vel_1, None)
         };
         drop(rb_guard_1);
         let rb_1 = RigidBodyRef {
@@ -488,9 +492,10 @@ impl Contact {
                 static_fric: collider_1.static_fric * collider_2.static_fric,
                 dynamic_fric: collider_1.dynamic_fric * collider_2.dynamic_fric,
                 rb_1,
-                rb_2: rb_2,
+                rb_2,
 
                 target_delta_velocity,
+                closing_velocity,
 
                 contact_id,
                 age,
