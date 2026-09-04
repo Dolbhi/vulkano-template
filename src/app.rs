@@ -207,7 +207,7 @@ impl App {
                         rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
                         let rigidbody = Arc::new(RwLock::new(rigidbody));
 
-                        let collider = CuboidCollider::new(transform, Some(rigidbody.clone()));
+                        let collider = CuboidCollider::new(transform, Some(rigidbody.clone()), 2., 1.7);
                         let inserted_collider = colliders.add(collider, transforms);
 
                         let mut resource_loader =

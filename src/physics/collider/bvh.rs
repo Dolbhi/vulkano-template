@@ -944,24 +944,24 @@ mod tree_tests {
 
         let a = BoundaryVolumeHierachy::register_collider(
             crap_box,
-            Arc::new(CuboidCollider {
-                transform: trans.next().unwrap(),
-                rigidbody: None,
-            }),
+            Arc::new(CuboidCollider::new(
+                trans.next().unwrap(),
+                None,2., 1.7
+            )),
         );
         let b = BoundaryVolumeHierachy::register_collider(
             box_2,
-            Arc::new(CuboidCollider {
-                transform: trans.next().unwrap(),
-                rigidbody: None,
-            }),
+            Arc::new(CuboidCollider::new(
+                trans.next().unwrap(),
+                None,2., 1.7
+            )),
         );
         let c = BoundaryVolumeHierachy::register_collider(
             box_2,
-            Arc::new(CuboidCollider {
-                transform: trans.next().unwrap(),
-                rigidbody: None,
-            }),
+            Arc::new(CuboidCollider::new(
+                trans.next().unwrap(),
+                None,2., 1.7
+            )),
         );
 
         let _a = tree.insert(a);
@@ -988,24 +988,24 @@ mod tree_tests {
 
         let a = BoundaryVolumeHierachy::register_collider(
             crap_box,
-            Arc::new(CuboidCollider {
-                transform: trans.next().unwrap(),
-                rigidbody: None,
-            }),
+            Arc::new(CuboidCollider::new(
+                trans.next().unwrap(),
+                None,2., 1.7
+            )),
         );
         let b = BoundaryVolumeHierachy::register_collider(
             box_2,
-            Arc::new(CuboidCollider {
-                transform: trans.next().unwrap(),
-                rigidbody: None,
-            }),
+            Arc::new(CuboidCollider::new(
+                trans.next().unwrap(),
+                None,2., 1.7
+            )),
         );
         let c = BoundaryVolumeHierachy::register_collider(
             box_2,
-            Arc::new(CuboidCollider {
-                transform: trans.next().unwrap(),
-                rigidbody: None,
-            }),
+            Arc::new(CuboidCollider::new(
+                trans.next().unwrap(),
+                None,2., 1.7
+            )),
         );
 
         let _a = tree.insert(a);
@@ -1053,10 +1053,10 @@ mod tree_tests {
         ] {
             let leaf = BoundaryVolumeHierachy::register_collider(
                 bounding_box,
-                Arc::new(CuboidCollider {
-                    transform: trans.next().unwrap(),
-                    rigidbody: None,
-                }),
+                Arc::new(CuboidCollider::new(
+                    trans.next().unwrap(),
+                    None,2., 1.7
+                )),
             );
             tree.insert(leaf);
         }
@@ -1099,10 +1099,10 @@ mod tree_tests {
 
         let leaf = BoundaryVolumeHierachy::register_collider(
             box_6,
-            Arc::new(CuboidCollider {
-                transform: trans.next().unwrap(),
-                rigidbody: None,
-            }),
+            Arc::new(CuboidCollider::new(
+                trans.next().unwrap(),
+                None,2., 1.7
+            )),
         );
         let a = tree.insert(leaf);
 
@@ -1111,10 +1111,10 @@ mod tree_tests {
         ] {
             let leaf = BoundaryVolumeHierachy::register_collider(
                 bounding_box,
-                Arc::new(CuboidCollider {
-                    transform: trans.next().unwrap(),
-                    rigidbody: None,
-                }),
+                Arc::new(CuboidCollider::new(
+                    trans.next().unwrap(),
+                    None,2., 1.7
+                )),
             );
             tree.insert(leaf);
             // unsafe {
@@ -1124,10 +1124,10 @@ mod tree_tests {
 
         let leaf = BoundaryVolumeHierachy::register_collider(
             box_2,
-            Arc::new(CuboidCollider {
-                transform: trans.next().unwrap(),
-                rigidbody: None,
-            }),
+            Arc::new(CuboidCollider::new(
+                trans.next().unwrap(),
+                None,2., 1.7
+            )),
         );
         let b = tree.insert(leaf);
 
@@ -1154,18 +1154,18 @@ mod tree_tests {
 
         let a = BoundaryVolumeHierachy::register_collider(
             crap_box,
-            Arc::new(CuboidCollider {
-                transform: trans.next().unwrap(),
-                rigidbody: None,
-            }),
+            Arc::new(CuboidCollider::new(
+                trans.next().unwrap(),
+                None,2., 1.7
+            )),
         );
         tree.insert(a);
         let b = BoundaryVolumeHierachy::register_collider(
             box_2,
-            Arc::new(CuboidCollider {
-                transform: trans.next().unwrap(),
-                rigidbody: None,
-            }),
+            Arc::new(CuboidCollider::new(
+                trans.next().unwrap(),
+                None,2., 1.7
+            )),
         );
         let b = tree.insert(b);
 
@@ -1185,10 +1185,10 @@ mod tree_tests {
         };
         let remove = BoundaryVolumeHierachy::register_collider(
             crap_box,
-            Arc::new(CuboidCollider {
-                transform: trans.next().unwrap(),
-                rigidbody: None,
-            }),
+            Arc::new(CuboidCollider::new(
+                trans.next().unwrap(),
+                None,2., 1.7
+            )),
         );
         let remove = tree.insert(remove);
 

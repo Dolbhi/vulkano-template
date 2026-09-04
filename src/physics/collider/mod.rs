@@ -31,6 +31,8 @@ pub struct BoundingBox {
 pub struct CuboidCollider {
     transform: TransformID,
     rigidbody: Option<Arc<RwLock<RigidBody>>>,
+    pub static_fric: f32,
+    pub dynamic_fric: f32,
     // bounding_box: BoundingBox,
 }
 
@@ -46,6 +48,7 @@ pub struct ContactIdentifier {
     pub collider: Weak<CuboidCollider>,
     element: CuboidElement,
 }
+/// First collider should always have rigidbody
 #[derive(Debug)]
 pub struct ContactIdPair(pub ContactIdentifier, pub ContactIdentifier);
 
@@ -199,11 +202,14 @@ impl CuboidCollider {
         // transforms: &mut TransformSystem,
         transform: TransformID,
         rigidbody: Option<Arc<RwLock<RigidBody>>>,
+        static_fric: f32,
+        dynamic_fric: f32
     ) -> Self {
         let collider = CuboidCollider {
             transform,
             rigidbody,
-            // bounding_box: BoundingBox::default(),
+            static_fric,
+            dynamic_fric
         };
         // collider.update_bounding(transforms);
         collider

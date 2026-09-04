@@ -9,8 +9,6 @@ const MIN_CONTACT_VEL: f32 = 0.005; // time step dependent
 const ANGULAR_MOVE_LIMIT_RAD: f32 = 0.5;
 const MAX_CONTACT_AGE: u8 = 3;
 const VELOCITY_ITER_LIMIT: u32 = 500;
-const STATIC_FRICTION_COEFF: f32 = 2.;
-const DYNAMIC_FRICTION_COEFF: f32 = 3.;
 
 #[derive(PartialEq, Clone, Copy)]
 struct OrdF32(pub f32);
@@ -30,6 +28,8 @@ pub struct Contact {
 
     inv_total_inertia: Matrix3<f32>, // TODO: pre-calc impulse?
     inv_normal_inertia: f32,
+    static_fric: f32,
+    dynamic_fric: f32,
     rb_1: RigidBodyRef,
     rb_2: Option<RigidBodyRef>,
 
@@ -182,7 +182,7 @@ impl ContactResolver {
             let impulse_r2 = impulse_r * impulse_r;
             // if target tangent impulse > max static fric impulse then use dynamic fric instead
             let impulse = if impulse.magnitude2() - impulse_r2
-                > STATIC_FRICTION_COEFF * STATIC_FRICTION_COEFF * impulse_r2
+                > contact.static_fric * impulse_r2
             {
                 // required friction too high
 
@@ -192,7 +192,7 @@ impl ContactResolver {
 
                 let tangent_vel =
                     (contact.target_delta_velocity.magnitude2() - (normal_vel * normal_vel)).sqrt();
-                let coeff = DYNAMIC_FRICTION_COEFF * tangent_vel * delta_seconds;
+                let coeff = contact.dynamic_fric * tangent_vel * delta_seconds;
 
                 // get normal and tangent components of static impulse
                 let static_normal = impulse.dot(contact.normal);
@@ -323,25 +323,25 @@ impl Contact {
         position: Vector,
         normal: Vector,
         penetration: f32,
-        // rb_1: Arc<RwLock<RigidBody>>,
-        // rb_2: Option<Arc<RwLock<RigidBody>>>,
         contact_id: ContactIdPair,
         age: u8,
     ) -> (Arc<AtomicUsize>, Self) {
-        let rb_1 = contact_id
+        let collider_1 = contact_id
             .0
             .collider
             .upgrade()
-            .unwrap()
+            .unwrap();
+        let collider_2 = contact_id
+            .1
+            .collider
+            .upgrade()
+            .unwrap();
+        let rb_1 = collider_1
             .get_rigidbody()
             .as_ref()
             .unwrap()
             .clone();
-        let rb_2 = contact_id
-            .1
-            .collider
-            .upgrade()
-            .unwrap()
+        let rb_2 = collider_2
             .get_rigidbody()
             .clone();
 
@@ -485,6 +485,8 @@ impl Contact {
 
                 inv_total_inertia: total_inertia.invert().unwrap(),
                 inv_normal_inertia: normal.dot(total_inertia * normal).recip(),
+                static_fric: collider_1.static_fric * collider_2.static_fric,
+                dynamic_fric: collider_1.dynamic_fric * collider_2.dynamic_fric,
                 rb_1,
                 rb_2: rb_2,
 
