@@ -365,7 +365,7 @@ pub fn init_char_test(mut loader: WorldLoader) {
     rb.set_moi_as_cuboid([0.5, 1., 0.5].into());
     let rb = Arc::new(RwLock::new(rb));
     let collider = loader.world.colliders.add(
-        CuboidCollider::new(transform, Some(rb.clone()), 2., 1.7),
+        CuboidCollider::new(transform, Some(rb.clone()), 0.2, 0.1),
         &mut loader.world.transforms,
     );
     let ro = loader.resources.load_ro(Cube, yellow_mat, true);
