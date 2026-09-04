@@ -20,6 +20,8 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [ ] Place billboards in test world
 
 ### Features
+- [ ] Sound system
+- [ ] Rigidbodies with composite colliders
 - [ ] Asset loader
 	- [ ] Mesh, material and scene loading from files (with universal IDs)
 	- [ ] Conversion into fast loading format
@@ -57,6 +59,7 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 ### Issues
 - [ ] Crashes when closed after resize?
 - [ ] AABB render object buffer overflows during rapid/erractic collisions
+- [ ] Edge-edge collision detection still inconsistent on certain edge cases
 - [x] Occasional camera jumping while moving
 - [x] Interpolation struggles with curve movements (use smooth camera)
 - [x] Crashes when moving to 2nd monitor with loaded level
