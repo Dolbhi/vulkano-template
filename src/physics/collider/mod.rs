@@ -31,7 +31,9 @@ pub struct BoundingBox {
 pub struct CuboidCollider {
     transform: TransformID,
     rigidbody: Option<Arc<RwLock<RigidBody>>>,
+    /// tangent_target_dv = tangent_vel * this.static_fric * other.static_fric * normal_vel * dt
     pub static_fric: f32,
+    /// tangent_target_dv = tangent_vel * this.dynamic_fric * other.dynamic_fric * normal_vel * dt
     pub dynamic_fric: f32,
     // bounding_box: BoundingBox,
 }

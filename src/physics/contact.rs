@@ -181,28 +181,15 @@ impl ContactResolver {
             let impulse_r2 = impulse_r * impulse_r;
             // if target tangent impulse > max static fric impulse then use dynamic fric instead
             let impulse = if impulse.magnitude2() - impulse_r2
-                > contact.static_fric * impulse_r2
+                > contact.static_fric * contact.static_fric * impulse_r2 * delta_seconds * delta_seconds
             {
                 // calc impluse for zero friction
-                let normal_vel = contact.target_delta_velocity.dot(contact.normal);
-                let smooth_impulse = contact.inv_normal_inertia * normal_vel;
+                let normal_spd = contact.target_delta_velocity.dot(contact.normal);
+                let tangent_vel = (contact.target_delta_velocity - normal_spd * contact.normal) * contact.dynamic_fric * normal_spd * delta_seconds;
 
-                let tangent_vel =
-                    (contact.target_delta_velocity.magnitude2() - (normal_vel * normal_vel)).sqrt();
-                let coeff = contact.dynamic_fric * tangent_vel * delta_seconds;
+                let final_impulse = contact.inv_total_inertia * (tangent_vel + normal_spd * contact.normal);
 
-                // get magnitude of normal and tangent components of static impulse
-                let static_normal = impulse.dot(contact.normal);
-                let static_tangent = (impulse.magnitude2() - static_normal * static_normal).sqrt();
-
-                let x = coeff * smooth_impulse / (static_tangent - coeff * static_normal);
-                let x = if x.is_nan() || x.is_sign_negative() {
-                    1.
-                } else {
-                    x.clamp(0., 1.)
-                };
-                let final_impulse = (1. - x) * smooth_impulse * contact.normal + x * impulse;
-                println!("[debug] Using dynamic friction ({:?}) ({:?}) => ({:?})", smooth_impulse * contact.normal, impulse, final_impulse);
+                println!("[debug] Using dynamic friction ({:?}) ({:?})", final_impulse, impulse);
                 final_impulse
 
                 // // TODO: combine with if statement below so rb_2 is only unwrapped once
@@ -358,7 +345,7 @@ impl Contact {
 
         let relative_pos = position - transform_1.translation;
         let point_vel_1 = rb_guard_1.point_velocity(relative_pos);
-        let old_vel_1 = rb_guard_1.old_velocity;
+        // let old_vel_1 = rb_guard_1.old_velocity;
 
         // normal points away from contact point 1 (assuming convex shape) TODO: generalise to any shape
         let normal = relative_pos.dot(normal).signum() * normal;
@@ -388,7 +375,7 @@ impl Contact {
                 .get_local_transform();
             let relative_pos = position - transform_2.translation;
             let point_vel_2 = rb_guard_2.point_velocity(relative_pos);
-            let old_vel_2 = rb_guard_2.old_velocity;
+            // let old_vel_2 = rb_guard_2.old_velocity;
 
             // wake any rb if needed
             if rb_guard_1.is_awake() {
@@ -427,7 +414,7 @@ impl Contact {
             };
 
             let closing_velocity = point_vel_1 - point_vel_2;
-            let old_closing_velocity = old_vel_1 - old_vel_2;
+            // let old_closing_velocity = old_vel_1 - old_vel_2;
             let restituition = if closing_velocity.dot(normal) < MIN_BOUNCE_VEL {
                 0.0
             } else {
@@ -438,7 +425,7 @@ impl Contact {
             // tdv(f) = v(f) + dv(f)
             //        = v(f) + v(f) - ov(f)
             // tdv = v + res * ov(r) + v(f) - ov(f)
-            let old_normal_velocity = old_closing_velocity.dot(normal) * normal;
+            // let old_normal_velocity = old_closing_velocity.dot(normal) * normal;
             // let delta_velocity = closing_velocity - old_closing_velocity;
             // let tangent_delta_velocity = delta_velocity - delta_velocity.dot(normal) * normal;
             let target_delta_velocity = closing_velocity + restituition * closing_velocity.dot(normal) * normal;
@@ -456,7 +443,7 @@ impl Contact {
             } else {
                 0.5
             };
-            let old_normal_velocity = old_vel_1.dot(normal) * normal;
+            // let old_normal_velocity = old_vel_1.dot(normal) * normal;
             // let delta_velocity = point_vel_1 - old_vel_1;
             // let tangent_delta_velocity = delta_velocity - delta_velocity.dot(normal) * normal;
             let target_delta_velocity = point_vel_1 + restituition * point_vel_1.dot(normal) * normal;
