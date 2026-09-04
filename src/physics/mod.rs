@@ -6,7 +6,7 @@ mod geo_alg;
 use crate::{
     game_objects::transform::{Transform, TransformID, TransformSystem}, utilities::math::skew,
 };
-use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, SquareMatrix, Vector3, Zero};
+use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, One, SquareMatrix, Vector3, Zero};
 use collider::ContactIdPair;
 pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy};
 use std::{
@@ -61,7 +61,7 @@ pub struct RigidBody {
 
     pub inv_mass: f32,
     /// sqrt of masses at unit distance on principle axes
-    pub principle_moi: Vector,
+    pub moi: Matrix3<f32>,
     pub gravity_multiplier: f32,
 
     /// heap index of contacts this rb is a part of
@@ -85,7 +85,7 @@ impl RigidBody {
             bivelocity: Vector::zero(),
 
             inv_mass: 1.,
-            principle_moi: (1., 1., 1.).into(),
+            moi: Matrix3::one(),
             gravity_multiplier: 1.,
 
             contact_refs: Vec::new(),
@@ -164,11 +164,6 @@ impl RigidBody {
     ) {
         self.velocity += impulse * self.inv_mass;
 
-        // let impulse_mag = impulse.magnitude();
-        // let torque_per_impulse = impulse.cross(point) / impulse_mag;
-        // let angular_inertia = self.angular_vel_per_impulse(torque_per_impulse, rotation);
-        // self.bivelocity += impulse_mag * torque_per_impulse * angular_inertia;
-
         let angular_inertia = self.w_per_i(rel_point, rotation.into());
         let delta_bv = angular_inertia * impulse;
         self.bivelocity += delta_bv;
@@ -207,7 +202,7 @@ impl RigidBody {
         if self.inv_mass.is_zero() {
             return;
         }
-        self.principle_moi = scale.map(|c| c * c) / (self.inv_mass * 12.);
+        self.moi = Matrix3::from_diagonal(scale.map(|c| c * c) / (self.inv_mass * 12.));
     }
 
     /// rotational acceleration per impulse at a point (does not include linear acceleration)
@@ -220,13 +215,8 @@ impl RigidBody {
         }
 
         let t = skew(rel_point) * rotation;
-        let result = Matrix3 {
-            x: t.x / self.principle_moi.x,
-            y: t.y / self.principle_moi.y,
-            z: t.z / self.principle_moi.z,
-        };
-        // skew * rot * inv_moi * rot^T * -skew
-        result * t.transpose()
+
+        t * self.moi.invert().unwrap() * t.transpose()
     }
 
     /// angular velocity per impulse at a point
@@ -238,10 +228,10 @@ impl RigidBody {
             return Matrix3::zero();
         }
 
-        let inv_moi = Matrix3::from_diagonal(self.principle_moi.map(|c| 1. / c));
+        // let inv_moi = Matrix3::from_diagonal(self.moi.map(|c| 1. / c));
 
         // rot * inv_moi * rot^T * skew
-        rotation * inv_moi * rotation.transpose() * skew(rel_point)
+        rotation * self.moi.invert().unwrap() * rotation.transpose() * skew(rel_point)
     }
 
     pub fn set_old_velocity(&mut self) {
@@ -300,7 +290,7 @@ mod physics_tests {
 
         rb.set_moi_as_cuboid((1., 1., 1.).into());
 
-        println!("WHATS THE VECTOR {:?}", rb.principle_moi);
+        println!("WHATS THE VECTOR {:?}", rb.moi);
 
         // println!(
         //     "(1,0,0): {:?}",
