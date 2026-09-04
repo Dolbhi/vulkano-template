@@ -162,18 +162,18 @@ impl ContactResolver {
             }
             iters += 1;
 
-            println!(
-                "~~~ Velocity resolution iter {:?} ~~~\n\tpos: {:?},\n\tnormal: {:?},\n\ttgt_dv: {:?},\n\tage: {:?}",
-                iters, contact.position, contact.normal, contact.target_delta_velocity, contact.age
-            );
-            println!(
-                "[rb1]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
-                contact.rb_1.point_vel,
-                contact.rb_1.torque_per_impulse,
-                contact.rb_1.linear_inertia,
-                contact.rb_1.angular_inertia,
-                contact.rb_1.relative_pos
-            );
+            // println!(
+            //     "~~~ Velocity resolution iter {:?} ~~~\n\tpos: {:?},\n\tnormal: {:?},\n\ttgt_dv: {:?},\n\tage: {:?}",
+            //     iters, contact.position, contact.normal, contact.target_delta_velocity, contact.age
+            // );
+            // println!(
+            //     "[rb1]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
+            //     contact.rb_1.point_vel,
+            //     contact.rb_1.torque_per_impulse,
+            //     contact.rb_1.linear_inertia,
+            //     contact.rb_1.angular_inertia,
+            //     contact.rb_1.relative_pos
+            // );
 
             let impulse = contact.inv_total_inertia * contact.target_delta_velocity;
             // println!("\tStatic impulse: {:?}", impulse);
@@ -191,16 +191,6 @@ impl ContactResolver {
 
                 println!("[debug] Using dynamic friction ({:?}) ({:?})", final_impulse, impulse);
                 final_impulse
-
-                // // TODO: combine with if statement below so rb_2 is only unwrapped once
-                // let velocity_diff = if let Some(rb_2) = &contact.rb_2 {
-                //     contact.rb_1.point_vel - rb_2.point_vel
-                // } else {
-                //     contact.rb_1.point_vel
-                // };
-                // let v_f = velocity_diff - velocity_diff.dot(contact.normal) * contact.normal;
-                // impulse_r * contact.normal
-                //     + v_f * DYNAMIC_FRICTION_COEFF * impulse_r.abs() * delta_seconds
             } else {
                 println!("[debug] Using static friction ({:?})", impulse);
                 impulse
@@ -215,14 +205,14 @@ impl ContactResolver {
                     &mut self.pending_contacts,
                 );
 
-                println!(
-                    "[rb2]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
-                    rb_2.point_vel,
-                    rb_2.torque_per_impulse,
-                    rb_2.linear_inertia,
-                    rb_2.angular_inertia,
-                    rb_2.relative_pos
-                );
+                // println!(
+                //     "[rb2]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
+                //     rb_2.point_vel,
+                //     rb_2.torque_per_impulse,
+                //     rb_2.linear_inertia,
+                //     rb_2.angular_inertia,
+                //     rb_2.relative_pos
+                // );
                 rb_2.apply_velocity_resolution(impulse, &mut self.pending_contacts);
             // contact.normal,
             } else {
