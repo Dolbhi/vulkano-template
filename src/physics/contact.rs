@@ -27,7 +27,7 @@ pub struct Contact {
     penetration: f32,
 
     inv_total_inertia: Matrix3<f32>, // TODO: pre-calc impulse?
-    inv_normal_inertia: f32,
+    // inv_normal_inertia: f32,
     static_fric: f32,
     dynamic_fric: f32,
     rb_1: RigidBodyRef,
@@ -465,7 +465,7 @@ impl Contact {
                 penetration,
 
                 inv_total_inertia: total_inertia.invert().unwrap(),
-                inv_normal_inertia: normal.dot(total_inertia * normal).recip(),
+                // inv_normal_inertia: normal.dot(total_inertia * normal).recip(),
                 static_fric: collider_1.static_fric * collider_2.static_fric,
                 dynamic_fric: collider_1.dynamic_fric * collider_2.dynamic_fric,
                 rb_1,
