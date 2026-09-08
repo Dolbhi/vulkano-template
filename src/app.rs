@@ -176,9 +176,10 @@ impl App {
                         ..
                     } = &mut *self.world.lock().unwrap();
                     transforms.update_interpolation(*last_delta_time);
+                    *inputs = self.inputs.clone();
 
                     // update basic mat swap
-                    if self.inputs.q.consume_button_down() {
+                    if inputs.q.consume_button_down() {
                         let mut query =
                             <(&mut MaterialSwapper<()>, &mut RenderObject<()>)>::query();
 
@@ -190,7 +191,7 @@ impl App {
                     }
 
                     // add new cube
-                    if self.inputs.o.consume_button_down() {
+                    if inputs.o.consume_button_down() {
                         // create unit cube at cam position and rotation
                         let cam_transform = transforms
                             .get_transform(&camera.transform)
@@ -237,7 +238,7 @@ impl App {
                         let max_cast: [f32; 3] = (point + Vector3::new(0.1, 0.1, 0.1)).into();
                         raycast_data = Some((min_cast, max_cast));
 
-                        if self.inputs.lmb.consume_button_down() {
+                        if inputs.lmb.consume_button_down() {
                             if let Some(rigidbody) = coll.get_rigidbody() {
                                 let mut model =
                                     transforms.get_global_model(coll.get_transform()).unwrap();
@@ -261,7 +262,6 @@ impl App {
 
                     // send inputs to game world
                     if self.game_state == GameState::Playing {
-                        *inputs = self.inputs.clone();
                         // inputs.movement = self.inputs.get_move();
                         camera.set_rotation(self.camera_rotation);
 
