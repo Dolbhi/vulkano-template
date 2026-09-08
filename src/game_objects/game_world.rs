@@ -64,7 +64,7 @@ impl GameWorld {
 
         // physics update
         let mut query = <(&TransformID, &mut Arc<RwLock<RigidBody>>)>::query();
-        for (transfrom, rigid_body) in query.iter_mut(&mut self.world) {
+        query.for_each_mut(&mut self.world, |(transfrom, rigid_body)| {
             rigid_body.write().unwrap().update(
                 self.transforms.get_transform_mut(transfrom).unwrap(),
                 seconds_passed,
@@ -74,45 +74,39 @@ impl GameWorld {
             //     transfrom,
             //     self.transforms.get_global_model(transfrom)
             // );
-        }
+        });
 
         // [Profiling] Physics
         let phys_time = logic_start.elapsed().as_micros() as u32;
         let coll_start = std::time::Instant::now();
 
         // update bounds
-        let mut query = <(&TransformID, &mut LeafInHierachy)>::query();
-        // println!("frame start");
-        for (id, collider) in query.iter_mut(&mut self.world) {
+        <(&TransformID, &mut LeafInHierachy)>::query().for_each_mut(&mut self.world, |(id, collider)| {
             if let Some(transform) = self.transforms.get_transform(id) {
                 if transform.needs_coll_update {
                     self.colliders.update(collider, &mut self.transforms);
                     self.transforms.reset_coll_update(id);
                 }
             }
-        }
+        });
 
         let contact_resolver = self.colliders.get_contacts(&mut self.transforms);
         contact_resolver.resolve(&mut self.transforms, seconds_passed);
         // store old velocity
-        let mut query = <&mut Arc<RwLock<RigidBody>>>::query();
-        for rigid_body in query.iter_mut(&mut self.world) {
-            rigid_body.write().unwrap().set_old_velocity();
-        }
+        <&mut Arc<RwLock<RigidBody>>>::query().for_each_mut(&mut self.world, |rb|rb.write().unwrap().set_old_velocity());
 
         // [Profiling] Colliders
         let coll_time = coll_start.elapsed().as_micros() as u32;
         let lerp_start = std::time::Instant::now();
 
         // update interpolation models
-        let mut query = <&TransformID>::query();
-        for transform_id in query.iter(&self.world) {
+        <&TransformID>::query().for_each(&self.world, |transform_id| {
             // *last_model =
             //     InterpolateTransform(self.transforms.get_global_model(transform_id).unwrap());
             if self.transforms.store_last_model(transform_id).is_err() {
                 println!("[Error] Failed to find transform of interpolated object");
             }
-        }
+        });
         self.transforms.update_last_fixed();
 
         // [Profiling] Interpolation
@@ -130,20 +124,20 @@ impl GameWorld {
         );
 
         // update rotate
-        let mut query = <(&TransformID, &Rotate)>::query();
-        for (transform_id, rotate) in query.iter(&self.world) {
+        <(&TransformID, &Rotate)>::query().for_each_mut(&mut self.world, |(transform_id, rotate)|
+        {
             let transform = self.transforms.get_transform_mut(transform_id).unwrap();
             transform.set_rotation(
                 Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
-                    * transform.get_local_transform().rotation,
+                * transform.get_local_transform().rotation,
             );
         }
+    );
 
-        let mut query = <(&TransformID, &TransformTracker)>::query();
-        for (transform_id, TransformTracker(tag)) in query.iter(&self.world) {
+        <(&TransformID, &TransformTracker)>::query().for_each_mut(&mut self.world, |(transform_id, TransformTracker(tag))| {
             let model = self.transforms.get_global_model(transform_id).unwrap();
             println!("[Transform] {}: {:?}", tag, model);
-        }
+        });
 
         let mut profiler = LOGIC_PROFILER.lock().unwrap();
         profiler.add_sample(phys_time, 1);

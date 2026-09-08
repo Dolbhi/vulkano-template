@@ -290,17 +290,16 @@ impl App {
                     // P.P.S Could also have a generic method to handle any world queries with iteration???
                     {
                         // update basic render objects
-                        let mut query = <(&TransformID, &mut RenderObject<()>)>::query();
                         // println!("==== RENDER OBJECT DATA ====");
-                        for (transform_id, render_object) in query.iter_mut(world) {
+                        <(&TransformID, &mut RenderObject<()>)>::query().for_each_mut(world, |(transform_id, render_object)| {
                             render_object.update_and_upload(transform_id, transforms);
-                        }
+                        });
 
-                        let mut query = <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query();
                         // println!("==== RENDER COLORED DATA ====");
-                        for (transform_id, render_object) in query.iter_mut(world) {
+                        <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query().for_each_mut(world, |(transform_id, render_object)| {
                             render_object.update_and_upload(transform_id, transforms);
-                        }
+                        });
+                        
                     }
 
                     // get frame data struct for upload
