@@ -5,6 +5,9 @@ A renderer using the [Vulkan API](https://www.khronos.org/vulkan/) written entir
 - [Vulkano Book](https://github.com/vulkano-rs/vulkano-book/): This renderer is a fork of the tutorial source code
 - [VulkanGuide](https://vkguide.dev/): Focused Vulkan guide on renderers for game engines
 
+## Branch Info
+This branch contains old attempts at an object loader (after ResourceRetriever but before WorldLoader) by passing creation information of all its components, some ideas can still be worked into main branch at a future date.
+
 ## To Do
 ### Misc.
 - [x] Smarter transform matrix calculation
