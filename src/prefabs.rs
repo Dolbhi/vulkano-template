@@ -251,7 +251,7 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     load_object!(loader.world.world, t, ro, rb, collider);
 
     // moving collider
-    let (pivot, _) = loader.add_1_comp([0., 0., 0.], Rotate([0., 1., 0.].into(), Rad(0.5)));
+    let (pivot, _) = crate::load_transform_and_object!(loader.world.world, [0., 0., 0.], Rotate([0., 1., 0.].into(), Rad(0.5)));
 
     let mover = loader
         .world
