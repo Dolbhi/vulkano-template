@@ -1,21 +1,7 @@
-use std::sync::{Arc, RwLock};
+use crate::{input::InputState, physics::ColliderSystem};
 
-use cgmath::{Quaternion, Rotation3};
-
-use crate::{
-    input::InputState,
-    physics::{ColliderSystem, LeafInHierachy, RigidBody},
-    LOGIC_PROFILER,
-};
-
-use super::{
-    transform::{TransformID, TransformSystem},
-    Camera, Rotate, TransformTracker,
-};
+use super::{transform::TransformSystem, Camera};
 use legion::*;
-
-pub const CAM_SPEED: f32 = 6.;
-pub const SLOW_COEFF: f32 = 0.1;
 
 /// stores game data and handles logic updates
 pub struct GameWorld {
