@@ -19,9 +19,9 @@ pub const SLOW_COEFF: f32 = 0.1;
 
 /// stores game data and handles logic updates
 pub struct GameWorld {
+    pub world: World,
     pub transforms: TransformSystem,
     pub colliders: ColliderSystem,
-    pub world: World,
     pub camera: Camera,
     pub fixed_seconds: f32,
     pub last_delta_time: f32,
@@ -41,9 +41,9 @@ impl GameWorld {
         // colliders.
 
         Self {
+            world,
             transforms,
             colliders,
-            world,
             camera,
             fixed_seconds: 0.,
             last_delta_time: 0.,
