@@ -2,15 +2,14 @@
 mod bvh;
 mod ray;
 
-pub use self::bvh::{LeafInHierachy, update_bounds_system};
+pub use self::bvh::LeafInHierachy;
 use super::{
     contact::{Contact, ContactResolver},
     matrix_truncate, RigidBody, Vector,
 };
-use crate::game_objects::{GameTime, transform::{TransformID, TransformSystem}};
+use crate::game_objects::transform::{TransformID, TransformSystem};
 use bvh::{BoundaryVolumeHierachy, DepthIter, LeafOutsideHierachy};
 use cgmath::{InnerSpace, Matrix, Matrix4, MetricSpace, SquareMatrix, Zero};
-use legion::system;
 use core::f32;
 use ray::Ray;
 use std::{
@@ -63,12 +62,6 @@ enum CuboidElement {
     Edge(u8),
 }
 use CuboidElement::*;
-
-#[system]
-fn update_colliders(#[resource] transforms: &mut TransformSystem, #[resource] colliders: &mut ColliderSystem, #[resource] GameTime(seconds_passed, _): &GameTime) {
-    let contact_resolver = colliders.get_contacts(transforms);
-    contact_resolver.resolve(transforms, *seconds_passed);
-}
 
 impl BoundingBox {
     pub fn new(min: impl Into<Vector>, max: impl Into<Vector>) -> Self {
