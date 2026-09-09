@@ -20,19 +20,19 @@ pub const SLOW_COEFF: f32 = 0.1;
 /// stores game data and handles logic updates
 pub struct GameWorld {
     pub world: World,
-    pub resources: Option<GameResources>,
+    pub resources : Option<GameResources>
 }
 
 pub struct GameResources {
     pub transforms: TransformSystem,
     pub colliders: ColliderSystem,
     pub camera: Camera,
-    pub last_delta_time: f32,
     pub fixed_seconds: f32,
+    pub last_delta_time: f32,
     pub inputs: InputState,
 }
 
-/// Wrapper for last delta time and total game time, both in seconds
+/// Wrapper for game time and last delta time, both in seconds
 pub struct GameTime(pub f32, pub f32);
 
 impl GameWorld {
@@ -51,50 +51,11 @@ impl GameWorld {
                 transforms,
                 colliders,
                 camera,
-                last_delta_time: 0.,
                 fixed_seconds: 0.,
+                last_delta_time: 0.,
                 inputs: InputState::default(),
-            }),
+            })
         }
-    }
-
-    pub fn update_time(&mut self, seconds_passed: f32) {
-        if let Some(resources) = self.resources.as_mut() {
-            resources.fixed_seconds += seconds_passed;
-            resources.last_delta_time = seconds_passed;
-        }
-    }
-
-    pub fn execute_schedule(&mut self, schedule: &mut Schedule) {
-        let GameResources {
-            transforms,
-            colliders,
-            camera,
-            last_delta_time,
-            fixed_seconds,
-            inputs,
-        } = self.resources.take().unwrap();
-
-        let mut sch_resources = Resources::default();
-        sch_resources.insert(transforms);
-        sch_resources.insert(colliders);
-        sch_resources.insert(camera);
-        sch_resources.insert(GameTime(last_delta_time, fixed_seconds));
-        sch_resources.insert(inputs);
-
-        schedule.execute(&mut self.world, &mut sch_resources);
-
-        let GameTime(last_delta_time, fixed_seconds) = sch_resources.remove().unwrap();
-        let resources = GameResources {
-            transforms: sch_resources.remove().unwrap(),
-            colliders: sch_resources.remove().unwrap(),
-            camera: sch_resources.remove().unwrap(),
-            last_delta_time,
-            fixed_seconds,
-            inputs: sch_resources.remove().unwrap(),
-        };
-
-        self.resources = Some(resources);
     }
 
     /// update world logic with a time step
@@ -105,8 +66,8 @@ impl GameWorld {
     /// 3. Other logic
     pub fn update(&mut self, seconds_passed: f32) {
         let mut resources = self.resources.take().unwrap();
-        resources.fixed_seconds += seconds_passed;
         resources.last_delta_time = seconds_passed;
+        resources.fixed_seconds += seconds_passed;
 
         // let mut profiler = unsafe { LOGIC_PROFILER.lock().unwrap() };
         let logic_start = std::time::Instant::now();
@@ -130,25 +91,19 @@ impl GameWorld {
         let coll_start = std::time::Instant::now();
 
         // update bounds
-        <(&TransformID, &mut LeafInHierachy)>::query().for_each_mut(
-            &mut self.world,
-            |(id, collider)| {
-                if let Some(transform) = resources.transforms.get_transform(id) {
-                    if transform.needs_coll_update {
-                        resources
-                            .colliders
-                            .update(collider, &mut resources.transforms);
-                        resources.transforms.reset_coll_update(id);
-                    }
+        <(&TransformID, &mut LeafInHierachy)>::query().for_each_mut(&mut self.world, |(id, collider)| {
+            if let Some(transform) = resources.transforms.get_transform(id) {
+                if transform.needs_coll_update {
+                    resources.colliders.update(collider, &mut resources.transforms);
+                    resources.transforms.reset_coll_update(id);
                 }
-            },
-        );
+            }
+        });
 
         let contact_resolver = resources.colliders.get_contacts(&mut resources.transforms);
         contact_resolver.resolve(&mut resources.transforms, seconds_passed);
         // store old velocity
-        <&mut Arc<RwLock<RigidBody>>>::query()
-            .for_each_mut(&mut self.world, |rb| rb.write().unwrap().set_old_velocity());
+        <&mut Arc<RwLock<RigidBody>>>::query().for_each_mut(&mut self.world, |rb|rb.write().unwrap().set_old_velocity());
 
         // [Profiling] Colliders
         let coll_time = coll_start.elapsed().as_micros() as u32;
@@ -170,8 +125,7 @@ impl GameWorld {
 
         // move cam
         resources.inputs.move_transform(
-            resources
-                .transforms
+            resources.transforms
                 .get_transform_mut(&resources.camera.transform)
                 .unwrap(),
             seconds_passed,
@@ -180,27 +134,20 @@ impl GameWorld {
         );
 
         // update rotate
-        <(&TransformID, &Rotate)>::query().for_each_mut(
-            &mut self.world,
-            |(transform_id, rotate)| {
-                let transform = resources
-                    .transforms
-                    .get_transform_mut(transform_id)
-                    .unwrap();
-                transform.set_rotation(
-                    Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
-                        * transform.get_local_transform().rotation,
-                );
-            },
-        );
+        <(&TransformID, &Rotate)>::query().for_each_mut(&mut self.world, |(transform_id, rotate)|
+        {
+            let transform = resources.transforms.get_transform_mut(transform_id).unwrap();
+            transform.set_rotation(
+                Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
+                * transform.get_local_transform().rotation,
+            );
+        }
+    );
 
-        <(&TransformID, &TransformTracker)>::query().for_each_mut(
-            &mut self.world,
-            |(transform_id, TransformTracker(tag))| {
-                let model = resources.transforms.get_global_model(transform_id).unwrap();
-                println!("[Transform] {}: {:?}", tag, model);
-            },
-        );
+        <(&TransformID, &TransformTracker)>::query().for_each_mut(&mut self.world, |(transform_id, TransformTracker(tag))| {
+            let model = resources.transforms.get_global_model(transform_id).unwrap();
+            println!("[Transform] {}: {:?}", tag, model);
+        });
 
         let mut profiler = LOGIC_PROFILER.lock().unwrap();
         profiler.add_sample(phys_time, 1);

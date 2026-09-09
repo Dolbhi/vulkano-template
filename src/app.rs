@@ -19,12 +19,9 @@ use winit::{
 
 use crate::{
     LOGIC_PROFILER, RENDER_PROFILER, game_objects::{
-        self, Camera, GameResources, GameTime, GameWorld, MaterialSwapper, WorldLoader, light::PointLightComponent, transform::{self, TransformCreateInfo, TransformID, TransformSystem},
-    }, input::InputState, load_object, physics::{self, CuboidCollider, RigidBody, quick_inverse}, prefabs::{init_char_test, init_phys_test, init_ui_test, init_world}, render::{DeferredRenderer, RenderLoop, RenderObject, resource_manager::ResourceManager}, shaders::{DirectionLight, GPUAABB, GPUGlobalData}, ui::{self, MenuOption},
+        Camera, GameResources, GameWorld, MaterialSwapper, WorldLoader, light::PointLightComponent, transform::{TransformCreateInfo, TransformID},
+    }, input::InputState, load_object, physics::{CuboidCollider, RigidBody, quick_inverse}, prefabs::{init_char_test, init_phys_test, init_ui_test, init_world}, render::{DeferredRenderer, RenderLoop, RenderObject, resource_manager::ResourceManager}, shaders::{DirectionLight, GPUAABB, GPUGlobalData}, ui::{self, MenuOption},
 };
-
-pub const CAM_SPEED: f32 = 6.;
-pub const SLOW_COEFF: f32 = 0.1;
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
 enum GameState {
@@ -162,7 +159,6 @@ impl App {
                     let GameWorld {
                         world,
                         resources,
-                        ..
                     } = &mut *self.world.lock().unwrap();
                     let GameResources {
                         mut transforms,
@@ -713,9 +709,6 @@ impl GameWorldThread {
             let mut update_period = Duration::from_micros(mircos);
             let mut next_time = Instant::now() + update_period;
             // let mut last_update = Instant::now();
-
-            let mut logic_schedule = build_logic_schedule();
-
             loop {
                 if thread_paused.load(std::sync::atomic::Ordering::Relaxed) {
                     thread::park();
@@ -735,9 +728,7 @@ impl GameWorldThread {
                         profiler.add_sample(update_start.elapsed().as_micros() as u32, 0);
                     }
 
-                    world.update_time(update_period.as_secs_f32());
-                    world.execute_schedule(&mut logic_schedule);
-                    // world.update(update_period.as_secs_f32());
+                    world.update(update_period.as_secs_f32());
                     update_period = Duration::from_micros(new_micros);
 
                     // skip frames if update took too long
@@ -788,38 +779,4 @@ impl GameWorldThread {
         self.delta_micros
             .store(micros, std::sync::atomic::Ordering::Relaxed);
     }
-}
-
-/// update world logic with a time step
-///
-/// # Order
-/// 1. Rigidbody movement
-/// 2. Collision resolution
-/// 3. Other logic
-fn build_logic_schedule() -> Schedule {
-    Schedule::builder()
-        .add_system(physics::update_rigidbodies_system())
-        .add_system(game_objects::update_rotate_system())
-        .flush()
-        .add_system(physics::update_bounds_system())
-        .flush()
-        .add_system(physics::update_colliders_system())
-        .flush()
-        .add_system(physics::update_old_vel_system())
-        .add_system(transform::update_interpolation_system())
-        .flush()
-        .add_system(transform::update_transform_last_fixed_system())
-        .add_thread_local_fn(|_, resources| {
-            // move cam
-            resources.get::<InputState>().unwrap().move_transform(
-                resources.get_mut::<TransformSystem>().unwrap()
-                    .get_transform_mut(&resources.get::<Camera>().unwrap().transform)
-                    .unwrap(),
-                resources.get::<GameTime>().unwrap().0,
-                CAM_SPEED,
-                SLOW_COEFF,
-            );
-        })
-        .add_system(game_objects::update_tracker_system())
-        .build()
 }
