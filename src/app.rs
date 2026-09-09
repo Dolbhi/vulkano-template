@@ -282,6 +282,7 @@ impl App {
                             );
                         }
                     }
+                    self.inputs = inputs.clone();
                     camera.sync_transform(transforms);
 
                     //  Render uploads
