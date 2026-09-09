@@ -793,22 +793,25 @@ impl GameWorldThread {
 /// update world logic with a time step
 ///
 /// # Order
-/// 1. Rigidbody movement
+/// 1. Non-collision movement
 /// 2. Collision resolution
 /// 3. Other logic
 fn build_logic_schedule() -> Schedule {
     Schedule::builder()
+        // 1.
         .add_system(physics::update_rigidbodies_system())
         .add_system(game_objects::update_rotate_system())
         .flush()
         .add_system(physics::update_bounds_system())
         .flush()
+        // 2.
         .add_system(physics::update_colliders_system())
         .flush()
         .add_system(physics::update_old_vel_system())
         .add_system(transform::update_interpolation_system())
         .flush()
         .add_system(transform::update_transform_last_fixed_system())
+        // 3.
         .add_thread_local_fn(|_, resources| {
             // move cam
             resources.get::<InputState>().unwrap().move_transform(
