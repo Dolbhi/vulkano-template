@@ -52,7 +52,7 @@ pub enum TransformError {
 }
 
 #[system(for_each)]
-fn update_interpolation(transform_id: &TransformID, #[resource] transforms: &mut TransformSystem) {
+pub fn update_interpolation(transform_id: &TransformID, #[resource] transforms: &mut TransformSystem) {
     // update interpolation models
     // *last_model =
     //     InterpolateTransform(self.transforms.get_global_model(transform_id).unwrap());
@@ -60,6 +60,11 @@ fn update_interpolation(transform_id: &TransformID, #[resource] transforms: &mut
         println!("[Error] Failed to find transform of interpolated object");
     }
 }
+#[system]
+pub fn update_transform_last_fixed(#[resource] transforms: &mut TransformSystem) {
+    transforms.update_last_fixed();
+}
+
 impl TransformID {
     pub fn id(&self) -> u32 {
         self.0

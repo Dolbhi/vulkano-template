@@ -38,7 +38,7 @@ pub struct WorldLoader<'a, 'b: 'a> {
 }
 
 #[system(for_each)]
-fn update_rotate(transform_id: &TransformID, rotate: &Rotate, #[resource] transforms: &mut TransformSystem, #[resource] time: &GameTime)
+pub fn update_rotate(transform_id: &TransformID, rotate: &Rotate, #[resource] transforms: &mut TransformSystem, #[resource] time: &GameTime)
 {
     // update rotate
     let transform = transforms.get_transform_mut(transform_id).unwrap();
@@ -49,13 +49,13 @@ fn update_rotate(transform_id: &TransformID, rotate: &Rotate, #[resource] transf
 }
 
 #[system(for_each)]
-fn update_tracker(transform_id: &TransformID, TransformTracker(tag): &TransformTracker, #[resource] transforms: &mut TransformSystem) {
+pub fn update_tracker(transform_id: &TransformID, TransformTracker(tag): &TransformTracker, #[resource] transforms: &mut TransformSystem) {
     let model = transforms.get_global_model(transform_id).unwrap();
     println!("[Transform] {}: {:?}", tag, model);
 }
 
 #[system(for_each)]
-fn swap_material(swapper: &mut MaterialSwapper<()>, render_object: &mut RenderObject<()>) {
+pub fn swap_material(swapper: &mut MaterialSwapper<()>, render_object: &mut RenderObject<()>) {
     // update basic mat swap
     let next_mat = swapper.swap_material();
     // println!("Swapped mat: {:?}", next_mat);

@@ -65,7 +65,7 @@ enum CuboidElement {
 use CuboidElement::*;
 
 #[system]
-fn update_colliders(#[resource] transforms: &mut TransformSystem, #[resource] colliders: &mut ColliderSystem, #[resource] GameTime(seconds_passed, _): &GameTime) {
+pub fn update_colliders(#[resource] transforms: &mut TransformSystem, #[resource] colliders: &mut ColliderSystem, #[resource] GameTime(seconds_passed, _): &GameTime) {
     let contact_resolver = colliders.get_contacts(transforms);
     contact_resolver.resolve(transforms, *seconds_passed);
 }

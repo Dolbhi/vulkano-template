@@ -8,7 +8,7 @@ use crate::{
 };
 use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, One, SquareMatrix, Vector3, Zero};
 use collider::ContactIdPair;
-pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy};
+pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy, update_bounds_system, update_colliders_system};
 use legion::{system};
 use std::{
     ops::ControlFlow, sync::{Arc, RwLock, atomic::AtomicUsize},
@@ -265,7 +265,7 @@ impl RigidBody {
 }
 
 #[system(for_each)]
-fn update_rigidbodies(transform_id: &TransformID, rigid_body: &mut Arc<RwLock<RigidBody>>, #[resource] transforms: &mut TransformSystem, #[resource] time: &GameTime) {
+pub fn update_rigidbodies(transform_id: &TransformID, rigid_body: &mut Arc<RwLock<RigidBody>>, #[resource] transforms: &mut TransformSystem, #[resource] time: &GameTime) {
     rigid_body.write().unwrap().update(
         transforms.get_transform_mut(transform_id).unwrap(),
         time.0,
@@ -279,7 +279,7 @@ fn update_rigidbodies(transform_id: &TransformID, rigid_body: &mut Arc<RwLock<Ri
 }
 
 #[system(for_each)]
-fn update_old_vel(rigid_body: &mut Arc<RwLock<RigidBody>>) {
+pub fn update_old_vel(rigid_body: &mut Arc<RwLock<RigidBody>>) {
     rigid_body.write().unwrap().set_old_velocity();
 }
 
