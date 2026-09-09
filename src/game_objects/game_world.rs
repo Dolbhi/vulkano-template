@@ -20,6 +20,10 @@ pub const SLOW_COEFF: f32 = 0.1;
 /// stores game data and handles logic updates
 pub struct GameWorld {
     pub world: World,
+    pub resources : Option<GameResources>
+}
+
+pub struct GameResources {
     pub transforms: TransformSystem,
     pub colliders: ColliderSystem,
     pub camera: Camera,
@@ -27,6 +31,7 @@ pub struct GameWorld {
     pub last_delta_time: f32,
     pub inputs: InputState,
 }
+
 /// Wrapper for game time and last delta time, both in seconds
 pub struct GameTime(pub f32, pub f32);
 
@@ -42,12 +47,14 @@ impl GameWorld {
 
         Self {
             world,
-            transforms,
-            colliders,
-            camera,
-            fixed_seconds: 0.,
-            last_delta_time: 0.,
-            inputs: InputState::default(),
+            resources: Some(GameResources {
+                transforms,
+                colliders,
+                camera,
+                fixed_seconds: 0.,
+                last_delta_time: 0.,
+                inputs: InputState::default(),
+            })
         }
     }
 
@@ -58,8 +65,9 @@ impl GameWorld {
     /// 2. Collision resolution
     /// 3. Other logic
     pub fn update(&mut self, seconds_passed: f32) {
-        self.last_delta_time = seconds_passed;
-        self.fixed_seconds += seconds_passed;
+        let mut resources = self.resources.take().unwrap();
+        resources.last_delta_time = seconds_passed;
+        resources.fixed_seconds += seconds_passed;
 
         // let mut profiler = unsafe { LOGIC_PROFILER.lock().unwrap() };
         let logic_start = std::time::Instant::now();
@@ -68,7 +76,7 @@ impl GameWorld {
         let mut query = <(&TransformID, &mut Arc<RwLock<RigidBody>>)>::query();
         query.for_each_mut(&mut self.world, |(transfrom, rigid_body)| {
             rigid_body.write().unwrap().update(
-                self.transforms.get_transform_mut(transfrom).unwrap(),
+                resources.transforms.get_transform_mut(transfrom).unwrap(),
                 seconds_passed,
             );
             // println!(
@@ -84,16 +92,16 @@ impl GameWorld {
 
         // update bounds
         <(&TransformID, &mut LeafInHierachy)>::query().for_each_mut(&mut self.world, |(id, collider)| {
-            if let Some(transform) = self.transforms.get_transform(id) {
+            if let Some(transform) = resources.transforms.get_transform(id) {
                 if transform.needs_coll_update {
-                    self.colliders.update(collider, &mut self.transforms);
-                    self.transforms.reset_coll_update(id);
+                    resources.colliders.update(collider, &mut resources.transforms);
+                    resources.transforms.reset_coll_update(id);
                 }
             }
         });
 
-        let contact_resolver = self.colliders.get_contacts(&mut self.transforms);
-        contact_resolver.resolve(&mut self.transforms, seconds_passed);
+        let contact_resolver = resources.colliders.get_contacts(&mut resources.transforms);
+        contact_resolver.resolve(&mut resources.transforms, seconds_passed);
         // store old velocity
         <&mut Arc<RwLock<RigidBody>>>::query().for_each_mut(&mut self.world, |rb|rb.write().unwrap().set_old_velocity());
 
@@ -105,20 +113,20 @@ impl GameWorld {
         <&TransformID>::query().for_each(&self.world, |transform_id| {
             // *last_model =
             //     InterpolateTransform(self.transforms.get_global_model(transform_id).unwrap());
-            if self.transforms.store_last_model(transform_id).is_err() {
+            if resources.transforms.store_last_model(transform_id).is_err() {
                 println!("[Error] Failed to find transform of interpolated object");
             }
         });
-        self.transforms.update_last_fixed();
+        resources.transforms.update_last_fixed();
 
         // [Profiling] Interpolation
         let lerp_time = lerp_start.elapsed().as_micros() as u32;
         let others_start = std::time::Instant::now();
 
         // move cam
-        self.inputs.move_transform(
-            self.transforms
-                .get_transform_mut(&self.camera.transform)
+        resources.inputs.move_transform(
+            resources.transforms
+                .get_transform_mut(&resources.camera.transform)
                 .unwrap(),
             seconds_passed,
             CAM_SPEED,
@@ -128,7 +136,7 @@ impl GameWorld {
         // update rotate
         <(&TransformID, &Rotate)>::query().for_each_mut(&mut self.world, |(transform_id, rotate)|
         {
-            let transform = self.transforms.get_transform_mut(transform_id).unwrap();
+            let transform = resources.transforms.get_transform_mut(transform_id).unwrap();
             transform.set_rotation(
                 Quaternion::from_axis_angle(rotate.0, rotate.1 * seconds_passed)
                 * transform.get_local_transform().rotation,
@@ -137,7 +145,7 @@ impl GameWorld {
     );
 
         <(&TransformID, &TransformTracker)>::query().for_each_mut(&mut self.world, |(transform_id, TransformTracker(tag))| {
-            let model = self.transforms.get_global_model(transform_id).unwrap();
+            let model = resources.transforms.get_global_model(transform_id).unwrap();
             println!("[Transform] {}: {:?}", tag, model);
         });
 
@@ -146,6 +154,8 @@ impl GameWorld {
         profiler.add_sample(coll_time, 2);
         profiler.add_sample(lerp_time, 3);
         profiler.add_sample(others_start.elapsed().as_micros() as u32, 4);
+
+        self.resources = Some(resources);
     }
 
     /// clear the world and transforms and reset the camera
