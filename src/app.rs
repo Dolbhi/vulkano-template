@@ -18,9 +18,19 @@ use winit::{
 };
 
 use crate::{
-    LOGIC_PROFILER, RENDER_PROFILER, game_objects::{
-        Camera, GameResources, GameWorld, MaterialSwapper, WorldLoader, light::PointLightComponent, transform::{TransformCreateInfo, TransformID},
-    }, input::InputState, load_object, physics::{CuboidCollider, RigidBody, quick_inverse}, prefabs::{init_char_test, init_phys_test, init_ui_test, init_world}, render::{DeferredRenderer, RenderLoop, RenderObject, resource_manager::ResourceManager}, shaders::{DirectionLight, GPUAABB, GPUGlobalData}, ui::{self, MenuOption},
+    game_objects::{
+        light::PointLightComponent,
+        transform::{TransformCreateInfo, TransformID},
+        Camera, GameWorld, MaterialSwapper, WorldLoader,
+    },
+    input::InputState,
+    load_object,
+    physics::{quick_inverse, CuboidCollider, RigidBody},
+    prefabs::{init_char_test, init_phys_test, init_ui_test, init_world},
+    render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
+    shaders::{DirectionLight, GPUGlobalData, GPUAABB},
+    ui::{self, MenuOption},
+    LOGIC_PROFILER, RENDER_PROFILER,
 };
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
@@ -109,17 +119,16 @@ impl App {
 
         let world = &mut *self.world.lock().unwrap();
         world.clear();
-        let mut game_resources = world.resources.as_mut().unwrap();
         let resources = &mut graphics
             .resources
             .begin_retrieving(&graphics.render_loop.context, &mut graphics.renderer);
 
-        loader(WorldLoader { world: &mut world.world, game_resources: &mut game_resources, resources });
+        loader(WorldLoader { world, resources });
 
         // camera light, child of the camera
-        let camera_light = game_resources.transforms.add_transform(
+        let camera_light = world.transforms.add_transform(
             TransformCreateInfo::default()
-                .with_parent(Some(game_resources.camera.transform))
+                .with_parent(Some(world.camera.transform))
                 .with_translation((0., 0., 0.2)), // light pos cannot = cam pos else the light will glitch
         );
         world
@@ -158,17 +167,14 @@ impl App {
                 .update(&mut graphics.renderer, |renderer, image_i, context| {
                     let GameWorld {
                         world,
-                        resources,
-                    } = &mut *self.world.lock().unwrap();
-                    let GameResources {
                         transforms,
                         colliders,
                         camera,
                         fixed_seconds,
                         last_delta_time,
                         inputs,
-                    } = resources.as_mut().unwrap();
-
+                        ..
+                    } = &mut *self.world.lock().unwrap();
                     transforms.update_interpolation(*last_delta_time);
                     *inputs = self.inputs.clone();
 

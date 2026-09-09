@@ -13,7 +13,9 @@ use cgmath::{InnerSpace, Matrix, Matrix4, MetricSpace, SquareMatrix, Zero};
 use core::f32;
 use ray::Ray;
 use std::{
-    f32::EPSILON, fmt::Debug, pin::Pin, sync::{Arc, RwLock, Weak},
+    f32::EPSILON,
+    fmt::Debug,
+    sync::{Arc, RwLock, Weak},
 };
 
 // const CROSS_INDICES: [[usize; 2]; 3] = [[1, 2], [2, 0], [0, 1]];
@@ -39,7 +41,7 @@ pub struct CuboidCollider {
 /// Note: Probably a useless wrapper around the bvh
 #[derive(Default)]
 pub struct ColliderSystem {
-    bounds_tree: Pin<Box<BoundaryVolumeHierachy>>,
+    bounds_tree: BoundaryVolumeHierachy,
     contact_resolver: ContactResolver,
 }
 
@@ -280,7 +282,7 @@ impl Debug for CuboidCollider {
 impl ColliderSystem {
     pub fn new() -> Self {
         Self {
-            bounds_tree: Box::pin(BoundaryVolumeHierachy::new()),
+            bounds_tree: BoundaryVolumeHierachy::new(),
             contact_resolver: ContactResolver::new(),
         }
     }
