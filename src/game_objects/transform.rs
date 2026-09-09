@@ -5,6 +5,7 @@ use std::{
 };
 
 use cgmath::{Matrix4, One, Quaternion, SquareMatrix, Vector3, VectorSpace, Zero};
+use legion::system;
 
 #[derive(Clone)]
 pub struct Transform {
@@ -50,6 +51,15 @@ pub enum TransformError {
     IDNotFound,
 }
 
+#[system(for_each)]
+fn update_interpolation(transform_id: &TransformID, #[resource] transforms: &mut TransformSystem) {
+    // update interpolation models
+    // *last_model =
+    //     InterpolateTransform(self.transforms.get_global_model(transform_id).unwrap());
+    if transforms.store_last_model(transform_id).is_err() {
+        println!("[Error] Failed to find transform of interpolated object");
+    }
+}
 impl TransformID {
     pub fn id(&self) -> u32 {
         self.0

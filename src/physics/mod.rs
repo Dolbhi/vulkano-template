@@ -4,14 +4,14 @@ mod geo_alg;
 // mod geo_alg_com;
 
 use crate::{
-    game_objects::transform::{Transform, TransformID, TransformSystem}, utilities::math::skew,
+    game_objects::{GameTime, transform::{Transform, TransformID, TransformSystem}}, utilities::math::skew,
 };
 use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, One, SquareMatrix, Vector3, Zero};
 use collider::ContactIdPair;
 pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy};
+use legion::{system};
 use std::{
-    ops::ControlFlow,
-    sync::{atomic::AtomicUsize, Arc},
+    ops::ControlFlow, sync::{Arc, RwLock, atomic::AtomicUsize},
 };
 
 type Vector = Vector3<f32>;
@@ -51,7 +51,6 @@ pub fn quick_inverse(model: &mut Matrix4<f32>) {
 pub fn matrix_truncate(model: &Matrix4<f32>) -> Matrix3<f32> {
     Matrix3::from_cols(model.x.truncate(), model.y.truncate(), model.z.truncate())
 }
-
 /// Has to be attached to a root transform
 pub struct RigidBody {
     /// Must be a root transform, is considered the centre of mass
@@ -263,6 +262,25 @@ impl RigidBody {
             self.past_contacts.remove(i);
         }
     }
+}
+
+#[system(for_each)]
+fn update_rigidbodies(transform_id: &TransformID, rigid_body: &mut Arc<RwLock<RigidBody>>, #[resource] transforms: &mut TransformSystem, #[resource] time: &GameTime) {
+    rigid_body.write().unwrap().update(
+        transforms.get_transform_mut(transform_id).unwrap(),
+        time.0,
+    );
+    // println!(
+    //     "[RB] id: {:?}, model: {:?}",
+    //     transfrom,
+    //     self.transforms.get_global_model(transfrom)
+    // );
+     
+}
+
+#[system(for_each)]
+fn update_old_vel(rigid_body: &mut Arc<RwLock<RigidBody>>) {
+    rigid_body.write().unwrap().set_old_velocity();
 }
 
 #[cfg(test)]

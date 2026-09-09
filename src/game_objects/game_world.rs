@@ -27,6 +27,8 @@ pub struct GameWorld {
     pub last_delta_time: f32,
     pub inputs: InputState,
 }
+/// Wrapper for game time and last delta time, both in seconds
+pub struct GameTime(pub f32, pub f32);
 
 impl GameWorld {
     pub fn new() -> Self {

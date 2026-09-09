@@ -190,7 +190,7 @@ impl App {
                         });
                     }
 
-                    // add new cube
+                    // add new cube (not a system YET)
                     if inputs.o.consume_button_down() {
                         // create unit cube at cam position and rotation
                         let cam_transform = transforms
