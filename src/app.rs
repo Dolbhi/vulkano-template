@@ -825,4 +825,11 @@ fn build_logic_schedule() -> Schedule {
         })
         .add_system(game_objects::update_tracker_system())
         .build()
+
+        // missing profiler:
+        // let mut profiler = LOGIC_PROFILER.lock().unwrap();
+        // profiler.add_sample(phys_time, 1);
+        // profiler.add_sample(coll_time, 2);
+        // profiler.add_sample(lerp_time, 3);
+        // profiler.add_sample(others_start.elapsed().as_micros() as u32, 4);
 }
