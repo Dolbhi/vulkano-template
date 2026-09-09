@@ -161,16 +161,16 @@ impl App {
                         resources,
                     } = &mut *self.world.lock().unwrap();
                     let GameResources {
-                        transforms,
-                        colliders,
-                        camera,
+                        mut transforms,
+                        mut colliders,
+                        mut camera,
                         fixed_seconds,
                         last_delta_time,
-                        inputs,
-                    } = resources.as_mut().unwrap();
+                        ..
+                    } = resources.take().unwrap();
 
-                    transforms.update_interpolation(*last_delta_time);
-                    *inputs = self.inputs.clone();
+                    transforms.update_interpolation(last_delta_time);
+                    let mut inputs = self.inputs.clone();
 
                     // update basic mat swap
                     if inputs.q.consume_button_down() {
@@ -203,7 +203,7 @@ impl App {
                         let rigidbody = Arc::new(RwLock::new(rigidbody));
 
                         let collider = CuboidCollider::new(transform, Some(rigidbody.clone()), 2., 1.7);
-                        let inserted_collider = colliders.add(collider, transforms);
+                        let inserted_collider = colliders.add(collider, &mut transforms);
 
                         let mut resource_loader =
                             graphics.resources.begin_retrieving(context, renderer);
@@ -221,7 +221,7 @@ impl App {
                     // raycast
                     let cam_model = transforms.get_global_model(&camera.transform).unwrap();
                     let raycast_result = colliders.raycast(
-                        transforms,
+                        &mut transforms,
                         cam_model.w.truncate(),
                         -cam_model.z.truncate(),
                         20.,
@@ -277,7 +277,7 @@ impl App {
                         }
                     }
                     self.inputs = inputs.clone();
-                    camera.sync_transform(transforms);
+                    camera.sync_transform(&mut transforms);
 
                     //  Render uploads
                     // TODO: have `deferred_renderer` provide this method since it defines the RO types
@@ -287,19 +287,19 @@ impl App {
                         // update basic render objects
                         // println!("==== RENDER OBJECT DATA ====");
                         <(&TransformID, &mut RenderObject<()>)>::query().for_each_mut(world, |(transform_id, render_object)| {
-                            render_object.update_and_upload(transform_id, transforms);
+                            render_object.update_and_upload(transform_id, &mut transforms);
                         });
 
                         // println!("==== RENDER COLORED DATA ====");
                         <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query().for_each_mut(world, |(transform_id, render_object)| {
-                            render_object.update_and_upload(transform_id, transforms);
+                            render_object.update_and_upload(transform_id, &mut transforms);
                         });
                         
                     }
 
                     // get frame data struct for upload
                     let frame = renderer.prepare_frame(image_i);
-                    frame.update_global_data(GPUGlobalData::from_camera(camera, extends));
+                    frame.update_global_data(GPUGlobalData::from_camera(&camera, extends));
 
                     // gather debug bounding boxes to draw
                     if self.bounds_debug_depth == Some(colliders.tree_depth()) {
@@ -350,8 +350,8 @@ impl App {
                         }
                         // show overlaps
                         for (coll_1, coll_2) in colliders.get_potential_overlaps() {
-                            let bounds_1 = coll_1.calc_bounding(transforms);
-                            let bounds_2 = coll_2.calc_bounding(transforms);
+                            let bounds_1 = coll_1.calc_bounding(&mut transforms);
+                            let bounds_2 = coll_2.calc_bounding(&mut transforms);
 
                             let centre = bounds_1.centre();
                             let min_cast: [f32; 3] = (centre - Vector3::new(0.1, 0.1, 0.1)).into();
@@ -479,7 +479,7 @@ impl App {
 
                     // directional lights
                     // let mut dl_query = <(&TransformID, &DirectionalLightComponent)>::query();
-                    let angle = *fixed_seconds / 4.;
+                    let angle = fixed_seconds / 4.;
                     let direction =
                         cgmath::InnerSpace::normalize(cgmath::vec3(angle.sin(), -1., angle.cos()));
                     let dir = DirectionLight {
@@ -492,6 +492,8 @@ impl App {
                     renderer
                         .lighting_system
                         .set_ambient_color([0.1, 0.1, 0.1, 1.]);
+
+                    *resources = Some(GameResources { transforms, colliders, camera, fixed_seconds, last_delta_time, inputs })
                 });
         }
     }
