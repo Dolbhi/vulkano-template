@@ -8,7 +8,7 @@ use crate::{
 };
 use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, One, SquareMatrix, Vector3, Zero};
 use collider::ContactIdPair;
-pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy, update_bounds_system, update_colliders_system};
+pub use collider::{ColliderSystem, CuboidCollider, update_bounds_system, update_colliders_system};
 use legion::{system};
 use std::{
     ops::ControlFlow, sync::{Arc, RwLock, atomic::AtomicUsize},
