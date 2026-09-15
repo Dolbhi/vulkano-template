@@ -80,6 +80,7 @@ pub fn init_world(loader: WorldLoader) {
     //      lost empires
     let le_transform = loader
         .world
+        .resources
         .transforms
         .add_transform(TransformCreateInfo::default());
     for mesh in le_meshes {
@@ -181,10 +182,10 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     let transform_info = TransformCreateInfo::default()
         .with_translation([0., -0.5, 0.])
         .with_scale([5., 0.5, 5.]);
-    let transform = loader.world.transforms.add_transform(transform_info);
-    let collider = loader.world.colliders.add(
+    let transform = loader.world.resources.transforms.add_transform(transform_info);
+    let collider = loader.world.resources.colliders.add(
         CuboidCollider::new(transform, None, 2., 1.7),
-        &mut loader.world.transforms,
+        &mut loader.world.resources.transforms,
     );
     load_object!(loader.world.world, transform, collider);
 
@@ -193,10 +194,10 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         .with_translation([10., -0.5, 0.])
         .with_scale([5., 0.5, 5.])
         .set_rotation(Quaternion::from_axis_angle((1., 0., 0.).into(), Rad(0.1)));
-    let transform = loader.world.transforms.add_transform(transform_info);
-    let collider = loader.world.colliders.add(
+    let transform = loader.world.resources.transforms.add_transform(transform_info);
+    let collider = loader.world.resources.colliders.add(
         CuboidCollider::new(transform, None, 2., 1.7),
-        &mut loader.world.transforms,
+        &mut loader.world.resources.transforms,
     );
     let ro = loader.resources.load_ro(Cube, yellow_mat, true);
     load_object!(loader.world.world, transform, collider, ro);
@@ -206,10 +207,10 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         .with_translation([20., -0.5, 0.])
         .with_scale([5., 0.5, 5.])
         .set_rotation(Quaternion::from_axis_angle((1., 0., 0.).into(), Rad(0.2)));
-    let transform = loader.world.transforms.add_transform(transform_info);
-    let collider = loader.world.colliders.add(
+    let transform = loader.world.resources.transforms.add_transform(transform_info);
+    let collider = loader.world.resources.colliders.add(
         CuboidCollider::new(transform, None, 2., 1.7),
-        &mut loader.world.transforms,
+        &mut loader.world.resources.transforms,
     );
     let ro = loader.resources.load_ro(Cube, yellow_mat, true);
     load_object!(loader.world.world, transform, collider, ro);
@@ -235,7 +236,7 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     );
 
     // rigidbody test
-    let t = loader.world.transforms.add_transform([0., 1., 0.]);
+    let t = loader.world.resources.transforms.add_transform([0., 1., 0.]);
     let ro = loader.resources.load_ro(Cube, green_mat, true);
     let mut rb = RigidBody::new(t);
     rb.velocity = (1.0, 10.0, 0.0).into();
@@ -243,9 +244,9 @@ pub fn init_phys_test(mut loader: WorldLoader) {
     rb.inv_mass = 0.5;
     rb.set_moi_as_cuboid((1., 1., 1.).into());
     let rb = Arc::new(RwLock::new(rb));
-    let collider = loader.world.colliders.add(
+    let collider = loader.world.resources.colliders.add(
         CuboidCollider::new(t, Some(rb.clone()), 2., 1.7),
-        &mut loader.world.transforms,
+        &mut loader.world.resources.transforms,
     );
     // println!("[DEBUG] rb id: {:?}", t);
     load_object!(loader.world.world, t, ro, rb, collider);
@@ -255,24 +256,25 @@ pub fn init_phys_test(mut loader: WorldLoader) {
 
     let mover = loader
         .world
+        .resources
         .transforms
         .add_transform(TransformCreateInfo::from([9., 0., 0.]).with_parent(Some(pivot)));
-    let collider = loader.world.colliders.add(
+    let collider = loader.world.resources.colliders.add(
         CuboidCollider::new(mover, None, 2., 1.7),
-        &mut loader.world.transforms,
+        &mut loader.world.resources.transforms,
     );
     let ro = loader.resources.load_ro(Cube, green_mat, true);
     load_object!(loader.world.world, mover, collider, ro);
 
     // collider test
-    let transform = loader.world.transforms.add_transform([0., 5., 0.]);
+    let transform = loader.world.resources.transforms.add_transform([0., 5., 0.]);
     let mut rigidbody = RigidBody::new(transform);
     rigidbody.gravity_multiplier = 0.0;
     rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
     let rigidbody = Arc::new(RwLock::new(rigidbody));
-    let collider = loader.world.colliders.add(
+    let collider = loader.world.resources.colliders.add(
         CuboidCollider::new(transform, Some(rigidbody.clone()), 2., 1.7),
-        &mut loader.world.transforms,
+        &mut loader.world.resources.transforms,
     );
     let ro = loader.resources.load_ro(Cube, red_mat, true);
     load_object!(
@@ -283,21 +285,21 @@ pub fn init_phys_test(mut loader: WorldLoader) {
         rigidbody // , TransformTracker("prefab")
     );
 
-    // let transform = loader.world.transforms.add_transform(
+    // let transform = loader.world.resources.transforms.add_transform(
     //     TransformCreateInfo::from([1.9, 5.4, 1.9]).set_rotation(Quaternion::from_axis_angle(
     //         [(0.5f32).sqrt(), 0., (0.5f32).sqrt()].into(),
     //         Rad(PI / 3.),
     //     )),
     // );
 
-    let transform = loader.world.transforms.add_transform([0., 7., 0.]);
+    let transform = loader.world.resources.transforms.add_transform([0., 7., 0.]);
     let mut rigidbody = RigidBody::new(transform);
     rigidbody.gravity_multiplier = 0.0;
     rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
     let rigidbody = Arc::new(RwLock::new(rigidbody));
-    let collider = loader.world.colliders.add(
+    let collider = loader.world.resources.colliders.add(
         CuboidCollider::new(transform, Some(rigidbody.clone()), 2., 1.7),
-        &mut loader.world.transforms,
+        &mut loader.world.resources.transforms,
     );
     let ro = loader.resources.load_ro(Cube, red_mat, true);
     load_object!(loader.world.world, transform, collider, ro, rigidbody);
@@ -327,10 +329,10 @@ pub fn init_char_test(mut loader: WorldLoader) {
     let transform_info = TransformCreateInfo::default()
         .with_translation([0., -0.5, 0.])
         .with_scale([10., 0.5, 10.]);
-    let transform = loader.world.transforms.add_transform(transform_info);
-    let collider = loader.world.colliders.add(
+    let transform = loader.world.resources.transforms.add_transform(transform_info);
+    let collider = loader.world.resources.colliders.add(
         CuboidCollider::new(transform, None, 2., 1.7),
-        &mut loader.world.transforms,
+        &mut loader.world.resources.transforms,
     );
     let ro = loader.resources.load_ro(Cube, green_mat, true);
     load_object!(loader.world.world, ro, transform, collider);
@@ -359,14 +361,14 @@ pub fn init_char_test(mut loader: WorldLoader) {
     let transform_info = TransformCreateInfo::default()
         .with_translation([0., 1., 0.])
         .with_scale([0.5, 1., 0.5]);
-    let transform = loader.world.transforms.add_transform(transform_info);
+    let transform = loader.world.resources.transforms.add_transform(transform_info);
     let mut rb = RigidBody::new(transform);
     rb.inv_mass = 1. / 70.;
     rb.set_moi_as_cuboid([0.5, 1., 0.5].into());
     let rb = Arc::new(RwLock::new(rb));
-    let collider = loader.world.colliders.add(
+    let collider = loader.world.resources.colliders.add(
         CuboidCollider::new(transform, Some(rb.clone()), 0.1, 0.2),
-        &mut loader.world.transforms,
+        &mut loader.world.resources.transforms,
     );
     let ro = loader.resources.load_ro(Cube, yellow_mat, true);
     load_object!(loader.world.world, ro, transform, collider, rb);

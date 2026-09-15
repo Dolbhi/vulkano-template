@@ -18,19 +18,9 @@ use winit::{
 };
 
 use crate::{
-    game_objects::{
-        light::PointLightComponent,
-        transform::{TransformCreateInfo, TransformID},
-        Camera, GameWorld, MaterialSwapper, WorldLoader,
-    },
-    input::InputState,
-    load_object,
-    physics::{quick_inverse, CuboidCollider, RigidBody},
-    prefabs::{init_char_test, init_phys_test, init_ui_test, init_world},
-    render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
-    shaders::{DirectionLight, GPUGlobalData, GPUAABB},
-    ui::{self, MenuOption},
-    LOGIC_PROFILER, RENDER_PROFILER,
+    LOGIC_PROFILER, RENDER_PROFILER, game_objects::{
+        Camera, GameResources, GameWorld, MaterialSwapper, WorldLoader, light::PointLightComponent, transform::{TransformCreateInfo, TransformID},
+    }, input::InputState, load_object, physics::{CuboidCollider, RigidBody, quick_inverse}, prefabs::{init_char_test, init_phys_test, init_ui_test, init_world}, render::{DeferredRenderer, RenderLoop, RenderObject, resource_manager::ResourceManager}, shaders::{DirectionLight, GPUAABB, GPUGlobalData}, ui::{self, MenuOption},
 };
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
@@ -126,9 +116,9 @@ impl App {
         loader(WorldLoader { world, resources });
 
         // camera light, child of the camera
-        let camera_light = world.transforms.add_transform(
+        let camera_light = world.resources.transforms.add_transform(
             TransformCreateInfo::default()
-                .with_parent(Some(world.camera.transform))
+                .with_parent(Some(world.resources.camera.transform))
                 .with_translation((0., 0., 0.2)), // light pos cannot = cam pos else the light will glitch
         );
         world
@@ -167,12 +157,14 @@ impl App {
                 .update(&mut graphics.renderer, |renderer, image_i, context| {
                     let GameWorld {
                         world,
-                        transforms,
-                        colliders,
-                        camera,
-                        fixed_seconds,
-                        last_delta_time,
-                        inputs,
+                        resources: GameResources {
+                            transforms,
+                            colliders,
+                            camera,
+                            fixed_seconds,
+                            last_delta_time,
+                            inputs,
+                        },
                         ..
                     } = &mut *self.world.lock().unwrap();
                     transforms.update_interpolation(*last_delta_time);

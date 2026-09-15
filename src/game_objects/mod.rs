@@ -5,7 +5,7 @@ pub mod transform;
 pub mod utility;
 
 pub use camera::Camera;
-pub use game_world::{GameWorld, GameTime};
+pub use game_world::{GameWorld, GameTime, GameResources};
 
 use cgmath::{Quaternion, Rad, Vector3, Rotation3};
 use legion::system;
@@ -99,7 +99,7 @@ impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
     where
         T: legion::storage::Component,
     {
-        let id = self.world.transforms.add_transform(transform);
+        let id = self.world.resources.transforms.add_transform(transform);
         (id, self.world.world.push((id, comp)))
     }
 
@@ -113,7 +113,7 @@ impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
         T1: legion::storage::Component,
         T2: legion::storage::Component,
     {
-        let id = self.world.transforms.add_transform(transform);
+        let id = self.world.resources.transforms.add_transform(transform);
         (id, self.world.world.push((id, comp_1, comp_2)))
     }
 
@@ -129,7 +129,7 @@ impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
         T2: legion::storage::Component,
         T3: legion::storage::Component,
     {
-        let id = self.world.transforms.add_transform(transform);
+        let id = self.world.resources.transforms.add_transform(transform);
         (id, self.world.world.push((id, comp_1, comp_2, comp_3)))
     }
 }
@@ -139,7 +139,7 @@ impl<'a, 'b: 'a> WorldLoader<'a, 'b> {
 macro_rules! load_transform_and_object {
     ($game_world:expr, $transform:expr, $($comp:expr),+) => {
         {
-            let id = $game_world.transforms.add_transform($transform);
+            let id = $game_world.resources.transforms.add_transform($transform);
             (id, $game_world.world.push((id, $($comp),+)))
         }
     };
