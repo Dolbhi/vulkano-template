@@ -162,3 +162,9 @@ impl Default for GameWorld {
         Self::new()
     }
 }
+
+macro_rules! run_system_mut {
+    ($game_world:expr, $type:ty, $sys:expr) => {
+        $type::query().for_each_mut(&mut $game_world.world, |comp| $sys($game_world.resources, comp));
+    };
+}
