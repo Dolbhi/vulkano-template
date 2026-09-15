@@ -17,6 +17,17 @@ use legion::*;
 pub const CAM_SPEED: f32 = 6.;
 pub const SLOW_COEFF: f32 = 0.1;
 
+macro_rules! run_system_mut {
+    ($game_world:expr, $type:ty, $sys:expr) => {
+        <$type>::query().for_each_mut(&mut $game_world.world, |comp| $sys(&mut $game_world.resources, comp));
+    };
+}
+macro_rules! run_system {
+    ($game_world:expr, $type:ty, $sys:expr) => {
+        <$type>::query().for_each(&$game_world.world, |comp| $sys(&$game_world.resources, comp));
+    };
+}
+
 /// stores game data and handles logic updates
 pub struct GameWorld {
     pub world: World,
@@ -88,14 +99,24 @@ impl GameWorld {
         let coll_start = std::time::Instant::now();
 
         // update bounds
-        <(&TransformID, &mut LeafInHierachy)>::query().for_each_mut(&mut self.world, |(id, collider)| {
-            if let Some(transform) = self.resources.transforms.get_transform(id) {
+        let update_bounds = |resources: &mut GameResources, (id, collider): (&TransformID, &mut LeafInHierachy)| {
+            if let Some(transform) = resources.transforms.get_transform(id) {
                 if transform.needs_coll_update {
-                    self.resources.colliders.update(collider, &mut self.resources.transforms);
-                    self.resources.transforms.reset_coll_update(id);
+                    resources.colliders.update(collider, &mut resources.transforms);
+                    resources.transforms.reset_coll_update(id);
                 }
             }
-        });
+        };
+        run_system_mut!(self, (&TransformID, &mut LeafInHierachy), update_bounds);
+
+        // <(&TransformID, &mut LeafInHierachy)>::query().for_each_mut(&mut self.world, |(id, collider)| {
+        //     if let Some(transform) = self.resources.transforms.get_transform(id) {
+        //         if transform.needs_coll_update {
+        //             self.resources.colliders.update(collider, &mut self.resources.transforms);
+        //             self.resources.transforms.reset_coll_update(id);
+        //         }
+        //     }
+        // });
 
         let contact_resolver = self.resources.colliders.get_contacts(&mut self.resources.transforms);
         contact_resolver.resolve(&mut self.resources.transforms, seconds_passed);
@@ -166,10 +187,4 @@ impl Default for GameWorld {
     fn default() -> Self {
         Self::new()
     }
-}
-
-macro_rules! run_system_mut {
-    ($game_world:expr, $type:ty, $sys:expr) => {
-        $type::query().for_each_mut(&mut $game_world.world, |comp| $sys(&mut $game_world.resources, comp));
-    };
 }

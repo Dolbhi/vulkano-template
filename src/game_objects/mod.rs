@@ -5,7 +5,7 @@ pub mod transform;
 pub mod utility;
 
 pub use camera::Camera;
-pub use game_world::{GameWorld, GameTime, GameResources};
+pub use game_world::{GameWorld, GameResources, GameTime};
 
 use cgmath::{Quaternion, Rad, Vector3, Rotation3};
 use legion::system;
