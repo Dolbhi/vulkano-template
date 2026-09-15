@@ -44,6 +44,15 @@ pub struct GameResources {
 /// Wrapper for game time and last delta time, both in seconds
 pub struct GameTime(pub f32, pub f32);
 
+pub trait RunnableMut : IntoQuery {
+    fn update(self, resources: &mut GameResources);
+
+    // // the thing we need macros for unfortunately
+    // fn test(gameworld: &mut GameWorld, resources: &mut GameResources) {
+    //     Self::query().for_each_mut(&mut gameworld.world, |c| Self::update(c, resources));
+    // }
+}
+
 impl GameWorld {
     pub fn new() -> Self {
         let mut transforms = TransformSystem::new();
