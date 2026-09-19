@@ -58,6 +58,7 @@ impl RunnableMut for (&TransformID, &Walker, &mut Arc<RwLock<RigidBody>>) {
 }
 
 impl RunnableMut for (&TransformID, &mut Walker, &PlayerWalkerController) {
+    // Transform id is currently unused since we use the cam orientation instead
     fn update(self, resources: &mut super::GameResources) {
         let mut movement = Vector3::zero();
         // let mut y_movement = 0.;
@@ -76,8 +77,8 @@ impl RunnableMut for (&TransformID, &mut Walker, &PlayerWalkerController) {
             self.1.target_vel = [0., 0.].into();
             return;
         }
-        
-        let movement = resources.transforms.get_global_rotation(self.0).unwrap() * movement;
+
+        let movement = resources.transforms.get_global_rotation(&resources.camera.transform).unwrap() * movement;
         let movement = Vector2::new(movement.x, movement.z);
         self.1.target_vel = movement.normalize_to(PLAYER_WALK_VEL);
     }

@@ -268,18 +268,14 @@ impl App {
                         camera.move_rotation(inputs.mouse_move.x, inputs.mouse_move.y);
                         inputs.mouse_move = [0., 0.].into();
 
-                        // allow moving while frozen
-                        if self
-                            .game_thread
-                            .paused
-                            .load(std::sync::atomic::Ordering::Acquire)
-                        {
+                        // only move cam directly if it is unparented
+                        if transforms.get_transform(&camera.transform).unwrap().get_parent().is_none() {
                             // move cam
                             inputs.move_transform(
                                 transforms.get_transform_mut(&camera.transform).unwrap(),
                                 Instant::now()
-                                    .duration_since(self.last_frame_time)
-                                    .as_secs_f32(),
+                                .duration_since(self.last_frame_time)
+                                .as_secs_f32(),
                                 6.,
                                 0.1,
                             );

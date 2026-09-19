@@ -87,6 +87,10 @@ impl Transform {
         }
     }
 
+    pub fn get_parent(&self) -> Option<TransformID> {
+        self.parent
+    }
+
     pub fn get_local_model(&mut self) -> Matrix4<f32> {
         match self.local_model {
             Some(matrix) => matrix,

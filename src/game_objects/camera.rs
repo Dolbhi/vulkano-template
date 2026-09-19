@@ -48,12 +48,13 @@ impl Camera {
     /// Lerp camera slightly towards target position
     ///
     /// Update transform rotation to match camera
-    pub fn sync_transform(&mut self, system: &mut TransformSystem) {
-        let transform = system.get_transform_mut(&self.transform).unwrap();
-        let view = transform.get_local_transform();
+    pub fn sync_transform(&mut self, transforms: &mut TransformSystem) {
+        let model = transforms.get_lerp_model(&self.transform).unwrap();
+        let transform = transforms.get_transform_mut(&self.transform).unwrap();
+        // let view = transform.get_local_transform();
         self.smooth_pos = self
             .damper
-            .smooth_follow(self.smooth_pos, *view.translation); //self.smooth_pos.lerp(*view.translation, 0.125);
+            .smooth_follow(self.smooth_pos, model.w.truncate()); //self.smooth_pos.lerp(*view.translation, 0.125);
         transform.set_rotation(self.rotation);
     }
 

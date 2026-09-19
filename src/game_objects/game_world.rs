@@ -123,16 +123,6 @@ impl GameWorld {
         let lerp_time = lerp_start.elapsed().as_micros() as u32;
         let others_start = std::time::Instant::now();
 
-        // // move cam
-        // self.resources.inputs.move_transform(
-        //     self.resources.transforms
-        //         .get_transform_mut(&self.resources.camera.transform)
-        //         .unwrap(),
-        //     seconds_passed,
-        //     CAM_SPEED,
-        //     SLOW_COEFF,
-        // );
-
         run_update!(self, (&TransformID, &TransformTracker));
 
         let mut profiler = LOGIC_PROFILER.lock().unwrap();
