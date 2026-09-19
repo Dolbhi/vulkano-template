@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use cgmath::{InnerSpace, Quaternion, Rad, Rotation3, Vector3};
+use cgmath::{InnerSpace, Matrix3, Quaternion, Rad, Rotation3, Vector3, Zero};
 
 use crate::{
     game_objects::{
@@ -360,7 +360,8 @@ pub fn init_char_test(mut loader: WorldLoader) {
     let transform = loader.world.resources.transforms.add_transform(transform_info);
     let mut rb = RigidBody::new(transform);
     rb.inv_mass = 1. / 70.;
-    rb.set_moi_as_cuboid([0.5, 1., 0.5].into());
+    // rb.set_moi_as_cuboid([0.5, 1., 0.5].into());
+    rb.inv_moi = Matrix3::zero(); // UN ROTATABLE
     let rb = Arc::new(RwLock::new(rb));
     let collider = loader.world.resources.colliders.add(
         CuboidCollider::new(transform, Some(rb.clone()), 0.1, 0.2),
