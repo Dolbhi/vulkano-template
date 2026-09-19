@@ -1,9 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use crate::{
-    input::InputState,
-    physics::{ColliderSystem, LeafInHierachy, RigidBody},
-    LOGIC_PROFILER,
+    LOGIC_PROFILER, game_objects::movement::Walker, input::InputState, physics::{ColliderSystem, LeafInHierachy, RigidBody},
 };
 
 use super::{
@@ -96,6 +94,7 @@ impl GameWorld {
         let logic_start = std::time::Instant::now();
 
         // physics update
+        run_update_mut!(self, (&TransformID, &Walker, &mut Arc<RwLock<RigidBody>>));
         run_update_mut!(self, (&TransformID, &mut Arc<RwLock<RigidBody>>));
 
         // [Profiling] Physics
