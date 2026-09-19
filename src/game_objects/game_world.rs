@@ -52,6 +52,14 @@ pub trait RunnableMut : IntoQuery {
     //     Self::query().for_each_mut(&mut gameworld.world, |c| Self::update(c, resources));
     // }
 }
+pub trait Runnable : IntoQuery {
+    fn update(self, resources: &GameResources);
+
+    // // the thing we need macros for unfortunately
+    // fn test(gameworld: &mut GameWorld, resources: &GameResources) {
+    //     Self::query().for_each(&mut gameworld.world, |c| Self::update(c, resources));
+    // }
+}
 
 impl GameWorld {
     pub fn new() -> Self {

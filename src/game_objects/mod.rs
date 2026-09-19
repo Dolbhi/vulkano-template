@@ -8,9 +8,8 @@ pub use camera::Camera;
 pub use game_world::{GameWorld, GameResources, GameTime};
 
 use cgmath::{Quaternion, Rad, Vector3, Rotation3};
-use legion::system;
 
-use crate::{game_objects::transform::TransformSystem, render::{
+use crate::{game_objects::{game_world::{Runnable, RunnableMut}}, render::{
     RenderObject, RenderSubmit, resource_manager::{MaterialID, MeshID, ResourceRetriever},
 }};
 
@@ -29,37 +28,61 @@ pub struct MaterialSwapper<T: Clone> {
     curent_index: usize,
 }
 
-pub struct TransformTracker<'a>(pub &'a str);
+pub struct TransformTracker(pub &'static str);
 
 pub struct WorldLoader<'a, 'b: 'a> {
     pub world: &'a mut GameWorld,
     pub resources: &'a mut ResourceRetriever<'b>,
 }
 
-#[system(for_each)]
-fn update_rotate(transform_id: &TransformID, rotate: &Rotate, #[resource] transforms: &mut TransformSystem, #[resource] time: &GameTime)
-{
-    // update rotate
-    let transform = transforms.get_transform_mut(transform_id).unwrap();
-    transform.set_rotation(
-        Quaternion::from_axis_angle(rotate.0, rotate.1 * time.0)
-        * transform.get_local_transform().rotation,
-    );
+impl RunnableMut for (&TransformID, &Rotate) {
+    fn update(self, resources: &mut GameResources) {
+        let (transform_id, rotate) = self;
+        // update rotate
+        let transform = resources.transforms.get_transform_mut(transform_id).unwrap();
+        transform.set_rotation(
+            Quaternion::from_axis_angle(rotate.0, rotate.1 * resources.last_delta_time)
+            * transform.get_local_transform().rotation,
+        );
+    }
+}
+impl RunnableMut for (&TransformID, &TransformTracker) {
+    fn update(self, resources: &mut GameResources) {
+        let model = resources.transforms.get_global_model(self.0).unwrap();
+        println!("[Transform] {}: {:?}", self.1.0, model);
+    }
+}
+impl Runnable for (&mut MaterialSwapper<()>, &mut RenderObject<()>) {
+    fn update(self, _: &GameResources) {
+        // update basic mat swap
+        let next_mat = self.0.swap_material();
+        // println!("Swapped mat: {:?}", next_mat);
+        self.1.material = next_mat;
+    }
 }
 
-#[system(for_each)]
-fn update_tracker(transform_id: &TransformID, TransformTracker(tag): &TransformTracker, #[resource] transforms: &mut TransformSystem) {
-    let model = transforms.get_global_model(transform_id).unwrap();
-    println!("[Transform] {}: {:?}", tag, model);
-}
-
-#[system(for_each)]
-fn swap_material(swapper: &mut MaterialSwapper<()>, render_object: &mut RenderObject<()>) {
-    // update basic mat swap
-    let next_mat = swapper.swap_material();
-    // println!("Swapped mat: {:?}", next_mat);
-    render_object.material = next_mat;
-}
+// #[system(for_each)]
+// fn update_rotate(transform_id: &TransformID, rotate: &Rotate, #[resource] transforms: &mut TransformSystem, #[resource] time: &GameTime)
+// {
+//     // update rotate
+//     let transform = transforms.get_transform_mut(transform_id).unwrap();
+//     transform.set_rotation(
+//         Quaternion::from_axis_angle(rotate.0, rotate.1 * time.0)
+//         * transform.get_local_transform().rotation,
+//     );
+// }
+// #[system(for_each)]
+// fn update_tracker(transform_id: &TransformID, TransformTracker(tag): &TransformTracker, #[resource] transforms: &mut TransformSystem) {
+//     let model = transforms.get_global_model(transform_id).unwrap();
+//     println!("[Transform] {}: {:?}", tag, model);
+// }
+// #[system(for_each)]
+// fn swap_material(swapper: &mut MaterialSwapper<()>, render_object: &mut RenderObject<()>) {
+//     // update basic mat swap
+//     let next_mat = swapper.swap_material();
+//     // println!("Swapped mat: {:?}", next_mat);
+//     render_object.material = next_mat;
+// }
 
 
 impl<T: Clone> MaterialSwapper<T> {
