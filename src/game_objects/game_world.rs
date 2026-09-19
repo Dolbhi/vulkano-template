@@ -15,12 +15,12 @@ use legion::*;
 pub const CAM_SPEED: f32 = 6.;
 pub const SLOW_COEFF: f32 = 0.1;
 
-macro_rules! run_system_mut {
+macro_rules! run_update_mut {
     ($game_world:expr, $type:ty) => {
         <$type>::query().for_each_mut(&mut $game_world.world, |comp| <$type>::update(comp, &mut $game_world.resources));
     };
 }
-macro_rules! run_system {
+macro_rules! run_update {
     ($game_world:expr, $type:ty) => {
         <$type>::query().for_each(&$game_world.world, |comp| <$type>::update(comp, &mut $game_world.resources));
     };
@@ -96,26 +96,26 @@ impl GameWorld {
         let logic_start = std::time::Instant::now();
 
         // physics update
-        run_system_mut!(self, (&TransformID, &mut Arc<RwLock<RigidBody>>));
+        run_update_mut!(self, (&TransformID, &mut Arc<RwLock<RigidBody>>));
 
         // [Profiling] Physics
         let phys_time = logic_start.elapsed().as_micros() as u32;
         let coll_start = std::time::Instant::now();
 
         // update bounds
-        run_system_mut!(self, (&TransformID, &mut LeafInHierachy));
+        run_update_mut!(self, (&TransformID, &mut LeafInHierachy));
 
         let contact_resolver = self.resources.colliders.get_contacts(&mut self.resources.transforms);
         contact_resolver.resolve(&mut self.resources.transforms, seconds_passed);
         // store old velocity
-        run_system_mut!(self, &mut Arc<RwLock<RigidBody>>);
+        run_update_mut!(self, &mut Arc<RwLock<RigidBody>>);
         
         // [Profiling] Colliders
         let coll_time = coll_start.elapsed().as_micros() as u32;
         let lerp_start = std::time::Instant::now();
 
         // update interpolation models
-        run_system!(self, &TransformID);
+        run_update!(self, &TransformID);
         self.resources.transforms.update_last_fixed();
 
         // [Profiling] Interpolation
@@ -132,10 +132,8 @@ impl GameWorld {
             SLOW_COEFF,
         );
 
-        // update rotate
-        run_system!(self, (&TransformID, &Rotate));
-
-        run_system!(self, (&TransformID, &TransformTracker));
+        run_update!(self, (&TransformID, &Rotate));
+        run_update!(self, (&TransformID, &TransformTracker));
 
         let mut profiler = LOGIC_PROFILER.lock().unwrap();
         profiler.add_sample(phys_time, 1);
