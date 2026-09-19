@@ -3,6 +3,7 @@ mod game_world;
 pub mod light;
 pub mod transform;
 pub mod utility;
+pub mod movement;
 
 pub use camera::Camera;
 pub use game_world::{GameWorld, GameResources, GameTime, Runnable, RunnableMut};
