@@ -61,30 +61,6 @@ impl Runnable for (&mut MaterialSwapper<()>, &mut RenderObject<()>) {
     }
 }
 
-// #[system(for_each)]
-// fn update_rotate(transform_id: &TransformID, rotate: &Rotate, #[resource] transforms: &mut TransformSystem, #[resource] time: &GameTime)
-// {
-//     // update rotate
-//     let transform = transforms.get_transform_mut(transform_id).unwrap();
-//     transform.set_rotation(
-//         Quaternion::from_axis_angle(rotate.0, rotate.1 * time.0)
-//         * transform.get_local_transform().rotation,
-//     );
-// }
-// #[system(for_each)]
-// fn update_tracker(transform_id: &TransformID, TransformTracker(tag): &TransformTracker, #[resource] transforms: &mut TransformSystem) {
-//     let model = transforms.get_global_model(transform_id).unwrap();
-//     println!("[Transform] {}: {:?}", tag, model);
-// }
-// #[system(for_each)]
-// fn swap_material(swapper: &mut MaterialSwapper<()>, render_object: &mut RenderObject<()>) {
-//     // update basic mat swap
-//     let next_mat = swapper.swap_material();
-//     // println!("Swapped mat: {:?}", next_mat);
-//     render_object.material = next_mat;
-// }
-
-
 impl<T: Clone> MaterialSwapper<T> {
     pub fn new(materials: impl IntoIterator<Item = RenderSubmit<T>>) -> Self {
         let materials = materials.into_iter().collect();
