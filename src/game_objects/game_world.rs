@@ -94,6 +94,7 @@ impl GameWorld {
         let logic_start = std::time::Instant::now();
 
         // physics update
+        run_update!(self, (&TransformID, &Rotate));
         run_update_mut!(self, (&TransformID, &Walker, &mut Arc<RwLock<RigidBody>>));
         run_update_mut!(self, (&TransformID, &mut Arc<RwLock<RigidBody>>));
 
@@ -131,7 +132,6 @@ impl GameWorld {
             SLOW_COEFF,
         );
 
-        run_update!(self, (&TransformID, &Rotate));
         run_update!(self, (&TransformID, &TransformTracker));
 
         let mut profiler = LOGIC_PROFILER.lock().unwrap();
