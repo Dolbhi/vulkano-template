@@ -10,7 +10,7 @@ const WALKER_MAX_GROUND_SEP: f32 = 0.2;
 pub struct Walker {
     pub target_vel: Vector2<f32>,
     pub max_friction: f32,
-    pub feet_pos: Vector3<f32>,
+    pub rel_feet_pos: Vector3<f32>,
 }
 
 impl RunnableMut for (&TransformID, &Walker, &mut Arc<RwLock<RigidBody>>) {
@@ -19,7 +19,7 @@ impl RunnableMut for (&TransformID, &Walker, &mut Arc<RwLock<RigidBody>>) {
         let rb_rotation = resources.transforms.get_global_rotation(self.0).unwrap();
         if let Some((_, coll)) = resources.colliders.raycast(
             &mut resources.transforms,
-            (model * self.1.feet_pos.extend(1.)).truncate(),
+            (model * self.1.rel_feet_pos.extend(1.)).truncate(),
             -model.y.truncate(), // only checks down
             WALKER_MAX_GROUND_SEP,
         ) {

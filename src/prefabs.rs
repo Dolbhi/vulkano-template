@@ -8,12 +8,8 @@ use cgmath::{InnerSpace, Quaternion, Rad, Rotation3, Vector3};
 
 use crate::{
     game_objects::{
-        light::PointLightComponent, transform::TransformCreateInfo, MaterialSwapper, Rotate,
-        /*TransformTracker,*/ WorldLoader,
-    },
-    load_object, load_transform_and_object,
-    physics::{CuboidCollider, RigidBody},
-    render::resource_manager::{MaterialID::*, MeshID::*, TextureID},
+        MaterialSwapper, Rotate, WorldLoader, light::PointLightComponent, movement::Walker, transform::TransformCreateInfo,
+    }, load_object, load_transform_and_object, physics::{CuboidCollider, RigidBody}, render::resource_manager::{MaterialID::*, MeshID::*, TextureID},
 };
 
 // type Mesh = std::sync::Arc<crate::vulkano_objects::buffers::MeshBuffers<VertexFull>>;
@@ -371,5 +367,10 @@ pub fn init_char_test(mut loader: WorldLoader) {
         &mut loader.world.resources.transforms,
     );
     let ro = loader.resources.load_ro(Cube, yellow_mat, true);
-    load_object!(loader.world.world, ro, transform, collider, rb);
+    let walker = Walker {
+        target_vel: [1.0, 0.0].into(),
+        max_friction: 10.,
+        rel_feet_pos: [0.0, -1.0, 0.0].into()
+    };
+    load_object!(loader.world.world, ro, transform, collider, rb, walker);
 }
