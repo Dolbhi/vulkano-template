@@ -21,7 +21,8 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn camera_rotation(current: &mut Quaternion<f32>, dx: f32, dy: f32) {
+    /// Rotate a given rotation based on mouse movements
+    pub fn mouse_rotation(current: &mut Quaternion<f32>, dx: f32, dy: f32) {
         let old_pitch = Rad::atan(current.v.x / current.s);
         let delta_pitch = clamp(
             Rad(-dy * MOUSE_SENSITIVITY),
@@ -36,6 +37,9 @@ impl Camera {
 
     pub fn set_rotation(&mut self, rotation: Quaternion<f32>) {
         self.rotation = rotation;
+    }
+    pub fn move_rotation(&mut self, dx: f32, dy: f32) {
+        Self::mouse_rotation(&mut self.rotation, dx, dy);
     }
     // pub fn rotate(&mut self, dx: f32, dy: f32) {
     //     Self::camera_rotation(&mut self.rotation, dx, dy);

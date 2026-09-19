@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cgmath::{InnerSpace, Matrix3, One, Quaternion, Vector3, Vector4};
+use cgmath::{InnerSpace, Matrix3, Vector2, Vector3, Vector4};
 use legion::*;
 
 // use rand::Rng;
@@ -40,7 +40,6 @@ struct Graphics {
 pub struct App {
     graphics: Option<Graphics>,
     world: Arc<Mutex<GameWorld>>,
-    camera_rotation: Quaternion<f32>,
     game_thread: GameWorldThread,
     inputs: InputState,
     game_state: GameState,
@@ -74,7 +73,6 @@ impl App {
             graphics: None,
             inputs: InputState::default(),
             world,
-            camera_rotation: Quaternion::one(),
             game_thread,
             game_state: Default::default(),
             last_frame_time: Instant::now(),
@@ -168,6 +166,18 @@ impl App {
                         ..
                     } = &mut *self.world.lock().unwrap();
                     transforms.update_interpolation(*last_delta_time);
+                    /*
+                    ~~ Can occur in any order ~~
+                    input events modifies app.inputs
+
+                    logic update modifies world.inputs <== POTENTIAL BUGS
+
+                    world.inputs = app.inputs
+                    render update modifies world.inputs
+                    app.inputs = world.inputs
+                    ~~~
+                    Currently changes to world.inputs are discarded
+                    */
                     *inputs = self.inputs.clone();
 
                     // update basic mat swap
@@ -255,7 +265,8 @@ impl App {
                     // send inputs to game world
                     if self.game_state == GameState::Playing {
                         // inputs.movement = self.inputs.get_move();
-                        camera.set_rotation(self.camera_rotation);
+                        camera.move_rotation(inputs.mouse_move.x, inputs.mouse_move.y);
+                        inputs.mouse_move = [0., 0.].into();
 
                         // allow moving while frozen
                         if self
@@ -685,10 +696,8 @@ impl ApplicationHandler for App {
         event: winit::event::DeviceEvent,
     ) {
         if let DeviceEvent::MouseMotion { delta } = event {
-            if self.game_state == GameState::Playing {
-                Camera::camera_rotation(&mut self.camera_rotation, delta.0 as f32, delta.1 as f32);
-            }
-        }
+            self.inputs.mouse_move += Vector2::new(delta.0 as f32, delta.1 as f32);
+        };
     }
 }
 

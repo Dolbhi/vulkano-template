@@ -10,8 +10,8 @@ use super::{
 };
 use legion::*;
 
-pub const CAM_SPEED: f32 = 6.;
-pub const SLOW_COEFF: f32 = 0.1;
+// pub const CAM_SPEED: f32 = 6.;
+// pub const SLOW_COEFF: f32 = 0.1;
 
 macro_rules! run_update_mut {
     ($game_world:expr, $type:ty) => {

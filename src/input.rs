@@ -134,14 +134,16 @@ impl ButtonState {
         self.just_pressed
     }
 
+    /// True if button was held down last frame
     pub fn get_was_pressed(&self) -> bool {
         self.was_pressed
     }
+    /// True if button switched from pressed to not pressed last frame
     pub fn get_just_pressed(&self) -> bool {
         self.just_pressed
     }
 
-    /// get button_down and reset it (kinda like an Option::take() actually)
+    /// get just_pressed and reset it (kinda like an Option::take() actually)
     pub fn consume_button_down(&mut self) -> bool {
         if self.just_pressed {
             self.just_pressed = false;
