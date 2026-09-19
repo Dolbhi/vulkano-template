@@ -1,6 +1,6 @@
 use std::ops::Neg;
 
-use cgmath::{BaseFloat, BaseNum, Matrix3, Matrix4, One, Vector3, num_traits::Num};
+use cgmath::{BaseFloat, BaseNum, InnerSpace, Matrix3, Matrix4, One, Vector3, num_traits::{Float, Num}};
 
 /// Create an antisymmetric skew matrix with the given vector components
 pub fn skew<S: Num + Neg<Output = S> + Copy>(v: Vector3<S>) -> Matrix3<S> {
@@ -18,4 +18,10 @@ pub fn apply_model<S: BaseFloat + One>(m: Matrix4<S>, v: Vector3<S>) -> Vector3<
 /// Split a transformation model into scale * rotation and translation
 pub fn split_model<S: BaseNum>(m: Matrix4<S>) -> (Matrix3<S>, Vector3<S>) {
     (Matrix3::from_cols(m.x.truncate(), m.y.truncate(), m.z.truncate()), m.w.truncate())
+}
+
+/// Split a vector between magnitude and direction
+pub fn mag_dir<S: BaseNum + Float>(v: Vector3<S>) -> (S, Vector3<S>) {
+    let mag = v.magnitude();
+    (mag, v/mag)
 }
