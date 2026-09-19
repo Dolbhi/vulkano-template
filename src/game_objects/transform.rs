@@ -238,6 +238,14 @@ impl TransformSystem {
             self.transforms.get_mut(id).unwrap().get_global_model(&parent_model)
         }))
     }
+    pub fn get_global_rotation(&self, id: &TransformID) -> Result<Quaternion<f32>, TransformError> {
+        let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
+        Ok(if let Some(parent) = transform.parent {
+            self.get_global_rotation(&parent)? * transform.rotation
+        } else {
+            transform.rotation
+        })
+    }
     // pub fn get_parent_model(&mut self, id: &TransformID) -> Result<Matrix4<f32>, TransformError> {
     //     let transform = self.transforms.get(id).ok_or(TransformError::IDNotFound)?;
     //     if let Some(id) = transform.parent {
@@ -247,7 +255,7 @@ impl TransformSystem {
     //     }
     // }
 
-    pub fn store_last_model(&mut self, id: &TransformID) -> Result<(), TransformError> {
+    fn store_last_model(&mut self, id: &TransformID) -> Result<(), TransformError> {
         let model = self.get_global_model(id)?;
         self.transforms.get_mut(id).unwrap().last_model = Some(model);
         Ok(())

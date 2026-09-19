@@ -16,7 +16,8 @@ pub struct Walker {
 impl RunnableMut for (&TransformID, &Walker, &mut Arc<RwLock<RigidBody>>) {
     fn update(self, resources: &mut super::GameResources) {
         let model = resources.transforms.get_global_model(self.0).expect("Cannot find transform associated with walker");
-        if let Some((point, coll)) = resources.colliders.raycast(
+        let rb_rotation = resources.transforms.get_global_rotation(self.0).unwrap();
+        if let Some((_, coll)) = resources.colliders.raycast(
             &mut resources.transforms,
             (model * self.1.feet_pos.extend(1.)).truncate(),
             -model.y.truncate(), // only checks down
@@ -44,7 +45,7 @@ impl RunnableMut for (&TransformID, &Walker, &mut Arc<RwLock<RigidBody>>) {
             let target_imp_dir = target_impulse / target_imp_mag;
             let clamped_impulse = self.1.max_friction.min(target_imp_mag) * target_imp_dir;
 
-            rb_guard.apply_impulse_rel([0., 0., 0.].into(), [clamped_impulse.x, 0., clamped_impulse.y].into(), [model.x, model.y, model.z]);
+            rb_guard.apply_impulse_rel([0., 0., 0.].into(), [clamped_impulse.x, 0., clamped_impulse.y].into(), rb_rotation);
         };
     }
 }
