@@ -11,6 +11,7 @@ use super::{
 const MOUSE_SENSITIVITY: f32 = 0.01;
 const CAM_DAMP_STRENGTH: f32 = 40.;
 
+/// Camera translation smoothly follows transform while the transform rotation is updated to match the camera
 pub struct Camera {
     pub fov: Rad<f32>,
     rotation: Quaternion<f32>,

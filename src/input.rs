@@ -1,4 +1,4 @@
-use cgmath::{InnerSpace, Rotation, Vector3, Zero};
+use cgmath::{InnerSpace, Rotation, Vector2, Vector3, Zero};
 use winit::{
     event::ElementState,
     keyboard::{KeyCode, PhysicalKey},
@@ -12,10 +12,12 @@ use crate::game_objects::transform::Transform;
 macro_rules! create_input_struct {
     {$(($key_name:ident, $code:pat)),+,$($other_name:ident),*} => {
         /// Input state is stored as a ButtonState (for rising edge detection)
-        #[derive(Default, Clone)]
+        #[derive(Clone)]
         pub struct InputState {
             $(pub $key_name: ButtonState),+,
-            $(pub $other_name: ButtonState),*
+            $(pub $other_name: ButtonState),*,
+
+            pub mouse_move: Vector2<f32>,
         }
 
         impl InputState {
@@ -24,6 +26,17 @@ macro_rules! create_input_struct {
                 match key_code {
                     $(PhysicalKey::Code($code) => self.$key_name.update_state(state),)+
                     _ => false
+                }
+            }
+        }
+
+        impl Default for InputState {
+            fn default() -> Self {
+                Self {
+                    $($key_name: ButtonState::default()),+,
+                    $($other_name: ButtonState::default()),*,
+
+                    mouse_move: [0., 0.].into()
                 }
             }
         }
