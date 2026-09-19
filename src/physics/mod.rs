@@ -23,9 +23,9 @@ const GRAVITY: Vector = Vector {
 /// Frames (updates) a rb must rest before beginning sleep
 const SLEEP_TIMER: u8 = 10;
 /// min velocity needed to reset sleep timer
-const WAKE_VEL_SQR: f32 = 0.1;
+const WAKE_VEL_SQR: f32 = 0.05;
 /// min angular velocity needed to reset sleep timer
-const WAKE_BIVEL_SQR: f32 = 0.1;
+const WAKE_BIVEL_SQR: f32 = 0.05;
 
 /// Invert a othonormal model matrix that has no skew
 ///

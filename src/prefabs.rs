@@ -8,7 +8,7 @@ use cgmath::{InnerSpace, Quaternion, Rad, Rotation3, Vector3};
 
 use crate::{
     game_objects::{
-        MaterialSwapper, Rotate, WorldLoader, light::PointLightComponent, movement::Walker, transform::TransformCreateInfo,
+        MaterialSwapper, Rotate, WorldLoader, light::PointLightComponent, movement::{PlayerWalkerController, Walker}, transform::TransformCreateInfo,
     }, load_object, load_transform_and_object, physics::{CuboidCollider, RigidBody}, render::resource_manager::{MaterialID::*, MeshID::*, TextureID},
 };
 
@@ -369,8 +369,8 @@ pub fn init_char_test(mut loader: WorldLoader) {
     let ro = loader.resources.load_ro(Cube, yellow_mat, true);
     let walker = Walker {
         target_vel: [0.0, 0.0].into(),
-        max_friction: 10.,
-        rel_feet_pos: [0.0, -1.0, 0.0].into()
+        max_friction: 50.,
+        rel_feet_pos: [0.0, -1.01, 0.0].into()
     };
-    load_object!(loader.world.world, ro, transform, collider, rb, walker);
+    load_object!(loader.world.world, ro, transform, collider, rb, walker, PlayerWalkerController);
 }
