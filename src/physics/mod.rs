@@ -59,7 +59,7 @@ pub struct RigidBody {
 
     pub inv_mass: f32,
     /// sqrt of masses at unit distance on principle axes
-    pub moi: Matrix3<f32>,
+    pub inv_moi: Matrix3<f32>,
     pub gravity_multiplier: f32,
 
     /// heap index of contacts this rb is a part of
@@ -83,7 +83,7 @@ impl RigidBody {
             bivelocity: Vector::zero(),
 
             inv_mass: 1.,
-            moi: Matrix3::one(),
+            inv_moi: Matrix3::one(),
             gravity_multiplier: 1.,
 
             contact_refs: Vec::new(),
@@ -200,7 +200,7 @@ impl RigidBody {
         if self.inv_mass.is_zero() {
             return;
         }
-        self.moi = Matrix3::from_diagonal(scale.map(|c| c * c) / (self.inv_mass * 12.));
+        self.inv_moi = Matrix3::from_diagonal(scale.map(|c| 1. / (c * c)) * (self.inv_mass * 12.));
     }
 
     /// rotational acceleration per impulse at a point (does not include linear acceleration)
@@ -214,7 +214,7 @@ impl RigidBody {
 
         let t = skew(rel_point) * rotation;
 
-        t * self.moi.invert().unwrap() * t.transpose()
+        t * self.inv_moi * t.transpose()
     }
 
     /// angular velocity per impulse at a point
@@ -229,7 +229,7 @@ impl RigidBody {
         // let inv_moi = Matrix3::from_diagonal(self.moi.map(|c| 1. / c));
 
         // rot * inv_moi * rot^T * skew
-        rotation * self.moi.invert().unwrap() * rotation.transpose() * skew(rel_point)
+        rotation * self.inv_moi * rotation.transpose() * skew(rel_point)
     }
 
     pub fn set_old_velocity(&mut self) {
@@ -307,7 +307,7 @@ mod physics_tests {
 
         rb.set_moi_as_cuboid((1., 1., 1.).into());
 
-        println!("WHATS THE VECTOR {:?}", rb.moi);
+        println!("WHATS THE VECTOR {:?}", rb.inv_moi);
 
         // println!(
         //     "(1,0,0): {:?}",
