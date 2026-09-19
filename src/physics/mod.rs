@@ -4,12 +4,11 @@ mod geo_alg;
 // mod geo_alg_com;
 
 use crate::{
-    game_objects::{GameTime, transform::{Transform, TransformID, TransformSystem}}, utilities::math::skew,
+    game_objects::{RunnableMut, transform::{Transform, TransformID, TransformSystem}}, utilities::math::skew,
 };
 use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, One, SquareMatrix, Vector3, Zero};
 use collider::ContactIdPair;
 pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy};
-use legion::{system};
 use std::{
     ops::ControlFlow, sync::{Arc, RwLock, atomic::AtomicUsize},
 };
@@ -264,23 +263,23 @@ impl RigidBody {
     }
 }
 
-#[system(for_each)]
-fn update_rigidbodies(transform_id: &TransformID, rigid_body: &mut Arc<RwLock<RigidBody>>, #[resource] transforms: &mut TransformSystem, #[resource] time: &GameTime) {
-    rigid_body.write().unwrap().update(
-        transforms.get_transform_mut(transform_id).unwrap(),
-        time.0,
-    );
-    // println!(
-    //     "[RB] id: {:?}, model: {:?}",
-    //     transfrom,
-    //     self.transforms.get_global_model(transfrom)
-    // );
-     
+impl RunnableMut for (&TransformID, &mut Arc<RwLock<RigidBody>>) {
+    fn update(self, resources: &mut crate::game_objects::GameResources) {
+        self.1.write().unwrap().update(
+            resources.transforms.get_transform_mut(self.0).unwrap(),
+            resources.last_delta_time,
+        );
+        // println!(
+        //     "[RB] id: {:?}, model: {:?}",
+        //     transfrom,
+        //     self.transforms.get_global_model(transfrom)
+        // );
+    }
 }
-
-#[system(for_each)]
-fn update_old_vel(rigid_body: &mut Arc<RwLock<RigidBody>>) {
-    rigid_body.write().unwrap().set_old_velocity();
+impl RunnableMut for &mut Arc<RwLock<RigidBody>> {
+    fn update(self, resources: &mut crate::game_objects::GameResources) {
+        self.write().unwrap().set_old_velocity();
+    }
 }
 
 #[cfg(test)]

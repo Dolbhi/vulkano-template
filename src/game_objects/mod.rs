@@ -5,13 +5,13 @@ pub mod transform;
 pub mod utility;
 
 pub use camera::Camera;
-pub use game_world::{GameWorld, GameResources, GameTime};
+pub use game_world::{GameWorld, GameResources, GameTime, Runnable, RunnableMut};
 
 use cgmath::{Quaternion, Rad, Vector3, Rotation3};
 
-use crate::{game_objects::{game_world::{Runnable, RunnableMut}}, render::{
+use crate::render::{
     RenderObject, RenderSubmit, resource_manager::{MaterialID, MeshID, ResourceRetriever},
-}};
+};
 
 use self::transform::{TransformCreateInfo, TransformID};
 

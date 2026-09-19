@@ -1,7 +1,7 @@
 use legion::system;
 
 use super::{ray::Ray, BoundingBox, CuboidCollider};
-use crate::{game_objects::transform::{TransformID, TransformSystem}, physics::{ColliderSystem, quick_inverse}};
+use crate::{game_objects::{RunnableMut, transform::{TransformID, TransformSystem}}, physics::{ColliderSystem, quick_inverse}};
 use std::{
     fmt::Debug,
     marker::PhantomData,
@@ -57,13 +57,15 @@ pub struct DepthIter<'a> {
     lifetime: PhantomData<&'a BoundaryVolumeHierachy>,
 }
 
-#[system(for_each)]
-pub fn update_bounds(id: &TransformID, collider: &mut LeafInHierachy, #[resource] transforms: &mut TransformSystem, #[resource] colliders: &mut ColliderSystem) {
-    // update bounds
-    if let Some(transform) = transforms.get_transform(id) {
-        if transform.needs_coll_update {
-            colliders.update(collider, transforms);
-            transforms.reset_coll_update(id);
+
+impl RunnableMut for (&TransformID, &mut LeafInHierachy) {
+    fn update(self, resources: &mut crate::game_objects::GameResources) {
+        // update bounds
+        if let Some(transform) = resources.transforms.get_transform(self.0) {
+            if transform.needs_coll_update {
+                resources.colliders.update(self.1, &mut resources.transforms);
+                resources.transforms.reset_coll_update(self.0);
+            }
         }
     }
 }
