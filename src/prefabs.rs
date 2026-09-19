@@ -368,7 +368,7 @@ pub fn init_char_test(mut loader: WorldLoader) {
     );
     let ro = loader.resources.load_ro(Cube, yellow_mat, true);
     let walker = Walker {
-        target_vel: [1.0, 0.0].into(),
+        target_vel: [0.0, 0.0].into(),
         max_friction: 10.,
         rel_feet_pos: [0.0, -1.0, 0.0].into()
     };

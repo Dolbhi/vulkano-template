@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use crate::{
-    LOGIC_PROFILER, game_objects::movement::Walker, input::InputState, physics::{ColliderSystem, LeafInHierachy, RigidBody},
+    LOGIC_PROFILER, game_objects::movement::{PlayerWalkerController, Walker}, input::InputState, physics::{ColliderSystem, LeafInHierachy, RigidBody},
 };
 
 use super::{
@@ -95,6 +95,7 @@ impl GameWorld {
 
         // physics update
         run_update!(self, (&TransformID, &Rotate));
+        run_update_mut!(self, (&TransformID, &mut Walker, &PlayerWalkerController));
         run_update_mut!(self, (&TransformID, &Walker, &mut Arc<RwLock<RigidBody>>));
         run_update_mut!(self, (&TransformID, &mut Arc<RwLock<RigidBody>>));
 
@@ -122,15 +123,15 @@ impl GameWorld {
         let lerp_time = lerp_start.elapsed().as_micros() as u32;
         let others_start = std::time::Instant::now();
 
-        // move cam
-        self.resources.inputs.move_transform(
-            self.resources.transforms
-                .get_transform_mut(&self.resources.camera.transform)
-                .unwrap(),
-            seconds_passed,
-            CAM_SPEED,
-            SLOW_COEFF,
-        );
+        // // move cam
+        // self.resources.inputs.move_transform(
+        //     self.resources.transforms
+        //         .get_transform_mut(&self.resources.camera.transform)
+        //         .unwrap(),
+        //     seconds_passed,
+        //     CAM_SPEED,
+        //     SLOW_COEFF,
+        // );
 
         run_update!(self, (&TransformID, &TransformTracker));
 

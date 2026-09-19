@@ -1,10 +1,11 @@
 use std::sync::{Arc, RwLock};
 
-use cgmath::{InnerSpace, Vector2, Vector3};
+use cgmath::{InnerSpace, Vector2, Vector3, Zero};
 
 use crate::{game_objects::{RunnableMut, transform::TransformID}, physics::RigidBody};
 
 const WALKER_MAX_GROUND_SEP: f32 = 0.2;
+const PLAYER_WALK_VEL: f32 = 1.0;
 
 /// Attempt to move at target_vel relative to the ground
 pub struct Walker {
@@ -12,6 +13,9 @@ pub struct Walker {
     pub max_friction: f32,
     pub rel_feet_pos: Vector3<f32>,
 }
+
+/// Walker entity will be player controlled
+pub struct PlayerWalkerController;
 
 impl RunnableMut for (&TransformID, &Walker, &mut Arc<RwLock<RigidBody>>) {
     fn update(self, resources: &mut super::GameResources) {
@@ -47,5 +51,31 @@ impl RunnableMut for (&TransformID, &Walker, &mut Arc<RwLock<RigidBody>>) {
 
             rb_guard.apply_impulse_rel([0., 0., 0.].into(), [clamped_impulse.x, 0., clamped_impulse.y].into(), rb_rotation);
         };
+    }
+}
+
+impl RunnableMut for (&TransformID, &mut Walker, &PlayerWalkerController) {
+    fn update(self, resources: &mut super::GameResources) {
+        let mut movement = Vector3::zero();
+        // let mut y_movement = 0.;
+        if resources.inputs.w.get_just_pressed() {
+            movement.z -= 1.; // forward
+        } else if resources.inputs.s.get_just_pressed() {
+            movement.z += 1.; // backwards
+        }
+        if resources.inputs.a.get_just_pressed() {
+            movement.x -= 1.; // left
+        } else if resources.inputs.d.get_just_pressed() {
+            movement.x += 1.; // right
+        }
+
+        if movement.is_zero() {
+            self.1.target_vel = [0., 0.].into();
+            return;
+        }
+
+        let movement = resources.transforms.get_global_rotation(self.0).unwrap() * movement;
+        let movement = Vector2::new(movement.x, movement.z);
+        self.1.target_vel = movement.normalize_to(PLAYER_WALK_VEL);
     }
 }
