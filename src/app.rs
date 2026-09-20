@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cgmath::{InnerSpace, Matrix3, One, Quaternion, SquareMatrix, Vector3, Vector4};
+use cgmath::{InnerSpace, Matrix3, One, Quaternion, Vector3, Vector4};
 use legion::*;
 
 // use rand::Rng;
