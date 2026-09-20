@@ -27,25 +27,6 @@ const WAKE_VEL_SQR: f32 = 0.1;
 /// min angular velocity needed to reset sleep timer
 const WAKE_BIVEL_SQR: f32 = 0.1;
 
-/// Invert a othonormal model matrix that has no skew
-///
-/// Assumes matrix is normalised (model.w.w == 1)
-#[allow(dead_code)]
-pub fn quick_inverse(model: &mut Matrix4<f32>) {
-    // reverse translation
-    model.w *= -1.;
-    model.w.w = 1.;
-
-    // reverse rotation and scale
-    for i in [0, 1, 2] {
-        let m_2 = model[i].magnitude2();
-        model[i] /= m_2;
-    }
-    model.swap_elements((0, 1), (1, 0));
-    model.swap_elements((1, 2), (2, 1));
-    model.swap_elements((2, 0), (0, 2));
-}
-
 #[allow(dead_code)]
 pub fn matrix_truncate(model: &Matrix4<f32>) -> Matrix3<f32> {
     Matrix3::from_cols(model.x.truncate(), model.y.truncate(), model.z.truncate())
@@ -154,6 +135,9 @@ impl RigidBody {
         self.sleep_timer != 0
     }
 
+    /// Apply impulse at a point relative to the target frame
+    /// 
+    /// impulse is in global space and rotation is the target's own rotation
     pub fn apply_impulse_rel(
         &mut self,
         rel_point: Vector,
@@ -178,13 +162,16 @@ impl RigidBody {
         // );
     }
 
+    /// Point and impulse are both in world space
+    /// 
+    /// Returns an error if the rb's transform cannot be found
     pub fn apply_impulse_global(
         &mut self,
         point: Vector,
         impulse: Vector,
-        transform: &mut TransformSystem,
+        transforms: &mut TransformSystem,
     ) -> Result<(),()> {
-        let transform_view = transform.get_transform(&self.transform).ok_or(())?.get_local_transform();
+        let transform_view = transforms.get_transform(&self.transform).ok_or(())?.get_local_transform();
         self.apply_impulse_rel(point - transform_view.translation, impulse, *transform_view.rotation);
         Ok(())
     }
@@ -277,7 +264,7 @@ impl RunnableMut for (&TransformID, &mut Arc<RwLock<RigidBody>>) {
     }
 }
 impl RunnableMut for &mut Arc<RwLock<RigidBody>> {
-    fn update(self, resources: &mut crate::game_objects::GameResources) {
+    fn update(self, _: &mut crate::game_objects::GameResources) {
         self.write().unwrap().set_old_velocity();
     }
 }
@@ -286,10 +273,10 @@ impl RunnableMut for &mut Arc<RwLock<RigidBody>> {
 mod physics_tests {
     use std::f32::consts::PI;
 
-    use cgmath::{Matrix3, One, Quaternion, Vector3};
+    use cgmath::{InnerSpace, Matrix3, Matrix4, One, Quaternion, Rad, SquareMatrix, Vector3};
 
     use crate::game_objects::transform::TransformSystem;
-    use crate::physics::RigidBody;
+    use crate::physics::{RigidBody};
 
     #[test]
     fn quat_convert() {
@@ -358,5 +345,20 @@ mod physics_tests {
                     z: 1.
                 }
         );
+    }
+
+    #[test]
+    fn quick_inv() {
+        let rot = Matrix4::from_axis_angle(Vector3 { x: 1., y: 1., z: 0. }.normalize(), Rad(1.2));
+        let scale = Matrix4::from_nonuniform_scale(0.2, 0.4, 2.);
+        let translate = Matrix4::from_translation((10., -2., -5.).into());
+
+        let model = translate * scale * rot;
+        let inv = model.invert().unwrap();
+
+        println!("Model: {:?}", model);
+        println!("Inv: {:?}", inv);
+        println!("One?: {:?}", inv * model);
+        assert!((inv * model).is_one());
     }
 }

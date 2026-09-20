@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cgmath::{InnerSpace, Matrix3, One, Quaternion, Vector3, Vector4};
+use cgmath::{InnerSpace, Matrix3, One, Quaternion, SquareMatrix, Vector3, Vector4};
 use legion::*;
 
 // use rand::Rng;
@@ -20,7 +20,7 @@ use winit::{
 use crate::{
     LOGIC_PROFILER, RENDER_PROFILER, game_objects::{
         Camera, GameResources, GameWorld, MaterialSwapper, WorldLoader, light::PointLightComponent, transform::{TransformCreateInfo, TransformID},
-    }, input::InputState, load_object, physics::{CuboidCollider, RigidBody, quick_inverse}, prefabs::{init_char_test, init_phys_test, init_ui_test, init_world}, render::{DeferredRenderer, RenderLoop, RenderObject, resource_manager::ResourceManager}, shaders::{DirectionLight, GPUAABB, GPUGlobalData}, ui::{self, MenuOption},
+    }, input::InputState, load_object, physics::{CuboidCollider, RigidBody}, prefabs::{init_char_test, init_phys_test, init_ui_test, init_world}, render::{DeferredRenderer, RenderLoop, RenderObject, resource_manager::ResourceManager}, shaders::{DirectionLight, GPUAABB, GPUGlobalData}, ui::{self, MenuOption},
 };
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
@@ -232,22 +232,26 @@ impl App {
 
                         if inputs.lmb.consume_button_down() {
                             if let Some(rigidbody) = coll.get_rigidbody() {
-                                let mut model =
-                                    transforms.get_global_model(coll.get_transform()).unwrap();
-                                quick_inverse(&mut model);
-                                // let normal = CuboidCollider::point_normal(point, &model).normalize();
-
-                                let rotation = transforms
-                                    .get_transform(coll.get_transform())
-                                    .unwrap()
-                                    .get_local_transform()
-                                    .rotation;
-                                let point = point + model.w.truncate();
-                                rigidbody.write().unwrap().apply_impulse_rel(
+                                rigidbody.write().unwrap().apply_impulse_global(
                                     point,
                                     -1.5 * cam_model.z.truncate().normalize(),
-                                    *rotation,
+                                    transforms,
                                 );
+                                // let model =
+                                //     transforms.get_global_model(coll.get_transform()).unwrap().invert().unwrap();
+                                // // let normal = CuboidCollider::point_normal(point, &model).normalize();
+
+                                // let rotation = transforms
+                                //     .get_transform(coll.get_transform())
+                                //     .unwrap()
+                                //     .get_local_transform()
+                                //     .rotation;
+                                // let point = point + model.w.truncate();
+                                // rigidbody.write().unwrap().apply_impulse_rel(
+                                //     point,
+                                //     -1.5 * cam_model.z.truncate().normalize(),
+                                //     *rotation,
+                                // );
                             }
                         }
                     }
