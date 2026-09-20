@@ -2,6 +2,7 @@ use super::{collider::ContactIdPair, geo_alg::bivec_exp, RigidBody, Vector};
 use crate::{game_objects::transform::TransformSystem, utilities::MaxHeap};
 use cgmath::{InnerSpace, Matrix3, One, SquareMatrix};
 use std::sync::{atomic::AtomicUsize, Arc, RwLock};
+use log::{debug, warn};
 
 const PEN_RESTITUTION: f32 = 1.; // useless for now
 const MIN_BOUNCE_VEL: f32 = 0.5; // time step dependent
@@ -77,8 +78,8 @@ impl ContactResolver {
     }
 
     pub fn resolve(&mut self, transform_system: &mut TransformSystem, delta_seconds: f32) {
-        println!("-----Resolve Start-----");
-        self.resolve_penetration(transform_system);
+        debug!("----- Contacts Resolution Start -----");
+        self.resolve_penetrations(transform_system);
 
         // re-insert contacts with velocity as value
         for (index, contact) in self.settled_contacts.drain(..) {
@@ -89,39 +90,37 @@ impl ContactResolver {
             );
         }
 
-        self.resolve_velocity(delta_seconds);
+        self.resolve_velocities(delta_seconds);
 
         self.clear();
     }
 
     /// each contact is only considered once for penetration resolution
-    fn resolve_penetration(&mut self, transform_system: &mut TransformSystem) {
+    fn resolve_penetrations(&mut self, transform_system: &mut TransformSystem) {
         while let Some((index, contact)) = self.pending_contacts.extract_min() {
             if contact.penetration < 0. {
                 self.settled_contacts.push((index, contact));
                 break;
             }
 
-            // println!(
-            //     "[Penetration resolution start]\n\tpos: {:?},\n\tnormal: {:?},\n\tpen: {:?},\n\tage: {:?},\n\tid: {:?}",
-            //     contact.position, contact.normal, contact.penetration, contact.age, contact.contact_id
-            // );
-            // println!(
-            //     "\t[rb1]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
-            //     contact.rb_1.relative_pos,
-            //     contact.rb_1.torque_per_impulse,
-            //     contact.rb_1.linear_inertia,
-            //     contact.rb_1.angular_inertia,
-            // );
+            debug!("(Penetration resolution start)\n\tpos: {:?},\n\tnormal: {:?},\n\tpen: {:?},\n\tage: {:?},\n\tid: {:?}",
+                contact.position, contact.normal, contact.penetration, contact.age, contact.contact_id);
+            debug!(
+                "(Penetration resolution: RB 1)\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
+                contact.rb_1.relative_pos,
+                contact.rb_1.torque_per_impulse,
+                contact.rb_1.linear_inertia,
+                contact.rb_1.angular_inertia,
+            );
 
             if let Some(rb_2) = &contact.rb_2 {
-                // println!(
-                //     "\t[rb2]\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
-                //     rb_2.relative_pos,
-                //     rb_2.torque_per_impulse,
-                //     rb_2.linear_inertia,
-                //     rb_2.angular_inertia,
-                // );
+                debug!(
+                    "(Penetration resolution: RB 2)\n\t\trel_pos: {:?},\n\t\tt_per_i: {:?},\n\t\tl_inertia: {:?},\n\t\ta_inertia: {:?}",
+                    rb_2.relative_pos,
+                    rb_2.torque_per_impulse,
+                    rb_2.linear_inertia,
+                    rb_2.angular_inertia,
+                );
 
                 // calculate move
                 contact.rb_1.resolve_penetration(
@@ -151,7 +150,7 @@ impl ContactResolver {
             self.settled_contacts.push((index, contact));
         }
     }
-    fn resolve_velocity(&mut self, delta_seconds: f32) {
+    fn resolve_velocities(&mut self, delta_seconds: f32) {
         let mut iters = 0;
         while let Some((index, mut contact)) = self.pending_contacts.extract_min() {
             if iters > VELOCITY_ITER_LIMIT
@@ -162,21 +161,21 @@ impl ContactResolver {
             }
             iters += 1;
 
-            // println!(
-            //     "~~~ Velocity resolution iter {:?} ~~~\n\tpos: {:?},\n\tnormal: {:?},\n\ttgt_dv: {:?},\n\tage: {:?}",
-            //     iters, contact.position, contact.normal, contact.target_delta_velocity, contact.age
-            // );
-            // println!(
-            //     "[rb1]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
-            //     contact.rb_1.point_vel,
-            //     contact.rb_1.torque_per_impulse,
-            //     contact.rb_1.linear_inertia,
-            //     contact.rb_1.angular_inertia,
-            //     contact.rb_1.relative_pos
-            // );
+            debug!(
+                "(Velocity resolution iter {:?})\n\tpos: {:?},\n\tnormal: {:?},\n\ttgt_dv: {:?},\n\tage: {:?}",
+                iters, contact.position, contact.normal, contact.target_delta_velocity, contact.age
+            );
+            debug!(
+                "(Velocity resolution: RB 1)\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
+                contact.rb_1.point_vel,
+                contact.rb_1.torque_per_impulse,
+                contact.rb_1.linear_inertia,
+                contact.rb_1.angular_inertia,
+                contact.rb_1.relative_pos
+            );
 
             let impulse = contact.inv_total_inertia * contact.target_delta_velocity;
-            // println!("\tStatic impulse: {:?}", impulse);
+            debug!("(Velocity resolution) Static impulse: {:?}", impulse);
             let impulse_r = impulse.dot(contact.normal);
             let impulse_r2 = impulse_r * impulse_r;
             // if target tangent impulse > max static fric impulse then use dynamic fric instead
@@ -189,13 +188,13 @@ impl ContactResolver {
 
                 let final_impulse = contact.inv_total_inertia * (tangent_vel + normal_spd * contact.normal);
 
-                println!("[debug] Using dynamic friction ({:?}) ({:?})", final_impulse, impulse);
+                debug!("(Velocity resolution: friction) Using dynamic friction ({:?}) ({:?})", final_impulse, impulse);
                 final_impulse
             } else {
-                println!("[debug] Using static friction ({:?})", impulse);
+                debug!("(Velocity resolution: friction) Using static friction ({:?})", impulse);
                 impulse
             };
-            // println!("\tfinal impulse: {:?}", impulse);
+            debug!("(Velocity resolution) Final impulse: {:?}", impulse);
 
             if let Some(rb_2) = &contact.rb_2 {
                 // calculate inertia
@@ -205,14 +204,14 @@ impl ContactResolver {
                     &mut self.pending_contacts,
                 );
 
-                // println!(
-                //     "[rb2]\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
-                //     rb_2.point_vel,
-                //     rb_2.torque_per_impulse,
-                //     rb_2.linear_inertia,
-                //     rb_2.angular_inertia,
-                //     rb_2.relative_pos
-                // );
+                debug!(
+                    "(Velocity resolution: RB 2)\n\tpoint_vel: {:?},\n\tt_per_i: {:?},\n\tl_inertia: {:?},\n\ta_inertia: {:?},\n\trel_pos: {:?}",
+                    rb_2.point_vel,
+                    rb_2.torque_per_impulse,
+                    rb_2.linear_inertia,
+                    rb_2.angular_inertia,
+                    rb_2.relative_pos
+                );
                 rb_2.apply_velocity_resolution(impulse, &mut self.pending_contacts);
             // contact.normal,
             } else {
@@ -248,10 +247,10 @@ impl ContactResolver {
             }
             // contact.target_delta_velocity =
             //     contact.target_delta_velocity.dot(contact.normal) * contact.normal;
-            // println!(
-            //     "\t[Velocity final results] new target vel: {:?}",
-            //     contact.target_delta_velocity
-            // );
+            debug!(
+                "(Velocity resolution: result) new target vel: {:?}",
+                contact.target_delta_velocity
+            );
 
             self.pending_contacts.insert_with_ref(
                 contact.target_delta_velocity.dot(contact.normal).into(),
@@ -518,19 +517,19 @@ impl RigidBodyRef {
         let angular_move_rad = angular_move.magnitude() / self.relative_pos.magnitude();
         if angular_move_rad > ANGULAR_MOVE_LIMIT_RAD {
             let excess = angular_move * (1.0 - (ANGULAR_MOVE_LIMIT_RAD / angular_move_rad));
-            // println!(
-            //     "\t[Penetration resolution] rotation limit hit! Excess: {:?}",
-            //     excess
-            // );
+            warn!(
+                "(Penetration resolution) rotation limit hit! Excess: {:?}",
+                excess
+            );
             angular_move -= excess;
             linear_move += excess;
         }
         let angular_rot = -angular_move.cross(self.relative_pos) / (self.relative_pos.magnitude2());
 
-        // println!(
-        //     "\t[Penetration resolution] move: {:?}, rotate: {:?}",
-        //     linear_move, angular_rot
-        // );
+        debug!(
+            "(Penetration resolution: result) move: {:?}, rotate: {:?}",
+            linear_move, angular_rot
+        );
 
         // apply move
         let guard_1 = self.rigidbody.read().unwrap();
@@ -541,10 +540,6 @@ impl RigidBodyRef {
                 *translation += linear_move;
                 *rotation = bivec_exp(angular_rot * 0.5).into_quaternion() * *rotation;
             });
-        // println!(
-        //     "[Debug] Post pen resolve model: {:?}",
-        //     transform_system.get_global_model(&guard_1.transform)
-        // );
 
         // update penetration of contacts on the same rb
         for (i, other_index) in guard_1.contact_refs.iter().enumerate() {
@@ -588,10 +583,10 @@ impl RigidBodyRef {
         // guard_1.velocity += linear_accel;
         // guard_1.bivelocity += angular_accel;
 
-        // println!(
-        //     "\t[Velocity results]\n\t\tlinear: {:?},\n\t\tangular: {:?}",
-        //     guard_1.velocity, guard_1.bivelocity
-        // );
+        debug!(
+            "(Velocity resolution: result)\n\t\tlinear: {:?},\n\t\tangular: {:?}",
+            guard_1.velocity, guard_1.bivelocity
+        );
 
         // update penetration of contacts on the same rb
         for (i, contact_index) in guard_1.contact_refs.iter().enumerate() {
@@ -629,58 +624,6 @@ impl RigidBodyRef {
             }
         }
     }
-
-    // fn negate_velocity(&self, normal: Vector, other_vel: Vector, pending_contacts: &mut MaxHeap<OrdF32, Contact>) {
-    //     let linear_accel = self.point_vel * normal;
-    //     let angular_accel =
-    //         angular_accel * self.torque_per_impulse / self.relative_pos.magnitude2();
-
-    //     println!(
-    //         "\t[Velocity resolution] linear: {:?}, angular: {:?}",
-    //         linear_accel, angular_accel
-    //     );
-
-    //     // apply move
-    //     let mut guard_1 = self.rigidbody.write().unwrap();
-    //     guard_1.velocity += linear_accel;
-    //     guard_1.bivelocity += angular_accel;
-
-    //     println!(
-    //         "\t[Velocity results] linear: {:?}, angular: {:?}",
-    //         guard_1.velocity, guard_1.bivelocity
-    //     );
-
-    //     // update penetration of contacts on the same rb
-    //     for (i, other_index) in guard_1.contact_refs.iter().enumerate() {
-    //         // could compare heap index Arc instead
-    //         if i == self.index {
-    //             // skip self
-    //             continue;
-    //         }
-
-    //         let other_index_loaded = other_index.load(std::sync::atomic::Ordering::Acquire);
-    //         if other_index_loaded != usize::MAX {
-    //             //< pending_contacts.len() {
-    //             pending_contacts.modify_key(other_index_loaded, |other_contact| {
-    //                 let (norm_mult, other_rb) =
-    //                     if Arc::ptr_eq(&self.rigidbody, &other_contact.rb_1.rigidbody) {
-    //                         (1., &mut other_contact.rb_1)
-    //                     } else {
-    //                         (-1., other_contact.rb_2.as_mut().unwrap()) // please
-    //                     };
-
-    //                 let old_rel_vel = other_rb.point_vel;
-    //                 let new_rel_vel = guard_1.point_velocity(other_rb.relative_pos);
-    //                 other_rb.point_vel = new_rel_vel;
-
-    //                 other_contact.target_delta_velocity +=
-    //                     norm_mult * other_contact.normal.dot(new_rel_vel - old_rel_vel);
-
-    //                 other_contact.target_delta_velocity.into()
-    //             });
-    //         }
-    //     }
-    // }
 }
 
 impl Eq for OrdF32 {}

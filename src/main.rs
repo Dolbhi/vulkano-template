@@ -4,6 +4,8 @@ use vulkano_template::app::App;
 // use winit::keyboard::PhysicalKey;
 
 fn main() {
+    env_logger::init();
+
     let event_loop = EventLoop::new().unwrap(); //.unwrap();
     let mut app = App::start();
 
