@@ -232,7 +232,7 @@ impl App {
 
                         if inputs.lmb.consume_button_down() {
                             if let Some(rigidbody) = coll.get_rigidbody() {
-                                rigidbody.write().unwrap().apply_impulse_global(
+                                let _ = rigidbody.write().unwrap().apply_impulse_global(
                                     point,
                                     -1.5 * cam_model.z.truncate().normalize(),
                                     transforms,
