@@ -237,21 +237,6 @@ impl App {
                                     -1.5 * cam_model.z.truncate().normalize(),
                                     transforms,
                                 );
-                                // let model =
-                                //     transforms.get_global_model(coll.get_transform()).unwrap().invert().unwrap();
-                                // // let normal = CuboidCollider::point_normal(point, &model).normalize();
-
-                                // let rotation = transforms
-                                //     .get_transform(coll.get_transform())
-                                //     .unwrap()
-                                //     .get_local_transform()
-                                //     .rotation;
-                                // let point = point + model.w.truncate();
-                                // rigidbody.write().unwrap().apply_impulse_rel(
-                                //     point,
-                                //     -1.5 * cam_model.z.truncate().normalize(),
-                                //     *rotation,
-                                // );
                             }
                         }
                     }
