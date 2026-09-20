@@ -39,12 +39,9 @@ impl Ray {
     ///
     /// Resulting ray is not normalised
     pub fn transform_model(&mut self, model: &Matrix4<f32>) {
-        self.origin += model.w.truncate();
-        // self.origin = (model * self.origin.extend(1.)).truncate();
-
-        let rotation = matrix_truncate(model);
-        self.origin = rotation * self.origin;
-        self.direction = rotation * self.direction;
+        // self.origin += model.w.truncate();
+        self.origin = (model * self.origin.extend(1.)).truncate();
+        self.direction = matrix_truncate(model) * self.direction;
 
         // let end = self.calc_point(self.distance);
         // let end = (model * end.extend(1.)).truncate();
