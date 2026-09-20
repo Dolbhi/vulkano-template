@@ -9,6 +9,7 @@ use crate::{
 use cgmath::{InnerSpace, Matrix, Matrix3, Matrix4, One, SquareMatrix, Vector3, Zero};
 use collider::ContactIdPair;
 pub use collider::{ColliderSystem, CuboidCollider, LeafInHierachy};
+use log::debug;
 use std::{
     ops::ControlFlow, sync::{Arc, RwLock, atomic::AtomicUsize},
 };
@@ -104,17 +105,17 @@ impl RigidBody {
             self.bivelocity = Vector::zero();
         }
 
-        // println!(
-        //     "[RB Post Update] ({:?})\n\tpos: {:?}\n\trot: {:?}\n\tvel: {:?}({:?})\n\tbiv: {:?}({:?})\n\tsleep_timer: {:?}",
-        //     self.transform,
-        //     transform.get_local_transform().translation,
-        //     transform.get_local_transform().rotation,
-        //     self.velocity,
-        //     self.velocity.magnitude(),
-        //     self.bivelocity,
-        //     self.bivelocity.magnitude(),
-        //     self.sleep_timer
-        // );
+        debug!(
+            "(RB update) id:{:?}\n\tpos: {:?}\n\trot: {:?}\n\tvel: {:?}({:?})\n\tbiv: {:?}({:?})\n\tsleep_timer: {:?}",
+            self.transform,
+            transform.get_local_transform().translation,
+            transform.get_local_transform().rotation,
+            self.velocity,
+            self.velocity.magnitude(),
+            self.bivelocity,
+            self.bivelocity.magnitude(),
+            self.sleep_timer
+        );
 
         self.contact_refs.clear();
         if self.caching_contacts {
@@ -122,8 +123,6 @@ impl RigidBody {
         } else {
             self.past_contacts.clear();
         }
-
-        // println!("MASSES: {:?}", self.sqrt_angular_mass);
     }
 
     /// reset internal sleep timer to wake rb
@@ -156,10 +155,10 @@ impl RigidBody {
             self.wake();
         }
 
-        // println!(
-        //     "[Point impulse] ({:?})\n\timpulse: {:?}\n\tnew_v: {:?}\n\tnew_b: {:?}",
-        //     self.transform, impulse, self.velocity, self.bivelocity,
-        // );
+        debug!(
+            "(RB impulse) id:{:?}\n\timpulse: {:?}\n\tnew_v: {:?}\n\tnew_b: {:?}",
+            self.transform, impulse, self.velocity, self.bivelocity,
+        );
     }
 
     /// Point and impulse are both in world space
