@@ -19,7 +19,7 @@ use winit::{
 
 use crate::{
     LOGIC_PROFILER, RENDER_PROFILER, game_objects::{
-        Camera, GameResources, GameWorld, MaterialSwapper, WorldLoader, light::PointLightComponent, transform::{TransformCreateInfo, TransformID},
+        GameResources, GameWorld, MaterialSwapper, WorldLoader, light::PointLightComponent, transform::{TransformCreateInfo, TransformID},
     }, input::InputState, load_object, physics::{CuboidCollider, RigidBody}, prefabs::{init_char_test, init_phys_test, init_ui_test, init_world}, render::{DeferredRenderer, RenderLoop, RenderObject, resource_manager::ResourceManager}, shaders::{DirectionLight, GPUAABB, GPUGlobalData}, ui::{self, MenuOption},
 };
 
