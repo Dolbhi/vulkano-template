@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use cgmath::{InnerSpace, Vector3, Zero};
+use log::warn;
 
 // const MAX_COUNTER_DV: f32 = -1.;
 const MAX_SQR_VEL: f32 = 200.;
@@ -26,7 +27,7 @@ impl VectorDamp {
         self.last_time = Instant::now();
         // lag too large, snap to target
         if elapsed_time > 2.0 / self.strength {
-            println!("[Warning] Lerp lag (elapsed time:{elapsed_time}), snapping to target");
+            warn!("(VectorDamp) Lerp lag (elapsed time:{elapsed_time}), snapping to target");
             self.velocity = Vector3::zero();
             return target;
         }
@@ -43,7 +44,7 @@ impl VectorDamp {
         self.velocity += delta_vel;
         let sqr_vel = self.velocity.magnitude2();
         if sqr_vel > MAX_SQR_VEL {
-            println!("[Warning] Vel maxed out, square vel: {sqr_vel}");
+            warn!("(VectorDamp) Vel maxed out, square vel: {sqr_vel}");
             self.velocity *= (MAX_SQR_VEL / sqr_vel).sqrt();
         }
 
