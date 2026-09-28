@@ -77,7 +77,7 @@ impl App {
             game_state: Default::default(),
             last_frame_time: Instant::now(),
             current_level: -1,
-            bounds_debug_depth: None,
+            bounds_debug_depth: Some(0),
         }
     }
 
