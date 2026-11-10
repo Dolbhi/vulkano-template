@@ -18,9 +18,19 @@ use winit::{
 };
 
 use crate::{
-    LOGIC_PROFILER, RENDER_PROFILER, game_objects::{
-        Camera, GameResources, GameWorld, MaterialSwapper, WorldLoader, light::PointLightComponent, transform::{TransformCreateInfo, TransformID},
-    }, input::InputState, load_object, physics::{ColliderSystem, CuboidCollider, RigidBody}, prefabs::{init_char_test, init_phys_test, init_ui_test, init_world}, render::{DeferredRenderer, RenderLoop, RenderObject, resource_manager::ResourceManager}, shaders::{DirectionLight, GPUAABB, GPUGlobalData}, ui::{self, MenuOption},
+    game_objects::{
+        light::PointLightComponent,
+        transform::{TransformCreateInfo, TransformID},
+        GameResources, GameWorld, MaterialSwapper, WorldLoader,
+    },
+    input::InputState,
+    load_object,
+    physics::{ColliderSystem, CuboidCollider, RigidBody},
+    prefabs::{init_char_test, init_phys_test, init_ui_test, init_world},
+    render::{resource_manager::ResourceManager, DeferredRenderer, RenderLoop, RenderObject},
+    shaders::{DirectionLight, GPUGlobalData, GPUAABB},
+    ui::{self, MenuOption},
+    LOGIC_PROFILER, RENDER_PROFILER,
 };
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
@@ -155,14 +165,15 @@ impl App {
                 .update(&mut graphics.renderer, |renderer, image_i, context| {
                     let GameWorld {
                         world,
-                        resources: GameResources {
-                            transforms,
-                            colliders,
-                            camera,
-                            fixed_seconds,
-                            last_delta_time,
-                            inputs,
-                        },
+                        resources:
+                            GameResources {
+                                transforms,
+                                colliders,
+                                camera,
+                                fixed_seconds,
+                                last_delta_time,
+                                inputs,
+                            },
                         ..
                     } = &mut *self.world.lock().unwrap();
                     transforms.update_interpolation(*last_delta_time);
@@ -210,7 +221,8 @@ impl App {
                         rigidbody.set_moi_as_cuboid((1., 1., 1.).into());
                         let rigidbody = Arc::new(RwLock::new(rigidbody));
 
-                        let collider = CuboidCollider::new(transform, Some(rigidbody.clone()), 2., 1.7);
+                        let collider =
+                            CuboidCollider::new(transform, Some(rigidbody.clone()), 2., 1.7);
                         let inserted_collider = colliders.add(collider, transforms);
 
                         let mut resource_loader =
@@ -258,13 +270,18 @@ impl App {
                         inputs.mouse_move = [0., 0.].into();
 
                         // only move cam directly if it is unparented
-                        if transforms.get_transform(&camera.transform).unwrap().get_parent().is_none() {
+                        if transforms
+                            .get_transform(&camera.transform)
+                            .unwrap()
+                            .get_parent()
+                            .is_none()
+                        {
                             // move cam
                             inputs.move_transform(
                                 transforms.get_transform_mut(&camera.transform).unwrap(),
                                 Instant::now()
-                                .duration_since(self.last_frame_time)
-                                .as_secs_f32(),
+                                    .duration_since(self.last_frame_time)
+                                    .as_secs_f32(),
                                 6.,
                                 0.1,
                             );
@@ -280,15 +297,20 @@ impl App {
                     {
                         // update basic render objects
                         // println!("==== RENDER OBJECT DATA ====");
-                        <(&TransformID, &mut RenderObject<()>)>::query().for_each_mut(world, |(transform_id, render_object)| {
-                            render_object.update_and_upload(transform_id, transforms);
-                        });
+                        <(&TransformID, &mut RenderObject<()>)>::query().for_each_mut(
+                            world,
+                            |(transform_id, render_object)| {
+                                render_object.update_and_upload(transform_id, transforms);
+                            },
+                        );
 
                         // println!("==== RENDER COLORED DATA ====");
-                        <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query().for_each_mut(world, |(transform_id, render_object)| {
-                            render_object.update_and_upload(transform_id, transforms);
-                        });
-                        
+                        <(&TransformID, &mut RenderObject<Vector4<f32>>)>::query().for_each_mut(
+                            world,
+                            |(transform_id, render_object)| {
+                                render_object.update_and_upload(transform_id, transforms);
+                            },
+                        );
                     }
 
                     // get frame data struct for upload
@@ -478,10 +500,8 @@ fn build_debug_box_data(
             [0., 1., 1., 1.]
         };
 
-        let min_cast: [f32; 3] =
-            (position - Vector3::new(0.03, 0.03, 0.03)).into();
-        let max_cast: [f32; 3] =
-            (position + Vector3::new(0.03, 0.03, 0.03)).into();
+        let min_cast: [f32; 3] = (position - Vector3::new(0.03, 0.03, 0.03)).into();
+        let max_cast: [f32; 3] = (position + Vector3::new(0.03, 0.03, 0.03)).into();
         bounding_boxes.push(GPUAABB {
             min: min_cast.into(),
             max: max_cast.into(),
@@ -526,8 +546,7 @@ fn build_debug_box_data(
                 let p = d + pos;
                 GPUAABB {
                     min: Into::<[f32; 3]>::into(p).into(),
-                    max: Into::<[f32; 3]>::into(p + read.point_velocity(d) * 0.2)
-                        .into(),
+                    max: Into::<[f32; 3]>::into(p + read.point_velocity(d) * 0.2).into(),
                     color: [1., 0., 0., 1.],
                 }
             })
